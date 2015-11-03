@@ -8,6 +8,23 @@ body, html {
 	left: 0;
 	top: 0;
 }
+#login {
+	position: fixed;
+	left: 0;
+	top: 0;
+}
+.login {
+	width: 150px;
+	height: 30px;
+	line-height: 30px;
+	margin: .5em;
+}
+#login {
+	border-radius: 15px;
+	box-shadow: 3px 3px 15px 3px gray;
+	background: white;
+	padding: 1em;
+}
 .tab {
 	display: inline-block;
 }
@@ -20,3 +37,9 @@ body, html {
 <div class="tab"><a href='https://www.reddit.com/r/tinybiome'>Discuss on Reddit</a></div>
 <div class="tab" id="err">Any errors will appear here.</div>
 </div>
+
+	<div id='login'>
+		<div class='login'><center>Tiny Biome</center></div>
+		<div><input class='login' id='name' /></div>
+		<div><button class='login' id='loginButton'>Play!</button></div>
+	</div>

@@ -2,7 +2,6 @@ package client
 
 import (
 	"log"
-	"math/rand"
 	"sync"
 	"time"
 )
@@ -99,10 +98,9 @@ func (r *Room) Accept(p Protocol) {
 		player.Net.WriteNewActor(oActor)
 	}
 	r.emuLock.RUnlock()
-	player.NewActor(rand.Intn(r.Width), rand.Intn(r.Height), r.StartMass)
 
 	for {
-		reason := p.GetMessage(r)
+		reason := p.GetMessage(player)
 		if reason != nil {
 			log.Println("REMOVING BECAUSE", reason)
 			break

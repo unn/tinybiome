@@ -1,14 +1,17 @@
-ws = new WebSocket("ws://"+document.location.hostname+":5000");
-ws.onerror = function() {
-	ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
-}
-ws.onclose = function() {
-	ohno("Websocket Closed?")
-}
-ws.onmessage = function(m) {
-	v = JSON.parse(m.data)
-	readMessage(v)
-}
+
+	ws = new WebSocket("ws://"+document.location.hostname+":5000");
+	ws.onerror = function() {
+		ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
+	}
+	ws.onclose = function() {
+		ohno("Websocket Closed?")
+	}
+	ws.onmessage = function(m) {
+		v = JSON.parse(m.data)
+		readMessage(v)
+	}
+
+
 function readMessage(v) {
 	switch (v["type"]) {
 	case "new":
@@ -34,6 +37,11 @@ function readMessage(v) {
 
 		for(var i=0; i<owns.length; i++) {
 			actors[owns[i]].owned = true
+		}
+		if (owns.length==0) {
+			document.getElementById("login").style.display="block";
+		} else {
+			document.getElementById("login").style.display="none";
 		}
 		break;
 	case "room":
@@ -167,7 +175,21 @@ function ohno(x) {
 	var errs = document.getElementById("err");
 	errs.innerHTML = x;
 }
-window.onload = window.onresize = function() {
+var popup;
+window.onload = function() {
+	window.onresize();
+	document.getElementById("loginButton").onclick = function() {
+		console.log("JOINING")
+		join = {type:"join"}
+		ws.send(JSON.stringify(join))
+	}
+}
+
+window.onresize = function() {
+    popup = document.getElementById("login");
+    popup.style.left = ""+String(window.innerWidth/2 - popup.offsetWidth/2)+"px";
+    popup.style.top = ""+String(window.innerHeight/2 - popup.offsetHeight/2)+"px";
+    console.log("Left",window.innerWidth/2 - popup.innerWidth/2);
     c.width = window.innerWidth;
     c.height = window.innerHeight;   
     camera.width = c.width;

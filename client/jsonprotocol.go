@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"strings"
 )
 
 type Protocol interface {
-	GetMessage(*Room) error
+	GetMessage(*Player) error
 	WriteNewActor(*Actor)
 	WriteDestroyActor(*Actor)
 	WriteOwns(*Player)
@@ -35,7 +36,8 @@ func NewJsonProtocol(ws io.ReadWriter) Protocol {
 }
 
 // runs in a goroutine
-func (s *JsonProtocol) GetMessage(r *Room) error {
+func (s *JsonProtocol) GetMessage(p *Player) error {
+	r := p.room
 	decoded := map[string]interface{}{}
 	err := s.R.Decode(&decoded)
 	if err != nil {
@@ -57,6 +59,13 @@ func (s *JsonProtocol) GetMessage(r *Room) error {
 				a.Split()
 			}
 		}
+	case "join":
+		for _, n := range p.Owns {
+			if n != nil {
+				return nil
+			}
+		}
+		p.NewActor(rand.Intn(r.Width), rand.Intn(r.Height), r.StartMass)
 	}
 	return nil
 }
