@@ -6,26 +6,36 @@ ws.onmessage = function(m) {
 function readMessage(v) {
 	switch (v["type"]) {
 	case "new":
+		console.log("HELLO", v.id)
 		p = new actor()
 		p.x = v.x
 		p.y = v.y
 		p.id = v.id
 		p.mass = v.mass
-		players[v.id] = p
+		actors[v.id] = p
 		break;
 	case "del":
-		p = players[v.id]
-		delete players[v.id]
+		console.log("GOODBYE", v.id)
+		p = actors[v.id]
+		delete actors[v.id]
 		break;
 	case "own":
+		console.log("NOW OWNS", v.ids)
+		for(var i=0; i<owns.length; i++) {
+			actors[owns[i]].owned = false
+		}
 		owns = v.ids
+
+		for(var i=0; i<owns.length; i++) {
+			actors[owns[i]].owned = true
+		}
 		break;
 	case "room":
 		room = {width:v.width,height:v.height}
 		console.log(room);
 		break;
 	case "move":
-		p = players[v.id]
+		p = actors[v.id]
 		p.x = v.x
 		p.y = v.y
 		p.mass = v.mass
@@ -42,10 +52,11 @@ function readMessage(v) {
 
 var room = {width:0,height:0, startmass:50};
 
-players = {}
+actors = {}
 
 function actor() {
 	this.mass = room.startmass
+	this.owned = false
 }
 
 owns = []
@@ -53,48 +64,56 @@ actor.prototype.postRender = function() {
 	onCanvasX = this.x - camera.x
 	onCanvasY = this.y - camera.y
 
-	ctx.strokeStyle = "blue";
-	ctx.beginPath();
-	ctx.moveTo(onCanvasX, onCanvasY);
-    ctx.lineTo(mousex, mousey);
-	ctx.stroke();
+	if (this.owned) {
+		ctx.strokeStyle = "blue";
+		ctx.beginPath();
+		ctx.moveTo(onCanvasX, onCanvasY);
+	    ctx.lineTo(mousex, mousey);
+		ctx.stroke();
+	}
 }
 actor.prototype.render = function() {
 	radius = Math.sqrt(this.mass/Math.PI)
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	ctx.fillStyle = "red";
+	if (this.owned) {
+		ctx.fillStyle = "green";
+	} else {
+		ctx.fillStyle = "red";
+	}
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
 	ctx.fill();
 }
 actor.prototype.step = function() {
-	onCanvasX = this.x - camera.x
-	onCanvasY = this.y - camera.y
+	if (this.owned) {
+		onCanvasX = this.x - camera.x
+		onCanvasY = this.y - camera.y
 
-	mdx = mousex - onCanvasX
-	mdy = mousey - onCanvasY
+		mdx = mousex - onCanvasX
+		mdy = mousey - onCanvasY
 
-	dist = Math.sqrt(mdx*mdx+mdy*mdy);
-	if (dist>=10) {
-		newDist = Math.sqrt(dist-10);
-		if (newDist>4) {
-			newDist = 4
+		dist = Math.sqrt(mdx*mdx+mdy*mdy);
+		if (dist>=10) {
+			newDist = Math.sqrt(dist-10);
+			if (newDist>4) {
+				newDist = 4
+			}
+			dx = mdx/dist*newDist;
+			dy = mdy/dist*newDist;
+		} else {
+			dx = 0
+			dy = 0
 		}
-		dx = mdx/dist*newDist;
-		dy = mdy/dist*newDist;
-	} else {
-		dx = 0
-		dy = 0
+
+		this.x += dx
+		this.y += dy
+
+		this.x = median(this.x, 0, room.width);
+		this.y = median(this.y, 0, room.height);
+		mov = {type:"move",x:this.x,y:this.y,id:this.id}
+		ws.send(JSON.stringify(mov))
 	}
-
-	this.x += dx
-	this.y += dy
-
-	this.x = median(this.x, 0, room.width);
-	this.y = median(this.y, 0, room.height);
-	mov = {type:"move",x:this.x,y:this.y,id:this.id}
-	ws.send(JSON.stringify(mov))
 }
 
 
@@ -136,7 +155,7 @@ function render() {
 
 		for (var i=0; i<owns.length; i+=1) {
 			pid = owns[i]
-			p = players[pid]
+			p = actors[pid]
 
 			camX += p.x;
 			camY += p.y;
@@ -154,15 +173,15 @@ function render() {
 	ctx.fillStyle = "white";
 	ctx.fillRect(2, 2, room.width-4, room.height-4);
 	var actor;
-	for (id in players) {
-		actor = players[id]
+	for (id in actors) {
+		actor = actors[id]
 		actor.render()
 	}
 	ctx.restore()
 
 	var actor;
-	for (id in players) {
-		actor = players[id]
+	for (id in actors) {
+		actor = actors[id]
 		actor.postRender()
 	}
 
@@ -179,8 +198,8 @@ function step() {
 
 
 	var actor;
-	for (id in players) {
-		actor = players[id]
+	for (id in actors) {
+		actor = actors[id]
 		actor.step()
 	}
 

@@ -7,15 +7,19 @@ import (
 	"net/http"
 )
 
-func main() {
+func init() {
 	room := client.NewRoom()
 	room.SetDimensions(1000, 1000)
 	cli := client.NewServer()
 	cli.AddRoom(room)
 	handler := websocket.Handler(cli.Accept)
 	log.Println("WEBSOCKETS STARTING")
-	err := http.ListenAndServe("0.0.0.0:5000", handler)
-	if err != nil {
-		log.Println("ERROR", err)
-	}
+	go func() {
+		add := settings()["ws_address"].(string)
+		err := http.ListenAndServe(add, handler)
+		if err != nil {
+			log.Println("ERROR", err)
+		}
+		wg.Signal()
+	}()
 }
