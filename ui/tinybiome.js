@@ -1,12 +1,16 @@
 ws = new WebSocket("ws://"+document.location.hostname+":5000");
 ws.onmessage = function(m) {
 	v = JSON.parse(m.data)
+	readMessage(v)
+}
+function readMessage(v) {
 	switch (v["type"]) {
 	case "new":
 		p = new player()
 		p.x = v.x
 		p.y = v.y
 		p.id = v.id
+		p.mass = v.mass
 		players[v.id] = p
 		break;
 	case "del":
@@ -24,7 +28,13 @@ ws.onmessage = function(m) {
 		p = players[v.id]
 		p.x = v.x
 		p.y = v.y
+		p.mass = v.mass
 		break;
+	case "multi":
+		for(var i=0;i<v.parts;i++) {
+			readMessage(v.parts[i])
+		}
+		break
 
 	}
 }
@@ -34,13 +44,17 @@ var room = {width:0,height:0};
 players = {}
 
 function player() {
+	this.mass = 15
 }
 
 owns = []
 player.prototype.render = function() {
+	radius = Math.sqrt(this.mass/Math.PI)
+	// a = pi * r^2
+	// sqrt(a/pi) = r
 	ctx.fillStyle = "red";
 	ctx.beginPath();
-	ctx.arc(this.x, this.y, 50, 0, 2 * Math.PI);
+	ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
 	ctx.stroke();
 }
 player.prototype.step = function() {
@@ -57,9 +71,26 @@ var mdx = mdy = 0;
 c.onmousemove = function(e) {
 	mdx = e.offsetX-c.width/2;
 	mdy = e.offsetY-c.height/2;
+}
+canSplit = true
+document.onkeydown = function(e) {
+    e = e || window.event;
+
+	if (canSplit && e.keyCode == '32') {
+    	canSplit = false
+    	split = {type:"split",ids:owns}
+    	ws.send(JSON.stringify(split))
+    }
 
 }
+document.onkeyup = function(e) {
+    e = e || window.event;
+    if (e.keyCode == '32') {
+    	canSplit = true
 
+    }
+
+}
 
 function render() {
 	ctx.clearRect(0, 0, c.width, c.height);

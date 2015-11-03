@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/ethicatech/tinybiome/client"
 	"golang.org/x/net/websocket"
+	"log"
 	"net/http"
 )
 
@@ -12,5 +13,9 @@ func main() {
 	cli := client.NewServer()
 	cli.AddRoom(room)
 	handler := websocket.Handler(cli.Accept)
-	http.ListenAndServe(":5000", handler)
+	log.Println("WEBSOCKETS STARTING")
+	err := http.ListenAndServe("0.0.0.0:5000", handler)
+	if err != nil {
+		log.Println("ERROR", err)
+	}
 }

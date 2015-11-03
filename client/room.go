@@ -2,24 +2,118 @@ package client
 
 import (
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 )
 
 const MaxEnts = 256 * 256
+const MaxPlayers = 1024
+const MaxOwns = 16
 
 type Actor struct {
-	ID    int
-	X     int
-	Y     int
-	Net   Protocol
-	moved bool
+	ID     int
+	X      int
+	Y      int
+	moved  bool
+	Mass   int
+	Player *Player
+}
+
+func (a *Actor) Move(x, y int) {
+	a.X = x
+	a.Y = y
+	a.moved = true
+}
+
+func (a *Actor) Split() {
+	if a.Mass < 10 {
+		return
+	}
+	a.Remove()
+	a.Player.NewActor(a.X-10, a.Y-10, int(float64(a.Mass)*.45))
+	a.Player.NewActor(a.X+10, a.Y+10, int(float64(a.Mass)*.45))
+}
+
+func (a *Actor) Remove() {
+	r := a.Player.room
+	r.emuLock.Lock()
+	r.Actors[a.ID] = nil
+	for _, player := range r.Players {
+		if player == nil {
+			continue
+		}
+		player.Net.WriteDestroyActor(a)
+	}
+	r.emuLock.Unlock()
+
+	a.Player.EditLock.Lock()
+	for n, oActor := range a.Player.Owns {
+		if oActor == a {
+			a.Player.Owns[n] = nil
+			break
+		}
+	}
+	a.Player.EditLock.Unlock()
+}
+
+type Player struct {
+	ID       int
+	Net      Protocol
+	room     *Room
+	Owns     [MaxOwns]*Actor
+	EditLock sync.RWMutex
+}
+
+func (p *Player) NewActor(x, y, mass int) *Actor {
+	r := p.room
+	id := r.getId()
+	actor := &Actor{ID: id, X: x, Y: y, Player: p, Mass: mass}
+
+	r.emuLock.Lock()
+	r.Actors[id] = actor
+	r.emuLock.Unlock()
+
+	r.emuLock.RLock()
+	for _, oPlayer := range r.Players {
+		if oPlayer == nil {
+			continue
+		}
+		oPlayer.Net.WriteNewActor(actor)
+	}
+	r.emuLock.RUnlock()
+
+	p.EditLock.Lock()
+	for n, a := range p.Owns {
+		if a == nil {
+			p.Owns[n] = actor
+			break
+		}
+	}
+	p.EditLock.Unlock()
+
+	p.Net.WriteOwns(p)
+
+	return actor
+}
+
+func (p *Player) Remove() {
+	r := p.room
+	for _, actor := range r.Actors {
+		if actor == nil {
+			continue
+		}
+		if actor.Player == p {
+			actor.Remove()
+		}
+	}
 }
 
 type Room struct {
 	Width   int
 	Height  int
-	Sockets [MaxEnts]*Actor
+	Actors  [MaxEnts]*Actor
+	Players [MaxPlayers]*Player
 
 	ticker  *time.Ticker
 	emuLock sync.RWMutex
@@ -57,19 +151,19 @@ func (r *Room) checkCollisions() {
 
 func (r *Room) sendUpdates() {
 	r.emuLock.RLock()
-	for id, actor := range r.Sockets {
+	for _, actor := range r.Actors {
 		if actor == nil {
 			continue
 		}
 		if actor.moved {
-			for oId, oActor := range r.Sockets {
-				if oId == id {
+			for _, player := range r.Players {
+				if actor.Player == player {
 					continue
 				}
-				if oActor == nil {
+				if player == nil {
 					continue
 				}
-				oActor.Net.WriteMovePlayer(actor)
+				player.Net.WriteMoveActor(actor)
 			}
 			actor.moved = false
 		}
@@ -83,29 +177,22 @@ func (r *Room) SetDimensions(x, y int) {
 }
 
 func (r *Room) Accept(p Protocol) {
-	id := r.getId()
-	actor := &Actor{ID: id, X: 50, Y: 50, Net: p}
-
-	actor.Net.WriteRoom(r)
+	player := &Player{Net: p, room: r, ID: r.getPlayerId()}
+	player.Net.WriteRoom(r)
 
 	r.emuLock.Lock()
-	r.Sockets[id] = actor
+	r.Players[player.ID] = player
 	r.emuLock.Unlock()
 
 	r.emuLock.RLock()
-	for _, oActor := range r.Sockets {
+	for _, oActor := range r.Actors {
 		if oActor == nil {
 			continue
 		}
-		actor.Net.WriteNewPlayer(oActor)
-		if oActor == actor {
-			oActor.Net.WriteOwnsPlayer(actor)
-		} else {
-			oActor.Net.WriteNewPlayer(actor)
-		}
+		player.Net.WriteNewActor(oActor)
 	}
-
 	r.emuLock.RUnlock()
+	player.NewActor(rand.Intn(r.Width), rand.Intn(r.Height), 30)
 
 	for {
 		reason := p.GetMessage(r)
@@ -114,29 +201,24 @@ func (r *Room) Accept(p Protocol) {
 			break
 		}
 	}
-	r.Remove(actor)
-}
-
-func (r *Room) Moved(actor *Actor) {
-	actor.moved = true
-}
-
-func (r *Room) Remove(actor *Actor) {
-	r.emuLock.Lock()
-	r.Sockets[actor.ID] = nil
-	for _, oActor := range r.Sockets {
-		if oActor == nil {
-			continue
-		}
-		oActor.Net.WriteDestroyPlayer(actor)
-	}
-	r.emuLock.Unlock()
+	player.Remove()
 }
 
 func (r *Room) getId() int {
 	r.emuLock.RLock()
 	defer r.emuLock.RUnlock()
-	for id, found := range r.Sockets {
+	for id, found := range r.Actors {
+		if found == nil {
+			return id
+		}
+	}
+	return -1
+}
+
+func (r *Room) getPlayerId() int {
+	r.emuLock.RLock()
+	defer r.emuLock.RUnlock()
+	for id, found := range r.Players {
 		if found == nil {
 			return id
 		}
@@ -147,6 +229,5 @@ func (r *Room) getId() int {
 func (r *Room) getActor(id int) *Actor {
 	r.emuLock.RLock()
 	defer r.emuLock.RUnlock()
-	return r.Sockets[id]
-
+	return r.Actors[id]
 }

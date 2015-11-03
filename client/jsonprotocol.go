@@ -4,27 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 )
 
 type Protocol interface {
 	GetMessage(*Room) error
-	WriteNewPlayer(*Actor)
-	WriteDestroyPlayer(*Actor)
-	WriteOwnsPlayer(*Actor)
+	WriteNewActor(*Actor)
+	WriteDestroyActor(*Actor)
+	WriteOwns(*Player)
 	WriteRoom(*Room)
-	WriteMovePlayer(*Actor)
+	WriteMoveActor(*Actor)
+
+	MultiStart()
+	MultiSteal(Protocol)
+	MultiSend()
 }
 
 type JsonProtocol struct {
-	RW io.ReadWriter
-	W  *json.Encoder
-	R  *json.Decoder
+	RW     io.ReadWriter
+	W      *json.Encoder
+	R      *json.Decoder
+	Buffer []string
 }
 
 func NewJsonProtocol(ws io.ReadWriter) Protocol {
 	w := json.NewEncoder(ws)
 	r := json.NewDecoder(ws)
-	return Protocol(&JsonProtocol{ws, w, r})
+	return Protocol(&JsonProtocol{ws, w, r, nil})
 }
 
 // runs in a goroutine
@@ -38,41 +44,75 @@ func (s *JsonProtocol) GetMessage(r *Room) error {
 	case "move":
 		pid := int(decoded["id"].(float64))
 		p := r.getActor(pid)
-		p.X = int(decoded["x"].(float64))
-		p.Y = int(decoded["y"].(float64))
-		r.Moved(p)
-
+		p.Move(int(decoded["x"].(float64)), int(decoded["y"].(float64)))
+	case "split":
+		ids := decoded["ids"].([]interface{})
+		for _, id := range ids {
+			id := id.(float64)
+			a := r.getActor(int(id))
+			a.Split()
+		}
 	}
 	return nil
+}
+
+func (s *JsonProtocol) send(dat string) {
+	if s.Buffer == nil {
+		s.RW.Write([]byte(dat))
+	} else {
+		s.Buffer = append(s.Buffer, dat)
+	}
 }
 
 // sends updates
 func (s *JsonProtocol) WriteRoom(r *Room) {
 	roomStr := `{"type":"room","width":%d,"height":%d}`
 	dat := fmt.Sprintf(roomStr, r.Width, r.Height)
-	s.RW.Write([]byte(dat))
+	s.send(dat)
+
 }
 
-func (s *JsonProtocol) WriteNewPlayer(actor *Actor) {
-	newPlayer := `{"type":"new","x":%d,"y":%d,"id":%d}`
-	dat := fmt.Sprintf(newPlayer, actor.X, actor.Y, actor.ID)
-	s.RW.Write([]byte(dat))
+func (s *JsonProtocol) WriteNewActor(actor *Actor) {
+	newPlayer := `{"type":"new","x":%d,"y":%d,"id":%d,"mass":%d}`
+	dat := fmt.Sprintf(newPlayer, actor.X, actor.Y, actor.ID, actor.Mass)
+	s.send(dat)
 }
 
-func (s *JsonProtocol) WriteOwnsPlayer(actor *Actor) {
-	ownsPlayer := `{"type":"own","ids":[%d]}`
-	dat := fmt.Sprintf(ownsPlayer, actor.ID)
-	s.RW.Write([]byte(dat))
+func (s *JsonProtocol) WriteOwns(player *Player) {
+	ownsPlayer := `{"type":"own","ids":%s}`
+	ids := make([]int, 0)
+	for _, own := range player.Owns {
+		if own != nil {
+			ids = append(ids, own.ID)
+		}
+	}
+	idsStr, _ := json.Marshal(ids)
+	dat := fmt.Sprintf(ownsPlayer, string(idsStr))
+	s.send(dat)
 }
 
-func (s *JsonProtocol) WriteDestroyPlayer(actor *Actor) {
+func (s *JsonProtocol) WriteDestroyActor(actor *Actor) {
 	delPlayer := `{"type":"del","id":%d}`
 	dat := fmt.Sprintf(delPlayer, actor.ID)
-	s.RW.Write([]byte(dat))
+	s.send(dat)
 }
 
-func (s *JsonProtocol) WriteMovePlayer(actor *Actor) {
-	delPlayer := `{"type":"move","id":%d,"x":%d,"y":%d}`
-	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y)
+func (s *JsonProtocol) WriteMoveActor(actor *Actor) {
+	delPlayer := `{"type":"move","id":%d,"x":%d,"y":%d,"mass":%d}`
+	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.Mass)
+	s.send(dat)
+}
+
+func (s *JsonProtocol) MultiStart() {
+	s.Buffer = make([]string, 0)
+}
+
+func (s *JsonProtocol) MultiSteal(p Protocol) {
+	s.Buffer = p.(*JsonProtocol).Buffer
+}
+
+func (s *JsonProtocol) MultiSend() {
+	dat := `{"type":"multi","parts":[` + strings.Join(s.Buffer, ",") + `]}`
 	s.RW.Write([]byte(dat))
+	s.Buffer = nil
 }
