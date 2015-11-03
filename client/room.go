@@ -15,6 +15,7 @@ type Room struct {
 	Width     int
 	Height    int
 	StartMass int
+	MergeTime int
 	Actors    [MaxEnts]*Actor
 	Players   [MaxPlayers]*Player
 
@@ -34,7 +35,8 @@ func (r *Room) run() {
 func NewRoom() *Room {
 	r := &Room{
 		ticker:    time.NewTicker(time.Millisecond * 10),
-		StartMass: 50,
+		StartMass: 100,
+		MergeTime: 10,
 	}
 
 	go func() {
@@ -68,6 +70,7 @@ func (r *Room) sendUpdates() {
 					continue
 				}
 				player.Net.WriteMoveActor(actor)
+				player.Net.WriteSetMassActor(actor)
 			}
 			actor.moved = false
 		}

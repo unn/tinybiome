@@ -31,13 +31,16 @@ function readMessage(v) {
 		}
 		break;
 	case "room":
-		room = {width:v.width,height:v.height}
+		room = {width:v.width,height:v.height,startmass:v.mass,mergetime:v.mergetime}
 		console.log(room);
 		break;
 	case "move":
 		p = actors[v.id]
 		p.x = v.x
 		p.y = v.y
+		break;
+	case "mass":
+		p = actors[v.id]
 		p.mass = v.mass
 		break;
 	case "multi":
@@ -57,6 +60,8 @@ actors = {}
 function actor() {
 	this.mass = room.startmass
 	this.owned = false
+	this.mergeTimer = (new Date())
+	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
 }
 
 owns = []
@@ -72,8 +77,9 @@ actor.prototype.postRender = function() {
 		ctx.stroke();
 	}
 }
+actor.prototype.radius = function() {return Math.sqrt(this.mass/Math.PI)}
 actor.prototype.render = function() {
-	radius = Math.sqrt(this.mass/Math.PI)
+	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
 	if (this.owned) {
@@ -109,8 +115,34 @@ actor.prototype.step = function() {
 		this.x += dx
 		this.y += dy
 
+		for (var i = 0; i < owns.length; i++) {
+			b = actors[owns[i]]
+			if (this == b) {
+				continue
+			}
+			dx = b.x - this.x
+			dy = b.y - this.y
+			dist = Math.sqrt(dx*dx + dy*dy)
+			if (dist == 0) {
+				dist = .01
+			}
+			allowedDist = this.radius() + b.radius()
+			depth = allowedDist - dist
+			if (depth > 0) {
+				if (this.mergetime > (new Date()) || b.mergetime > (new Date())) {
+					dx = dx / dist * depth
+					dy = dy / dist * depth
+					this.x -= dx
+					this.y -= dy
+				}
+			}
+		}
+
 		this.x = median(this.x, 0, room.width);
 		this.y = median(this.y, 0, room.height);
+
+
+
 		mov = {type:"move",x:this.x,y:this.y,id:this.id}
 		ws.send(JSON.stringify(mov))
 	}

@@ -14,6 +14,7 @@ type Protocol interface {
 	WriteOwns(*Player)
 	WriteRoom(*Room)
 	WriteMoveActor(*Actor)
+	WriteSetMassActor(*Actor)
 
 	MultiStart()
 	MultiSteal(Protocol)
@@ -44,13 +45,17 @@ func (s *JsonProtocol) GetMessage(r *Room) error {
 	case "move":
 		pid := int(decoded["id"].(float64))
 		p := r.getActor(pid)
-		p.Move(int(decoded["x"].(float64)), int(decoded["y"].(float64)))
+		if p != nil {
+			p.Move(int(decoded["x"].(float64)), int(decoded["y"].(float64)))
+		}
 	case "split":
 		ids := decoded["ids"].([]interface{})
 		for _, id := range ids {
 			id := id.(float64)
 			a := r.getActor(int(id))
-			a.Split()
+			if a != nil {
+				a.Split()
+			}
 		}
 	}
 	return nil
@@ -66,8 +71,8 @@ func (s *JsonProtocol) send(dat string) {
 
 // sends updates
 func (s *JsonProtocol) WriteRoom(r *Room) {
-	roomStr := `{"type":"room","width":%d,"height":%d}`
-	dat := fmt.Sprintf(roomStr, r.Width, r.Height)
+	roomStr := `{"type":"room","width":%d,"height":%d,"mass":%d,"mergetime":%d}`
+	dat := fmt.Sprintf(roomStr, r.Width, r.Height, r.StartMass, r.MergeTime)
 	s.send(dat)
 
 }
@@ -98,8 +103,14 @@ func (s *JsonProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *JsonProtocol) WriteMoveActor(actor *Actor) {
-	delPlayer := `{"type":"move","id":%d,"x":%d,"y":%d,"mass":%d}`
-	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.Mass)
+	delPlayer := `{"type":"move","id":%d,"x":%d,"y":%d}`
+	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y)
+	s.send(dat)
+}
+
+func (s *JsonProtocol) WriteSetMassActor(actor *Actor) {
+	delPlayer := `{"type":"mass","id":%d,"mass":%d}`
+	dat := fmt.Sprintf(delPlayer, actor.ID, actor.Mass)
 	s.send(dat)
 }
 
