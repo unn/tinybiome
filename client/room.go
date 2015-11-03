@@ -30,9 +30,11 @@ func (a *Actor) Split() {
 	if a.Mass < 10 {
 		return
 	}
+	a.Player.Net.MultiStart()
 	a.Remove()
 	a.Player.NewActor(a.X-10, a.Y-10, int(float64(a.Mass)*.45))
 	a.Player.NewActor(a.X+10, a.Y+10, int(float64(a.Mass)*.45))
+	a.Player.Net.MultiSend()
 }
 
 func (a *Actor) Remove() {
@@ -110,10 +112,11 @@ func (p *Player) Remove() {
 }
 
 type Room struct {
-	Width   int
-	Height  int
-	Actors  [MaxEnts]*Actor
-	Players [MaxPlayers]*Player
+	Width     int
+	Height    int
+	StartMass int
+	Actors    [MaxEnts]*Actor
+	Players   [MaxPlayers]*Player
 
 	ticker  *time.Ticker
 	emuLock sync.RWMutex
@@ -130,7 +133,8 @@ func (r *Room) run() {
 
 func NewRoom() *Room {
 	r := &Room{
-		ticker: time.NewTicker(time.Millisecond * 10),
+		ticker:    time.NewTicker(time.Millisecond * 10),
+		StartMass: 50,
 	}
 
 	go func() {
@@ -192,7 +196,7 @@ func (r *Room) Accept(p Protocol) {
 		player.Net.WriteNewActor(oActor)
 	}
 	r.emuLock.RUnlock()
-	player.NewActor(rand.Intn(r.Width), rand.Intn(r.Height), 30)
+	player.NewActor(rand.Intn(r.Width), rand.Intn(r.Height), r.StartMass)
 
 	for {
 		reason := p.GetMessage(r)

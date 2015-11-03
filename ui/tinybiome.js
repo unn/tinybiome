@@ -6,7 +6,7 @@ ws.onmessage = function(m) {
 function readMessage(v) {
 	switch (v["type"]) {
 	case "new":
-		p = new player()
+		p = new actor()
 		p.x = v.x
 		p.y = v.y
 		p.id = v.id
@@ -31,7 +31,8 @@ function readMessage(v) {
 		p.mass = v.mass
 		break;
 	case "multi":
-		for(var i=0;i<v.parts;i++) {
+		console.log("MULTI", v.parts)
+		for(var i=0;i<v.parts.length;i++) {
 			readMessage(v.parts[i])
 		}
 		break
@@ -39,26 +40,61 @@ function readMessage(v) {
 	}
 }
 
-var room = {width:0,height:0};
+var room = {width:0,height:0, startmass:50};
 
 players = {}
 
-function player() {
-	this.mass = 15
+function actor() {
+	this.mass = room.startmass
 }
 
 owns = []
-player.prototype.render = function() {
+actor.prototype.postRender = function() {
+	onCanvasX = this.x - camera.x
+	onCanvasY = this.y - camera.y
+
+	ctx.strokeStyle = "blue";
+	ctx.beginPath();
+	ctx.moveTo(onCanvasX, onCanvasY);
+    ctx.lineTo(mousex, mousey);
+	ctx.stroke();
+}
+actor.prototype.render = function() {
 	radius = Math.sqrt(this.mass/Math.PI)
 	// a = pi * r^2
 	// sqrt(a/pi) = r
 	ctx.fillStyle = "red";
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
-	ctx.stroke();
+	ctx.fill();
 }
-player.prototype.step = function() {
+actor.prototype.step = function() {
+	onCanvasX = this.x - camera.x
+	onCanvasY = this.y - camera.y
 
+	mdx = mousex - onCanvasX
+	mdy = mousey - onCanvasY
+
+	dist = Math.sqrt(mdx*mdx+mdy*mdy);
+	if (dist>=10) {
+		newDist = Math.sqrt(dist-10);
+		if (newDist>4) {
+			newDist = 4
+		}
+		dx = mdx/dist*newDist;
+		dy = mdy/dist*newDist;
+	} else {
+		dx = 0
+		dy = 0
+	}
+
+	this.x += dx
+	this.y += dy
+
+	this.x = median(this.x, 0, room.width);
+	this.y = median(this.y, 0, room.height);
+	mov = {type:"move",x:this.x,y:this.y,id:this.id}
+	ws.send(JSON.stringify(mov))
 }
 
 
@@ -67,10 +103,11 @@ var c = document.getElementById("playarea");
 var camera = {x:0,y:0,width:c.width,height:c.height};
 var ctx = c.getContext("2d");
 
-var mdx = mdy = 0;
+var mousex = c.width/2;
+var mousey = c.height/2;
 c.onmousemove = function(e) {
-	mdx = e.offsetX-c.width/2;
-	mdy = e.offsetY-c.height/2;
+	mousex = e.offsetX;
+	mousey = e.offsetY;
 }
 canSplit = true
 document.onkeydown = function(e) {
@@ -93,35 +130,6 @@ document.onkeyup = function(e) {
 }
 
 function render() {
-	ctx.clearRect(0, 0, c.width, c.height);
-	ctx.save()
-	ctx.translate(-camera.x,-camera.y)
-	ctx.fillStyle = "black";
-	ctx.fillRect(0, 0, room.width, room.height);
-	ctx.fillStyle = "white";
-	ctx.fillRect(2, 2, room.width-4, room.height-4);
-	var player;
-	for (id in players) {
-		player = players[id]
-		player.render()
-	}
-	ctx.restore()
-	window.requestAnimationFrame(render)
-}
-
-function step() {
-	dist = Math.sqrt(mdx*mdx+mdy*mdy);
-	if (dist>=10) {
-		newDist = Math.sqrt(dist-10);
-		if (newDist>4) {
-			newDist = 4
-		}
-		dx = mdx/dist*newDist;
-		dy = mdy/dist*newDist;
-	} else {
-		dx = 0
-		dy = 0
-	}
 	if (owns.length>0) {
 		camX = 0;
 		camY = 0;
@@ -129,12 +137,7 @@ function step() {
 		for (var i=0; i<owns.length; i+=1) {
 			pid = owns[i]
 			p = players[pid]
-			p.x += dx
-			p.y += dy
-			p.x = median(p.x, 0, room.width);
-			p.y = median(p.y, 0, room.height);
-			mov = {type:"move",x:p.x,y:p.y,id:pid}
-			ws.send(JSON.stringify(mov))
+
 			camX += p.x;
 			camY += p.y;
 		}
@@ -143,11 +146,45 @@ function step() {
 		camera.y = camY / owns.length - camera.height / 2;
 	}
 
-	var player;
+	ctx.clearRect(0, 0, c.width, c.height);
+	ctx.save()
+	ctx.translate(-camera.x,-camera.y)
+	ctx.fillStyle = "black";
+	ctx.fillRect(0, 0, room.width, room.height);
+	ctx.fillStyle = "white";
+	ctx.fillRect(2, 2, room.width-4, room.height-4);
+	var actor;
 	for (id in players) {
-		player = players[id]
-		player.step()
+		actor = players[id]
+		actor.render()
 	}
+	ctx.restore()
+
+	var actor;
+	for (id in players) {
+		actor = players[id]
+		actor.postRender()
+	}
+
+	ctx.strokeStyle = "blue";
+	ctx.beginPath();
+	ctx.arc(mousex, mousey, 50, 0, 2 * Math.PI);
+	ctx.stroke();
+
+	window.requestAnimationFrame(render)
+}
+
+function step() {
+
+
+
+	var actor;
+	for (id in players) {
+		actor = players[id]
+		actor.step()
+	}
+
+
 }
 
 window.requestAnimationFrame(render)
