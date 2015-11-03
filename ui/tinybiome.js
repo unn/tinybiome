@@ -1,4 +1,10 @@
 ws = new WebSocket("ws://"+document.location.hostname+":5000");
+ws.onerror = function() {
+	ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
+}
+ws.onclose = function() {
+	ohno("Websocket Closed?")
+}
 ws.onmessage = function(m) {
 	v = JSON.parse(m.data)
 	readMessage(v)
@@ -68,12 +74,16 @@ owns = []
 actor.prototype.postRender = function() {
 	onCanvasX = this.x - camera.x
 	onCanvasY = this.y - camera.y
-
+	dx = mousex-onCanvasX
+	dy = mousey-onCanvasY
+	dist = Math.sqrt(dx*dx+dy*dy)
+	dx = dx / dist * (dist-10)
+	dy = dy / dist * (dist-10)
 	if (this.owned) {
-		ctx.strokeStyle = "blue";
+		ctx.strokeStyle = "rgba(30,60,80,.4)";
 		ctx.beginPath();
 		ctx.moveTo(onCanvasX, onCanvasY);
-	    ctx.lineTo(mousex, mousey);
+	    ctx.lineTo(onCanvasX+dx, onCanvasY+dy);
 		ctx.stroke();
 	}
 }
@@ -82,13 +92,15 @@ actor.prototype.render = function() {
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	if (this.owned) {
-		ctx.fillStyle = "green";
-	} else {
-		ctx.fillStyle = "red";
-	}
+
+	ctx.fillStyle = this.owned ? "#009900" : "#990000";
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
+	ctx.fill();
+
+	ctx.fillStyle = this.owned ? "#33FF33" : "#FF3333";
+	ctx.beginPath();
+	ctx.arc(this.x, this.y, radius*.8, 0, 2 * Math.PI);
 	ctx.fill();
 }
 actor.prototype.step = function() {
@@ -151,6 +163,18 @@ actor.prototype.step = function() {
 
 
 var c = document.getElementById("playarea");
+function ohno(x) {
+	var errs = document.getElementById("err");
+	errs.innerHTML = x;
+}
+window.onload = window.onresize = function() {
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;   
+    camera.width = c.width;
+    camera.height = c.height;
+    console.log("New Cam",camera)
+}
+
 var camera = {x:0,y:0,width:c.width,height:c.height};
 var ctx = c.getContext("2d");
 
@@ -180,6 +204,8 @@ document.onkeyup = function(e) {
 
 }
 
+tileSize = 50;
+
 function render() {
 	if (owns.length>0) {
 		camX = 0;
@@ -200,10 +226,25 @@ function render() {
 	ctx.clearRect(0, 0, c.width, c.height);
 	ctx.save()
 	ctx.translate(-camera.x,-camera.y)
-	ctx.fillStyle = "black";
-	ctx.fillRect(0, 0, room.width, room.height);
-	ctx.fillStyle = "white";
-	ctx.fillRect(2, 2, room.width-4, room.height-4);
+
+	ctx.strokeStyle = "lightgray";
+	offsetX = camera.x % tileSize;
+	offsetY = camera.y % tileSize;
+	ctx.beginPath();
+
+	for (var x=Math.max(camera.x-offsetX,0); x<Math.min(camera.x+camera.width-offsetX,room.width); x+=tileSize) {
+		ctx.moveTo(x,Math.max(camera.y,0));
+		ctx.lineTo(x,Math.min(camera.y+camera.height,room.height));
+	}
+	for (var y=Math.max(camera.y-offsetY,0); y<Math.min(camera.y+camera.width-offsetY,room.height); y+=tileSize) {
+		ctx.moveTo(Math.max(camera.x,0),y);
+		ctx.lineTo(Math.min(camera.x+camera.width,room.width),y);
+	}
+	ctx.stroke();
+
+
+	ctx.strokeStyle = "black";
+	ctx.strokeRect(0, 0, room.width, room.height);
 	var actor;
 	for (id in actors) {
 		actor = actors[id]
@@ -217,9 +258,9 @@ function render() {
 		actor.postRender()
 	}
 
-	ctx.strokeStyle = "blue";
+	ctx.strokeStyle = "rgba(30,60,80,.4)";
 	ctx.beginPath();
-	ctx.arc(mousex, mousey, 50, 0, 2 * Math.PI);
+	ctx.arc(mousex, mousey, 10, 0, 2 * Math.PI);
 	ctx.stroke();
 
 	window.requestAnimationFrame(render)

@@ -9,7 +9,7 @@ import (
 
 func init() {
 	room := client.NewRoom()
-	room.SetDimensions(1000, 1000)
+	room.SetDimensions(4000, 4000)
 	cli := client.NewServer()
 	cli.AddRoom(room)
 	handler := websocket.Handler(cli.Accept)
