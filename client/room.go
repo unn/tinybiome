@@ -17,6 +17,7 @@ type Room struct {
 	MergeTime int
 	Actors    [MaxEnts]*Actor
 	Players   [MaxPlayers]*Player
+	HighestID int
 
 	ticker  *time.Ticker
 	emuLock sync.RWMutex
@@ -24,7 +25,12 @@ type Room struct {
 
 func (r *Room) run() {
 	r.emuLock.RLock()
-	defer r.emuLock.RUnlock()
+
+	defer func() {
+
+		r.emuLock.RUnlock()
+
+	}()
 
 	r.emulateMovement()
 	r.checkCollisions()
@@ -55,8 +61,7 @@ func (r *Room) checkCollisions() {
 }
 
 func (r *Room) sendUpdates() {
-	r.emuLock.RLock()
-	for _, actor := range r.Actors {
+	for _, actor := range r.Actors[:r.HighestID] {
 		if actor == nil {
 			continue
 		}
@@ -74,7 +79,6 @@ func (r *Room) sendUpdates() {
 			actor.moved = false
 		}
 	}
-	r.emuLock.RUnlock()
 }
 
 func (r *Room) SetDimensions(x, y int) {
@@ -90,6 +94,8 @@ func (r *Room) Accept(p Protocol) {
 	r.Players[player.ID] = player
 	r.emuLock.Unlock()
 
+	log.Println(player, "IN LIST")
+
 	r.emuLock.RLock()
 	for _, oActor := range r.Actors {
 		if oActor == nil {
@@ -98,6 +104,8 @@ func (r *Room) Accept(p Protocol) {
 		player.Net.WriteNewActor(oActor)
 	}
 	r.emuLock.RUnlock()
+
+	log.Println(player, "INITIAL SYNC COMPLETE")
 
 	for {
 		reason := p.GetMessage(player)
@@ -111,9 +119,17 @@ func (r *Room) Accept(p Protocol) {
 
 func (r *Room) getId() int {
 	r.emuLock.RLock()
-	defer r.emuLock.RUnlock()
+
+	defer func() {
+
+		r.emuLock.RUnlock()
+
+	}()
 	for id, found := range r.Actors {
 		if found == nil {
+			if id > r.HighestID {
+				r.HighestID = id
+			}
 			return id
 		}
 	}
@@ -122,7 +138,12 @@ func (r *Room) getId() int {
 
 func (r *Room) getPlayerId() int {
 	r.emuLock.RLock()
-	defer r.emuLock.RUnlock()
+
+	defer func() {
+
+		r.emuLock.RUnlock()
+
+	}()
 	for id, found := range r.Players {
 		if found == nil {
 			return id
@@ -133,6 +154,11 @@ func (r *Room) getPlayerId() int {
 
 func (r *Room) getActor(id int) *Actor {
 	r.emuLock.RLock()
-	defer r.emuLock.RUnlock()
+
+	defer func() {
+
+		r.emuLock.RUnlock()
+
+	}()
 	return r.Actors[id]
 }

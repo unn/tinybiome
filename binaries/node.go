@@ -5,9 +5,11 @@ import (
 	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
+	"runtime"
 )
 
 func init() {
+	runtime.SetBlockProfileRate(1)
 	room := client.NewRoom()
 	room.SetDimensions(4000, 4000)
 	cli := client.NewServer()
