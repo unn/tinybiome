@@ -1,3 +1,4 @@
+var currentRoom;
 
 	ws = new WebSocket("ws://"+document.location.hostname+":5000");
 	ws.onerror = function() {
@@ -16,17 +17,17 @@ function readMessage(v) {
 	switch (v["type"]) {
 	case "new":
 		console.log("HELLO", v.id)
-		p = new actor()
+		p = new actor(v.id)
 		p.x = v.x
 		p.y = v.y
-		p.id = v.id
 		p.mass = v.mass
-		actors[v.id] = p
 		break;
+	case "pellet":
+		p = new pellet(v.x, v.y)
 	case "del":
 		console.log("GOODBYE", v.id)
 		p = actors[v.id]
-		delete actors[v.id]
+		p.remove()
 		break;
 	case "own":
 		console.log("NOW OWNS", v.ids)
@@ -45,8 +46,15 @@ function readMessage(v) {
 		}
 		break;
 	case "room":
-		room = {width:v.width,height:v.height,startmass:v.mass,mergetime:v.mergetime}
+		room = new room(v.width,v.height)
+		currentRoom = room
+		room.startmass = v.mass
+		room.mergetime = v.mergetime
 		console.log(room);
+		for(var i=0;i<100000;i++) {
+			new pellet(Math.random()*room.width,Math.random()*room.height)
+		}
+		room.allowTiles()
 		break;
 	case "move":
 		p = actors[v.id]
@@ -67,18 +75,148 @@ function readMessage(v) {
 	}
 }
 
-var room = {width:0,height:0, startmass:50};
+renderTiles = {}
+renderTileSize = 100
+tilePadding = 10
+
+function renderTile(x,y) {
+	var m_canvas = document.createElement('canvas');
+	m_canvas.width = renderTileSize + tilePadding*2;
+	m_canvas.height = renderTileSize + tilePadding*2;
+	var m_context = m_canvas.getContext('2d');
+	this.canvas = m_canvas
+	this.ctx = m_context
+	this.x = x
+	this.y = y
+	this.id = "tile("+this.x+","+this.y+")"
+	renderable[this.id] = this
+	renderTiles[this.id] = this
+	this.canRender = false
+	this.renderables = {}
+}
+renderTile.prototype.render = function(ctx) {
+  	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
+}
+renderTile.prototype.rerender = function() {
+	if (!this.canRender) {
+		return
+	}
+	console.log("rerendering",this.id)
+	this.ctx.clearRect(0, 0, c.width, c.height);
+	this.ctx.save()
+	this.ctx.translate(-this.x,-this.y)
+
+	for (id in this.renderables) {
+		objectToRender = this.renderables[id]
+		objectToRender.render(this.ctx)
+	}
+	this.ctx.restore()
+}
+renderTile.prototype.contains = function(x,y) {
+	return (this.x<x && this.y<y && this.x+renderTileSize>=x && this.y+renderTileSize>=y)
+}
+renderTile.prototype.bbox = function() {
+	return [this.x,this.y,this.x+renderTileSize,this.y+renderTileSize]
+}
+
+function room(width, height) {
+	this.width = width
+	this.height = height
+	for(var x=0; x<width; x+=renderTileSize) {
+		for(var y=0; y<height; y+=renderTileSize) {
+			new renderTile(x,y)
+		}
+	}
+}
+room.prototype.findTile = function(x,y) {
+	for (i in renderTiles) {
+		rt = renderTiles[i]
+		if (rt.contains(x,y)) {
+			return rt
+		}
+	}
+}
+room.prototype.render = function(ctx) {
+	renderDetails = {"ms":new Date(),"skips":0,"renders":0}
+	ctx.strokeStyle = "black";
+	ctx.strokeRect(0, 0, room.width, room.height);
+	// calculateRenderables()
+
+
+	padding = 10
+	for (id in renderable) {
+		objectToRender = renderable[id]
+		bbox = objectToRender.bbox()
+		if (hidingBbox) {
+			if (bbox[2] < camera.x - padding || bbox[3] < camera.y - padding
+				|| bbox[0] > camera.x + camera.width + padding
+				|| bbox[1] > camera.y + camera.height + padding) {
+				renderDetails.skips += 1
+				continue				
+			}
+
+		}
+		renderDetails.renders += 1
+		objectToRender.render(ctx)
+	}
+	renderDetails.ms = (new Date()) - renderDetails.ms
+	console.log("Render time", renderDetails.ms)
+}
+room.prototype.allowTiles = function() {
+	for(tileId in renderTiles) {
+		renderTiles[tileId].canRender = true
+		renderTiles[tileId].rerender()
+	}
+}
+function rgb(r, g, b){
+  return "rgb("+Math.floor(r)+","+Math.floor(g)+","+Math.floor(b)+")";
+}
+function pellet(x,y) {
+	this.x = x
+	this.y = y
+	this.id = ""+x+","+y
+	preRenderable[this.id] = this
+	currentRoom.findTile(x,y).renderables[this.id] = this
+	this.radius = 3
+	this.color = rgb(Math.random()*255,Math.random()*255,Math.random()*255)
+}
+pellet.prototype.render = function(ctx) {
+	ctx.fillStyle = this.color;
+	ctx.beginPath();
+	ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+	ctx.fill();
+}
+pellet.prototype.remove = function() {
+	delete preRenderable[this.id]
+}
+pellet.prototype.bbox = function() {
+	r = this.radius
+	return [this.x-r, this.y-r, this.x+r, this.y+r]
+}
 
 actors = {}
+preRenderable = {}
+renderable = {}
+activeRenders = {}
 
-function actor() {
+function actor(id) {
+	this.id = id
 	this.mass = room.startmass
 	this.owned = false
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
+	renderable[this.id] = this
+	actors[this.id] = this
 }
 
 owns = []
+actor.prototype.bbox = function() {
+	r = this.radius()
+	bb = [this.x-r, this.y-r, this.x+r, this.y+r]
+	// [2707.2190938111135, 3086.8755672544276, 2718.5028854820685, 3098.1593589253825] 
+	// Object {x: 2237.860989646591, y: 2852.517463089905, width: 950, height: 480}
+	return bb
+}
 actor.prototype.postRender = function() {
 	onCanvasX = this.x - camera.x
 	onCanvasY = this.y - camera.y
@@ -96,7 +234,7 @@ actor.prototype.postRender = function() {
 	}
 }
 actor.prototype.radius = function() {return Math.sqrt(this.mass/Math.PI)}
-actor.prototype.render = function() {
+actor.prototype.render = function(ctx) {
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
@@ -167,6 +305,10 @@ actor.prototype.step = function() {
 		ws.send(JSON.stringify(mov))
 	}
 }
+actor.prototype.remove = function() {
+	delete renderable[this.id]
+	delete actors[this.id]
+}
 
 
 
@@ -227,6 +369,8 @@ document.onkeyup = function(e) {
 }
 
 tileSize = 50;
+hidingBbox = true;
+
 
 function render() {
 	if (owns.length>0) {
@@ -264,20 +408,19 @@ function render() {
 	}
 	ctx.stroke();
 
-
-	ctx.strokeStyle = "black";
-	ctx.strokeRect(0, 0, room.width, room.height);
-	var actor;
-	for (id in actors) {
-		actor = actors[id]
-		actor.render()
+	if (currentRoom) {
+		currentRoom.render(ctx)
 	}
+
 	ctx.restore()
 
+
 	var actor;
-	for (id in actors) {
-		actor = actors[id]
-		actor.postRender()
+	for (id in renderable) {
+		actor = renderable[id]
+		if (actor.postRender) {
+			actor.postRender()
+		}
 	}
 
 	ctx.strokeStyle = "rgba(30,60,80,.4)";
@@ -289,9 +432,6 @@ function render() {
 }
 
 function step() {
-
-
-
 	var actor;
 	for (id in actors) {
 		actor = actors[id]
