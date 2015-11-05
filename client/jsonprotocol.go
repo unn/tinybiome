@@ -16,6 +16,8 @@ type Protocol interface {
 	WriteRoom(*Room)
 	WriteMoveActor(*Actor)
 	WriteSetMassActor(*Actor)
+	WriteNewPellet(*Pellet)
+	WriteDestroyPellet(*Pellet)
 
 	MultiStart()
 	MultiSteal(Protocol)
@@ -92,6 +94,18 @@ func (s *JsonProtocol) WriteNewActor(actor *Actor) {
 	s.send(dat)
 }
 
+func (s *JsonProtocol) WriteNewPellet(pellet *Pellet) {
+	str := `{"type":"addpel","x":%d,"y":%d}`
+	dat := fmt.Sprintf(str, pellet.X, pellet.Y)
+	s.send(dat)
+}
+
+func (s *JsonProtocol) WriteDestroyPellet(pellet *Pellet) {
+	str := `{"type":"delpel","x":%d,"y":%d}`
+	dat := fmt.Sprintf(str, pellet.X, pellet.Y)
+	s.send(dat)
+}
+
 func (s *JsonProtocol) WriteOwns(player *Player) {
 	ownsPlayer := `{"type":"own","ids":%s}`
 	ids := make([]int, 0)
@@ -132,7 +146,9 @@ func (s *JsonProtocol) MultiSteal(p Protocol) {
 }
 
 func (s *JsonProtocol) MultiSend() {
-	dat := `{"type":"multi","parts":[` + strings.Join(s.Buffer, ",") + `]}`
-	s.RW.Write([]byte(dat))
+	if len(s.Buffer) > 0 {
+		dat := `{"type":"multi","parts":[` + strings.Join(s.Buffer, ",") + `]}`
+		s.RW.Write([]byte(dat))
+	}
 	s.Buffer = nil
 }

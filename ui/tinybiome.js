@@ -22,8 +22,17 @@ function readMessage(v) {
 		p.y = v.y
 		p.mass = v.mass
 		break;
-	case "pellet":
+	case "addpel":
 		p = new pellet(v.x, v.y)
+		break
+	case "delpel":
+		p = currentRoom.findTile(v.x,v.y).find(v.x,v.y)
+		if (p) {
+			p.remove()	
+		} else {
+			console.log("COULDNT FIND", v.x,v.y)
+		}
+		break
 	case "del":
 		console.log("GOODBYE", v.id)
 		p = actors[v.id]
@@ -51,10 +60,6 @@ function readMessage(v) {
 		room.startmass = v.mass
 		room.mergetime = v.mergetime
 		console.log(room);
-		for(var i=0;i<100000;i++) {
-			new pellet(Math.random()*room.width,Math.random()*room.height)
-		}
-		room.allowTiles()
 		break;
 	case "move":
 		p = actors[v.id]
@@ -76,10 +81,10 @@ function readMessage(v) {
 }
 
 renderTiles = {}
-renderTileSize = 100
+renderTileSize = 200
 tilePadding = 10
 
-function renderTile(x,y) {
+function renderTile(room,x,y) {
 	var m_canvas = document.createElement('canvas');
 	m_canvas.width = renderTileSize + tilePadding*2;
 	m_canvas.height = renderTileSize + tilePadding*2;
@@ -90,27 +95,43 @@ function renderTile(x,y) {
 	this.y = y
 	this.id = "tile("+this.x+","+this.y+")"
 	renderable[this.id] = this
-	renderTiles[this.id] = this
+	room.tiles[this.id] = this
 	this.canRender = false
 	this.renderables = {}
+	this.dirty = false
+}
+renderTile.prototype.add = function(particle) {
+	this.renderables[particle.id] = particle
+	this.dirty = true
+}
+renderTile.prototype.remove = function(particle) {
+	delete this.renderables[particle.id]
+	this.dirty = true
 }
 renderTile.prototype.render = function(ctx) {
+	if (this.dirty) {
+		this.rerender()
+	}
   	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
+
+  	if (this.contains(mousex+camera.x,mousey+camera.y)) {
+	  	ctx.strokeStyle = "rgba(0,0,0,.2)";
+	  	ctx.strokeRect(this.x,this.y,renderTileSize,renderTileSize)
+	  	ctx.strokeRect(this.x-tilePadding,this.y-tilePadding,tilePadding*2+renderTileSize,tilePadding*2+renderTileSize)
+  }
 }
 renderTile.prototype.rerender = function() {
-	if (!this.canRender) {
-		return
-	}
 	console.log("rerendering",this.id)
 	this.ctx.clearRect(0, 0, c.width, c.height);
 	this.ctx.save()
-	this.ctx.translate(-this.x,-this.y)
+	this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
 
 	for (id in this.renderables) {
 		objectToRender = this.renderables[id]
 		objectToRender.render(this.ctx)
 	}
 	this.ctx.restore()
+	this.dirty = false
 }
 renderTile.prototype.contains = function(x,y) {
 	return (this.x<x && this.y<y && this.x+renderTileSize>=x && this.y+renderTileSize>=y)
@@ -118,30 +139,38 @@ renderTile.prototype.contains = function(x,y) {
 renderTile.prototype.bbox = function() {
 	return [this.x,this.y,this.x+renderTileSize,this.y+renderTileSize]
 }
+renderTile.prototype.findCollisions = function(actor) {
+	for(pel in this.renderables) {
+		p = this.renderables[pel]
+		if (actor.contains(p)) {
+			p.remove()
+			actor.mass += 5
+		}
+	}
+}
+renderTile.prototype.find = function(x,y) {
+	id = ""+x+","+y
+	return this.renderables[id]
+}
 
 function room(width, height) {
+	this.tiles = {}
 	this.width = width
 	this.height = height
 	for(var x=0; x<width; x+=renderTileSize) {
 		for(var y=0; y<height; y+=renderTileSize) {
-			new renderTile(x,y)
+			new renderTile(this,x,y)
 		}
 	}
 }
 room.prototype.findTile = function(x,y) {
-	for (i in renderTiles) {
-		rt = renderTiles[i]
-		if (rt.contains(x,y)) {
-			return rt
-		}
-	}
+	var tile_id = "tile("+Math.floor(x/renderTileSize)*renderTileSize+","+Math.floor(y/renderTileSize)*renderTileSize+")"
+	return this.tiles[tile_id]
 }
 room.prototype.render = function(ctx) {
 	renderDetails = {"ms":new Date(),"skips":0,"renders":0}
 	ctx.strokeStyle = "black";
 	ctx.strokeRect(0, 0, room.width, room.height);
-	// calculateRenderables()
-
 
 	padding = 10
 	for (id in renderable) {
@@ -152,7 +181,7 @@ room.prototype.render = function(ctx) {
 				|| bbox[0] > camera.x + camera.width + padding
 				|| bbox[1] > camera.y + camera.height + padding) {
 				renderDetails.skips += 1
-				continue				
+				continue
 			}
 
 		}
@@ -160,44 +189,54 @@ room.prototype.render = function(ctx) {
 		objectToRender.render(ctx)
 	}
 	renderDetails.ms = (new Date()) - renderDetails.ms
-	console.log("Render time", renderDetails.ms)
 }
-room.prototype.allowTiles = function() {
-	for(tileId in renderTiles) {
-		renderTiles[tileId].canRender = true
-		renderTiles[tileId].rerender()
+room.prototype.findCollisions = function(actor) {
+	bb = actor.bbox()
+	bb[0] = Math.floor(bb[0]/renderTileSize)*renderTileSize
+	bb[1] = Math.floor(bb[1]/renderTileSize)*renderTileSize
+	bb[2] = Math.floor(bb[2]/renderTileSize)*renderTileSize
+	bb[3] = Math.floor(bb[3]/renderTileSize)*renderTileSize
+	for(var x=bb[0];x<=bb[2];x+=renderTileSize) {
+		for(var y=bb[1];y<=bb[3];y+=renderTileSize) {
+			found = this.findTile(x,y)
+			if (found) found.findCollisions(actor)
+		}
 	}
 }
-function rgb(r, g, b){
-  return "rgb("+Math.floor(r)+","+Math.floor(g)+","+Math.floor(b)+")";
-}
+
 function pellet(x,y) {
 	this.x = x
 	this.y = y
 	this.id = ""+x+","+y
-	preRenderable[this.id] = this
-	currentRoom.findTile(x,y).renderables[this.id] = this
-	this.radius = 3
+	currentRoom.findTile(x,y).add(this)
+	this._radius = 3
 	this.color = rgb(Math.random()*255,Math.random()*255,Math.random()*255)
+}
+pellet.prototype.radius = function() {
+	return this._radius
 }
 pellet.prototype.render = function(ctx) {
 	ctx.fillStyle = this.color;
 	ctx.beginPath();
-	ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+	ctx.arc(this.x, this.y, this._radius, 0, 2 * Math.PI);
 	ctx.fill();
 }
 pellet.prototype.remove = function() {
-	delete preRenderable[this.id]
+	myTile = currentRoom.findTile(this.x,this.y)
+	myTile.remove(this)
 }
 pellet.prototype.bbox = function() {
-	r = this.radius
+	r = this._radius
 	return [this.x-r, this.y-r, this.x+r, this.y+r]
 }
 
 actors = {}
-preRenderable = {}
 renderable = {}
 activeRenders = {}
+
+function rgb(r, g, b){
+  return "rgb("+Math.floor(r)+","+Math.floor(g)+","+Math.floor(b)+")";
+}
 
 function actor(id) {
 	this.id = id
@@ -210,6 +249,16 @@ function actor(id) {
 }
 
 owns = []
+actor.prototype.contains = function(actor) {
+	dx = actor.x - this.x
+	dy = actor.y - this.y
+	dist = dx*dx+dy*dy
+	allowedDist = actor.radius() + this.radius()
+	if (dist < allowedDist*allowedDist) {
+		return true
+	}
+	return false
+}
 actor.prototype.bbox = function() {
 	r = this.radius()
 	bb = [this.x-r, this.y-r, this.x+r, this.y+r]
@@ -258,10 +307,11 @@ actor.prototype.step = function() {
 		mdy = mousey - onCanvasY
 
 		dist = Math.sqrt(mdx*mdx+mdy*mdy);
+		maxSpeed = 4/(Math.pow(this.mass,.1)/3)
 		if (dist>=10) {
 			newDist = Math.sqrt(dist-10);
-			if (newDist>4) {
-				newDist = 4
+			if (newDist>maxSpeed) {
+				newDist = maxSpeed
 			}
 			dx = mdx/dist*newDist;
 			dy = mdy/dist*newDist;
