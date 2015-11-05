@@ -4,6 +4,7 @@ import (
 	"golang.org/x/net/websocket"
 	"log"
 	"net"
+	"net/http"
 	"sync"
 )
 
@@ -11,15 +12,42 @@ type Server struct {
 	Room *Room
 	Lock sync.RWMutex
 	IPS  map[string]struct{}
+	WSH  websocket.Handler
 }
 
 func NewServer() *Server {
-	return &Server{IPS: map[string]struct{}{}}
+	cli := &Server{IPS: map[string]struct{}{}}
+	cli.WSH = websocket.Handler(cli.Accept)
+	return cli
 }
 
 var allowedHosts = map[string]struct{}{
 	"http://www.tinybio.me": struct{}{},
 	"http://localhost:8080": struct{}{},
+}
+
+func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
+	a := req.RemoteAddr
+	ip, _, _ := net.SplitHostPort(a)
+
+	s.Lock.Lock()
+	if _, found := s.IPS[ip]; found {
+		res.WriteHeader(400)
+		s.Lock.Unlock()
+		log.Println("REJECTING", ip)
+		return
+	} else {
+		s.IPS[ip] = struct{}{}
+	}
+
+	s.Lock.Unlock()
+
+	log.Println("New Client", ip)
+	s.WSH.ServeHTTP(res, req)
+
+	s.Lock.Lock()
+	delete(s.IPS, ip)
+	s.Lock.Unlock()
 }
 
 func (s *Server) Accept(ws *websocket.Conn) {
@@ -28,26 +56,7 @@ func (s *Server) Accept(ws *websocket.Conn) {
 	}
 
 	room := s.Room
-	a := ws.Request().RemoteAddr
-	ip, _, _ := net.SplitHostPort(a)
-	reject := false
-	s.Lock.Lock()
-	if _, found := s.IPS[ip]; found {
-		reject = true
-	} else {
-		s.IPS[ip] = struct{}{}
-	}
-	s.Lock.Unlock()
-
-	if !reject {
-		log.Println("New Client", ip)
-		room.Accept(NewJsonProtocol(ws))
-		s.Lock.Lock()
-		delete(s.IPS, ip)
-		s.Lock.Unlock()
-	} else {
-		log.Println("REJECTING", ip)
-	}
+	room.Accept(NewJsonProtocol(ws))
 
 }
 
