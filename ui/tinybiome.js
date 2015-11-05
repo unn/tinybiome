@@ -1,4 +1,5 @@
 var currentRoom;
+var myplayer;
 
 	ws = new WebSocket("ws://"+document.location.hostname+":5000");
 	ws.onerror = function() {
@@ -16,14 +17,18 @@ var currentRoom;
 function readMessage(v) {
 	switch (v["type"]) {
 	case "new":
-		console.log("HELLO", v.id)
-		p = new actor(v.id)
-		p.x = v.x
-		p.y = v.y
+		console.log("CREATING ACTOR", v.id, "OWNED BY", v.owner)
+		p = new actor(v.id, v.owner, v.x, v.y)
 		p.mass = v.mass
 		break;
+	case "del":
+		console.log("REMOVING ACTOR", v.id)
+		p = actors[v.id]
+		p.remove()
+
+		break;
 	case "addpel":
-		p = new pellet(v.x, v.y)
+		p = new pellet(v.x, v.y, v.style)
 		break
 	case "delpel":
 		p = currentRoom.findTile(v.x,v.y).find(v.x,v.y)
@@ -33,26 +38,22 @@ function readMessage(v) {
 			console.log("COULDNT FIND", v.x,v.y)
 		}
 		break
-	case "del":
-		console.log("GOODBYE", v.id)
-		p = actors[v.id]
-		p.remove()
-		break;
-	case "own":
-		console.log("NOW OWNS", v.ids)
-		for(var i=0; i<owns.length; i++) {
-			actors[owns[i]].owned = false
-		}
-		owns = v.ids
 
-		for(var i=0; i<owns.length; i++) {
-			actors[owns[i]].owned = true
-		}
-		if (owns.length==0) {
-			document.getElementById("login").style.display="block";
-		} else {
-			document.getElementById("login").style.display="none";
-		}
+	case "addplayer":
+		console.log("CREATING PLAYER", v.id)
+		p = (new player(currentRoom, v.id))
+		p.name = v.name ? v.name : "";
+		break
+	case "delplayer":
+		console.log("CREATING PLAYER", v.id)
+		currentRoom.players[v.id].remove()
+		break
+	case "nameplayer":
+		currentRoom.players[v.id].name=v.name
+		break
+	case "own":
+		console.log("NOW OWNS", v.id)
+		myplayer = currentRoom.players[v.id]
 		break;
 	case "room":
 		room = new room(v.width,v.height)
@@ -63,8 +64,12 @@ function readMessage(v) {
 		break;
 	case "move":
 		p = actors[v.id]
-		p.x = v.x
-		p.y = v.y
+		if (p.owner == myplayer.id) {
+			p.x = v.x
+			p.y = v.y
+		}
+		p.lastUpdateX = v.x
+		p.lastUpdateY = v.y
 		break;
 	case "mass":
 		p = actors[v.id]
@@ -81,8 +86,18 @@ function readMessage(v) {
 }
 
 renderTiles = {}
-renderTileSize = 200
+renderTileSize = 250
 tilePadding = 10
+
+function player(room, id) {
+	this.room = room
+	this.id = id
+	this.room.players[id] = this
+	this.owns = {}
+}
+player.prototype.remove = function() {
+	delete this.room.players[this.id]
+}
 
 function renderTile(room,x,y) {
 	var m_canvas = document.createElement('canvas');
@@ -162,6 +177,7 @@ function room(width, height) {
 			new renderTile(this,x,y)
 		}
 	}
+	this.players = {}
 }
 room.prototype.findTile = function(x,y) {
 	var tile_id = "tile("+Math.floor(x/renderTileSize)*renderTileSize+","+Math.floor(y/renderTileSize)*renderTileSize+")"
@@ -204,13 +220,55 @@ room.prototype.findCollisions = function(actor) {
 	}
 }
 
-function pellet(x,y) {
+function draw_leaderboard(ctx, room) {
+	var playersWithScore = []
+	for(k in room.players) {
+		p = room.players[k]
+		s = 0
+		for(i in p.owns) {
+			a = p.owns[i];
+			s += a.mass
+		}
+		playersWithScore.push([p.name,s])
+	}
+	playersWithScore.sort(function(a,b){return b[1]-a[1]})
+
+	ctx.textAlign = "right";
+	ctx.textBaseline = "top";
+	ctx.fillStyle = "white";
+	ctx.strokeStyle = "black"
+	ctx.font = "20px sans serif";
+
+	l = "Leaderboard"
+	ctx.fillText(l, camera.width,0)
+	ctx.strokeText(l, camera.width,0)
+
+	for(var i=0; i<playersWithScore.length; i+=1) {
+		n = playersWithScore[i][0] ? playersWithScore[i][0] : "Microbe"
+		ctx.fillText(n, camera.width - 100,i*20+20)
+		ctx.strokeText(n, camera.width - 100,i*20+20)
+
+		m = playersWithScore[i][1]
+		ctx.fillText(m, camera.width,i*20+20)
+		ctx.strokeText(m, camera.width,i*20+20)
+	}
+	console.log(JSON.stringify(playersWithScore))
+	
+}
+
+function pellet(x,y,style) {
+	this.style = style
 	this.x = x
 	this.y = y
 	this.id = ""+x+","+y
 	currentRoom.findTile(x,y).add(this)
 	this._radius = 3
-	this.color = rgb(Math.random()*255,Math.random()*255,Math.random()*255)
+	if (this.style==0) {
+		this.color = rgb(Math.random()*100,Math.random()*100,255)
+	}
+	if (this.style==1) {
+		this.color = rgb(255,Math.random()*100,Math.random()*100)
+	}
 }
 pellet.prototype.radius = function() {
 	return this._radius
@@ -238,17 +296,26 @@ function rgb(r, g, b){
   return "rgb("+Math.floor(r)+","+Math.floor(g)+","+Math.floor(b)+")";
 }
 
-function actor(id) {
+function actor(id, owner, x, y) {
 	this.id = id
+	this.x = x
+	this.y = y
+	this.lastUpdateX = this.x
+	this.lastUpdateY = this.y
 	this.mass = room.startmass
-	this.owned = false
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
 	renderable[this.id] = this
 	actors[this.id] = this
+	this.owner = owner
+	currentRoom.players[this.owner].owns[this.id] = this
+	if (myplayer) {
+		if (this.owner == myplayer.id) {
+			document.getElementById("login").style.display="none";
+		}
+	}
 }
 
-owns = []
 actor.prototype.contains = function(actor) {
 	dx = actor.x - this.x
 	dy = actor.y - this.y
@@ -274,7 +341,7 @@ actor.prototype.postRender = function() {
 	dist = Math.sqrt(dx*dx+dy*dy)
 	dx = dx / dist * (dist-10)
 	dy = dy / dist * (dist-10)
-	if (this.owned) {
+	if (this.owner == myplayer.id) {
 		ctx.strokeStyle = "rgba(30,60,80,.4)";
 		ctx.beginPath();
 		ctx.moveTo(onCanvasX, onCanvasY);
@@ -287,19 +354,33 @@ actor.prototype.render = function(ctx) {
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-
-	ctx.fillStyle = this.owned ? "#009900" : "#990000";
+	ctx.fillStyle = this.owner==myplayer.id ? "#009900" : "#990000";
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
 	ctx.fill();
 
-	ctx.fillStyle = this.owned ? "#33FF33" : "#FF3333";
+	ctx.fillStyle = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, radius*.8, 0, 2 * Math.PI);
 	ctx.fill();
+
+	ctx.textAlign = "center";
+	ctx.fillStyle = "white";
+	ctx.strokeStyle = "black";
+	ctx.font = "28px serif";
+	ctx.textBaseline = "bottom";
+	n = currentRoom.players[this.owner].name
+	n = n ? n : "Microbe"
+ 	ctx.fillText(n, this.x, this.y);
+ 	ctx.strokeText(n, this.x, this.y);
+
+
+	ctx.textBaseline = "top";
+ 	ctx.fillText(this.mass, this.x, this.y);
+ 	ctx.strokeText(this.mass, this.x, this.y);
 }
 actor.prototype.step = function() {
-	if (this.owned) {
+	if (this.owner==myplayer.id) {
 		onCanvasX = this.x - camera.x
 		onCanvasY = this.y - camera.y
 
@@ -307,7 +388,11 @@ actor.prototype.step = function() {
 		mdy = mousey - onCanvasY
 
 		dist = Math.sqrt(mdx*mdx+mdy*mdy);
-		maxSpeed = 4/(Math.pow(this.mass,.1)/3)
+		maxSpeed = 4/(Math.pow(.46*this.mass,.1))
+
+		// mass between 10 - 500000
+		// 
+
 		if (dist>=10) {
 			newDist = Math.sqrt(dist-10);
 			if (newDist>maxSpeed) {
@@ -323,8 +408,8 @@ actor.prototype.step = function() {
 		this.x += dx
 		this.y += dy
 
-		for (var i = 0; i < owns.length; i++) {
-			b = actors[owns[i]]
+		for (i in myplayer.owns) {
+			b = myplayer.owns[i]
 			if (this == b) {
 				continue
 			}
@@ -349,15 +434,30 @@ actor.prototype.step = function() {
 		this.x = median(this.x, 0, room.width);
 		this.y = median(this.y, 0, room.height);
 
-
-
-		mov = {type:"move",x:this.x,y:this.y,id:this.id}
-		ws.send(JSON.stringify(mov))
+		dx = this.lastUpdateX-this.x
+		dy = this.lastUpdateY-this.y
+		distSinceLU = Math.sqrt(dx*dx+dy*dy)
+		if (distSinceLU > 4 || Math.random() < .1) {
+			mov = {type:"move",x:this.x,y:this.y,id:this.id}
+			ws.send(JSON.stringify(mov))
+			console.log(mov)
+			this.lastUpdateX = this.x
+			this.lastUpdateY = this.y
+		}
+	} else {
+		this.x = (this.x*3+this.lastUpdateX)/4
+		this.y = (this.y*3+this.lastUpdateY)/4
 	}
 }
 actor.prototype.remove = function() {
 	delete renderable[this.id]
 	delete actors[this.id]
+	delete currentRoom.players[this.owner].owns[this.id]
+	if (this.owner == myplayer.id) {
+		if (Object.keys(myplayer.owns).length==0) {
+			document.getElementById("login").style.display="block";
+		}
+	}
 }
 
 
@@ -372,7 +472,8 @@ window.onload = function() {
 	window.onresize();
 	document.getElementById("loginButton").onclick = function() {
 		console.log("JOINING")
-		join = {type:"join"}
+		n = document.getElementById("name").value;
+		join = {type:"join",name:n}
 		ws.send(JSON.stringify(join))
 	}
 }
@@ -404,7 +505,7 @@ document.onkeydown = function(e) {
 
 	if (canSplit && e.keyCode == '32') {
     	canSplit = false
-    	split = {type:"split",ids:owns}
+    	split = {type:"split"}
     	ws.send(JSON.stringify(split))
     }
 
@@ -423,20 +524,22 @@ hidingBbox = true;
 
 
 function render() {
-	if (owns.length>0) {
-		camX = 0;
-		camY = 0;
+	if (myplayer) {
+		l = Object.keys(myplayer.owns).length
+		if (l>0) {
+			camX = 0;
+			camY = 0;
 
-		for (var i=0; i<owns.length; i+=1) {
-			pid = owns[i]
-			p = actors[pid]
+			for (i in myplayer.owns) {
+				p = myplayer.owns[i]
 
-			camX += p.x;
-			camY += p.y;
+				camX += p.x;
+				camY += p.y;
+			}
+
+			camera.x = camX / l - camera.width / 2;
+			camera.y = camY / l - camera.height / 2;
 		}
-
-		camera.x = camX / owns.length - camera.width / 2;
-		camera.y = camY / owns.length - camera.height / 2;
 	}
 
 	ctx.clearRect(0, 0, c.width, c.height);
@@ -465,6 +568,7 @@ function render() {
 	ctx.restore()
 
 
+
 	var actor;
 	for (id in renderable) {
 		actor = renderable[id]
@@ -477,6 +581,11 @@ function render() {
 	ctx.beginPath();
 	ctx.arc(mousex, mousey, 10, 0, 2 * Math.PI);
 	ctx.stroke();
+
+	if (currentRoom) {
+
+	draw_leaderboard(ctx,currentRoom)
+	}
 
 	window.requestAnimationFrame(render)
 }

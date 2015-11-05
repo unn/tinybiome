@@ -4,14 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"strings"
+	"time"
 )
 
 type Protocol interface {
 	GetMessage(*Player) error
 	WriteNewActor(*Actor)
 	WriteDestroyActor(*Actor)
+	WriteNewPlayer(*Player)
+	WriteDestroyPlayer(*Player)
+	WriteNamePlayer(*Player)
 	WriteOwns(*Player)
 	WriteRoom(*Room)
 	WriteMoveActor(*Actor)
@@ -29,12 +34,15 @@ type JsonProtocol struct {
 	W      *json.Encoder
 	R      *json.Decoder
 	Buffer []string
+	T      time.Time
+	Count  int
 }
 
 func NewJsonProtocol(ws io.ReadWriter) Protocol {
 	w := json.NewEncoder(ws)
 	r := json.NewDecoder(ws)
-	return Protocol(&JsonProtocol{ws, w, r, nil})
+	return Protocol(&JsonProtocol{RW: ws, W: w, R: r, Buffer: nil,
+		T: time.Now()})
 }
 
 // runs in a goroutine
@@ -42,9 +50,20 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 	r := p.room
 	decoded := map[string]interface{}{}
 	err := s.R.Decode(&decoded)
+	if time.Since(s.T) > 1*time.Second {
+		s.T = time.Now()
+		s.Count = 0
+	}
+	s.Count += 1
+
 	if err != nil {
 		return err
 	}
+	if s.Count > 100 {
+		log.Println("DROPPING")
+		return nil
+	}
+
 	switch decoded["type"] {
 	case "move":
 		pid := int(decoded["id"].(float64))
@@ -53,15 +72,13 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 			p.Move(int(decoded["x"].(float64)), int(decoded["y"].(float64)))
 		}
 	case "split":
-		ids := decoded["ids"].([]interface{})
-		for _, id := range ids {
-			id := id.(float64)
-			a := r.getActor(int(id))
+		for _, a := range p.Owns {
 			if a != nil {
 				a.Split()
 			}
 		}
 	case "join":
+		p.Rename(decoded["name"].(string))
 		for _, n := range p.Owns {
 			if n != nil {
 				return nil
@@ -89,14 +106,14 @@ func (s *JsonProtocol) WriteRoom(r *Room) {
 }
 
 func (s *JsonProtocol) WriteNewActor(actor *Actor) {
-	newPlayer := `{"type":"new","x":%d,"y":%d,"id":%d,"mass":%d}`
-	dat := fmt.Sprintf(newPlayer, actor.X, actor.Y, actor.ID, actor.Mass)
+	newPlayer := `{"type":"new","x":%d,"y":%d,"id":%d,"mass":%d,"owner":%d}`
+	dat := fmt.Sprintf(newPlayer, actor.X, actor.Y, actor.ID, actor.Mass, actor.Player.ID)
 	s.send(dat)
 }
 
 func (s *JsonProtocol) WriteNewPellet(pellet *Pellet) {
-	str := `{"type":"addpel","x":%d,"y":%d}`
-	dat := fmt.Sprintf(str, pellet.X, pellet.Y)
+	str := `{"type":"addpel","x":%d,"y":%d,"style":%d}`
+	dat := fmt.Sprintf(str, pellet.X, pellet.Y, pellet.Type)
 	s.send(dat)
 }
 
@@ -106,16 +123,27 @@ func (s *JsonProtocol) WriteDestroyPellet(pellet *Pellet) {
 	s.send(dat)
 }
 
+func (s *JsonProtocol) WriteNewPlayer(player *Player) {
+	str := `{"type":"addplayer","id":%d,"name":"%s"}`
+	dat := fmt.Sprintf(str, player.ID, player.Name)
+	s.send(dat)
+}
+
+func (s *JsonProtocol) WriteNamePlayer(player *Player) {
+	str := `{"type":"nameplayer","id":%d,"name":"%s"}`
+	dat := fmt.Sprintf(str, player.ID, player.Name)
+	s.send(dat)
+}
+
+func (s *JsonProtocol) WriteDestroyPlayer(player *Player) {
+	str := `{"type":"delplayer","id":%d}`
+	dat := fmt.Sprintf(str, player.ID)
+	s.send(dat)
+}
+
 func (s *JsonProtocol) WriteOwns(player *Player) {
-	ownsPlayer := `{"type":"own","ids":%s}`
-	ids := make([]int, 0)
-	for _, own := range player.Owns {
-		if own != nil {
-			ids = append(ids, own.ID)
-		}
-	}
-	idsStr, _ := json.Marshal(ids)
-	dat := fmt.Sprintf(ownsPlayer, string(idsStr))
+	ownsPlayer := `{"type":"own","id":%d}`
+	dat := fmt.Sprintf(ownsPlayer, player.ID)
 	s.send(dat)
 }
 
