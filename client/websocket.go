@@ -29,7 +29,7 @@ func (s *Server) Accept(ws *websocket.Conn) {
 	if _, found := s.IPS[a]; found {
 		reject = true
 	} else {
-		s.IPS[a] = a
+		s.IPS[a] = struct{}{}
 	}
 	s.Lock.Unlock()
 
