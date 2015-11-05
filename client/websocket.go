@@ -23,6 +23,10 @@ var allowedHosts = map[string]struct{}{
 }
 
 func (s *Server) Accept(ws *websocket.Conn) {
+	if _, found := allowedHosts[ws.RemoteAddr().String()]; !found {
+		return
+	}
+
 	room := s.Room
 	a := ws.Request().RemoteAddr
 	ip, _, _ := net.SplitHostPort(a)
@@ -34,10 +38,6 @@ func (s *Server) Accept(ws *websocket.Conn) {
 		s.IPS[ip] = struct{}{}
 	}
 	s.Lock.Unlock()
-
-	if _, found := allowedHosts[ws.RemoteAddr().String()]; !found {
-		reject = true
-	}
 
 	if !reject {
 		log.Println("New Client", ip)
