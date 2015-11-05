@@ -3,6 +3,7 @@ package client
 import (
 	"golang.org/x/net/websocket"
 	"log"
+	"net"
 	"sync"
 )
 
@@ -24,12 +25,13 @@ var allowedHosts = map[string]struct{}{
 func (s *Server) Accept(ws *websocket.Conn) {
 	room := s.Room
 	a := ws.Request().RemoteAddr
+	ip, _, _ := net.SplitHostPort(a)
 	reject := false
 	s.Lock.Lock()
-	if _, found := s.IPS[a]; found {
+	if _, found := s.IPS[ip]; found {
 		reject = true
 	} else {
-		s.IPS[a] = struct{}{}
+		s.IPS[ip] = struct{}{}
 	}
 	s.Lock.Unlock()
 
@@ -38,14 +40,14 @@ func (s *Server) Accept(ws *websocket.Conn) {
 	}
 
 	if !reject {
-		log.Println("New Client", a)
+		log.Println("New Client", ip)
 		room.Accept(NewJsonProtocol(ws))
 	} else {
-		log.Println("REJECTING", a)
+		log.Println("REJECTING", ip)
 	}
 
 	s.Lock.Lock()
-	delete(s.IPS, a)
+	delete(s.IPS, ip)
 	s.Lock.Unlock()
 }
 
