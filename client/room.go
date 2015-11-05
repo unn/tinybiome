@@ -92,13 +92,9 @@ func (r *Room) sendUpdates() {
 				if actor.Player == player {
 					continue
 				}
-				if player == nil {
-					continue
-				}
 				player.Net.WriteMoveActor(actor)
 				player.Net.WriteSetMassActor(actor)
 			}
-			actor.moved = false
 		}
 		player.Net.MultiSend()
 	}
