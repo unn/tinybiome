@@ -22,11 +22,6 @@ var allowedHosts = map[string]struct{}{
 	"http://localhost:8080": struct{}{},
 }
 
-var allowedHosts = map[string]struct{}{
-	"http://www.tinybio.me": struct{}{},
-	"http://localhost:8080": struct{}{},
-}
-
 func (s *Server) Accept(ws *websocket.Conn) {
 	room := s.Room
 	a := ws.Request().RemoteAddr
@@ -35,13 +30,16 @@ func (s *Server) Accept(ws *websocket.Conn) {
 	s.Lock.Lock()
 	if _, found := s.IPS[ip]; found {
 		reject = true
+		log.Println("REJECTING", ip, "BECAUSE ALREADY PLAYING")
 	} else {
 		s.IPS[ip] = struct{}{}
 	}
 	s.Lock.Unlock()
 
-	if _, found := allowedHosts[ws.RemoteAddr().String()]; found {
+	o := ws.RemoteAddr().String()
+	if _, found := allowedHosts[o]; !found {
 		reject = true
+		log.Println("REJECTING", ip, "BECAUSE ORIGIN IS", o)
 	}
 
 	if !reject {
@@ -51,6 +49,7 @@ func (s *Server) Accept(ws *websocket.Conn) {
 		log.Println("REJECTING", ip)
 	}
 
+	log.Println("CLIENT LEAVING", ip)
 	s.Lock.Lock()
 	delete(s.IPS, ip)
 	s.Lock.Unlock()

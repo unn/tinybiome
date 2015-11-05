@@ -53,15 +53,17 @@ func (p *Pellet) Remove() {
 
 type Actor struct {
 	ID         int
-	X          int
-	Y          int
+	X          float64
+	Y          float64
+	XSpeed     float64
+	YSpeed     float64
 	moved      bool
-	Mass       int
+	Mass       float64
 	Player     *Player
 	MergeTime  time.Time
 	radius     float64
 	LastUpdate time.Time
-	DecayLevel int
+	DecayLevel float64
 }
 
 func (a *Actor) Decay() {
@@ -84,11 +86,11 @@ func (a *Actor) Radius() float64 {
 	return a.radius
 }
 
-func (a *Actor) Move(x, y int) {
-	dx := float64(x - a.X)
-	dy := float64(y - a.Y)
+func (a *Actor) Move(x, y float64) {
+	dx := x - a.X
+	dy := y - a.Y
 	dist := math.Sqrt(dx*dx + dy*dy)
-	allowed := 1.2 * (4 / (math.Pow(.46*float64(a.Mass), .1)))
+	allowed := 1.2 * (4 / (math.Pow(.46*a.Mass, .1)))
 	frames := time.Since(a.LastUpdate).Seconds() * 1000 / (1000 / 60)
 	allowed = allowed * frames
 	a.LastUpdate = time.Now()
@@ -97,8 +99,8 @@ func (a *Actor) Move(x, y int) {
 		dy = dy / dist * allowed
 	}
 
-	a.X += int(dx)
-	a.Y += int(dy)
+	a.X += dx
+	a.Y += dy
 
 	consumes := []*Actor{}
 	done := a.Player.room.Read("Moving player")
@@ -106,8 +108,8 @@ func (a *Actor) Move(x, y int) {
 		if b == a || b == nil {
 			continue
 		}
-		dx := float64(b.X - a.X)
-		dy := float64(b.Y - a.Y)
+		dx := b.X - a.X
+		dy := b.Y - a.Y
 		dist := math.Sqrt(dx*dx + dy*dy)
 		if dist == 0 {
 			dist = .01
@@ -118,8 +120,8 @@ func (a *Actor) Move(x, y int) {
 			if b.Player == a.Player && !a.CanEat(b) {
 				dx = dx / dist * depth
 				dy = dy / dist * depth
-				a.X -= int(dx)
-				a.Y -= int(dy)
+				a.X -= dx
+				a.Y -= dy
 				a.Player.Net.WriteMoveActor(a)
 			}
 			if (dist < a.Radius() || dist < b.Radius()) && a.CanEat(b) {
@@ -130,9 +132,9 @@ func (a *Actor) Move(x, y int) {
 	pellets := []*Pellet{}
 	r := a.Player.room
 	for _, p := range r.Pellets[:r.PelletCount] {
-		dx := p.X - a.X
-		dy := p.Y - a.Y
-		dist := float64(dx*dx + dy*dy)
+		dx := float64(p.X) - a.X
+		dy := float64(p.Y) - a.Y
+		dist := dx*dx + dy*dy
 		allowedDist := 3 + a.Radius()
 		if dist < allowedDist*allowedDist {
 			pellets = append(pellets, p)
@@ -148,6 +150,9 @@ func (a *Actor) Move(x, y int) {
 		a.ConsumePellet(pellets[i])
 	}
 	a.moved = true
+}
+func (a *Actor) Tick(d time.Duration) {
+
 }
 
 func (a *Actor) CanMerge() bool {
@@ -169,7 +174,7 @@ func (a *Actor) CanEat(b *Actor) bool {
 
 func (a *Actor) Consume(b *Actor) {
 	log.Println(a, "CONSUMES", b)
-	a.Mass += int(float64(b.Mass) * .9)
+	a.Mass += b.Mass * .9
 	a.RecalcRadius()
 	b.Remove()
 	a.Player.Net.WriteSetMassActor(a)
@@ -179,7 +184,7 @@ func (a *Actor) ConsumePellet(b *Pellet) {
 	if b.Type == 0 {
 		a.DecayLevel /= 2
 	} else {
-		a.Mass += int(float64(b.Mass) * .9)
+		a.Mass += float64(b.Mass) * .9
 	}
 	a.RecalcRadius()
 	b.Remove()
@@ -187,7 +192,7 @@ func (a *Actor) ConsumePellet(b *Pellet) {
 }
 
 func (a *Actor) String() string {
-	return fmt.Sprintf("%d (m:%d, o:%s)", a.ID, a.Mass, a.Player)
+	return fmt.Sprintf("%d (m:%f, o:%s)", a.ID, a.Mass, a.Player)
 }
 
 func (a *Actor) Split() {
@@ -195,8 +200,8 @@ func (a *Actor) Split() {
 		return
 	}
 	a.Player.Net.MultiStart()
-	a.Player.NewActor(a.X-1, a.Y-1, int(float64(a.Mass)*.45))
-	a.Player.NewActor(a.X+1, a.Y+1, int(float64(a.Mass)*.45))
+	a.Player.NewActor(a.X-1, a.Y-1, a.Mass*.45)
+	a.Player.NewActor(a.X+1, a.Y+1, a.Mass*.45)
 	a.Remove()
 	a.Player.Net.MultiSend()
 }
@@ -234,7 +239,7 @@ type Player struct {
 	Name     string
 }
 
-func (p *Player) NewActor(x, y, mass int) *Actor {
+func (p *Player) NewActor(x, y, mass float64) *Actor {
 	r := p.room
 	actor := &Actor{X: x, Y: y, Player: p, Mass: mass,
 		MergeTime: time.Now().Add(time.Duration(r.MergeTime) * time.Second)}
