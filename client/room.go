@@ -10,7 +10,7 @@ import (
 const MaxEnts = 256 * 256
 const MaxPlayers = 1024
 const MaxOwns = 16
-const MaxPellets = 10000
+const MaxPellets = 5000
 
 type Room struct {
 	Width       int

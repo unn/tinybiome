@@ -1,6 +1,9 @@
 var currentRoom;
 var myplayer;
 
+var felt = document.createElement('IMG');
+felt.src = 'imgs/felt.jpg';
+
 	ws = new WebSocket("ws://"+document.location.hostname+":5000");
 	ws.onerror = function() {
 		ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
@@ -32,6 +35,7 @@ function readMessage(v) {
 		break
 	case "delpel":
 		p = currentRoom.findTile(v.x,v.y).find(v.x,v.y)
+
 		if (p) {
 			p.remove()	
 		} else {
@@ -114,6 +118,7 @@ function renderTile(room,x,y) {
 	this.canRender = false
 	this.renderables = {}
 	this.dirty = false
+	this.room = room
 }
 renderTile.prototype.add = function(particle) {
 	this.renderables[particle.id] = particle
@@ -124,9 +129,18 @@ renderTile.prototype.remove = function(particle) {
 	this.dirty = true
 }
 renderTile.prototype.render = function(ctx) {
-	if (this.dirty) {
-		this.rerender()
+	if (Math.random()*1000<Object.keys(this.renderables).length) {
+		r = pickRandomProperty(this.renderables)
+		if (r) {
+			r = this.renderables[r]
+			this.room.addParticle(r.x,r.y,r.color)	
+		}
 	}
+		if (this.dirty) {
+			this.rerender()
+		}
+
+	
   	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
 
   	if (this.contains(mousex+camera.x,mousey+camera.y)) {
@@ -136,7 +150,6 @@ renderTile.prototype.render = function(ctx) {
   }
 }
 renderTile.prototype.rerender = function() {
-	console.log("rerendering",this.id)
 	this.ctx.clearRect(0, 0, c.width, c.height);
 	this.ctx.save()
 	this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
@@ -168,6 +181,45 @@ renderTile.prototype.find = function(x,y) {
 	return this.renderables[id]
 }
 
+function pickRandomProperty(obj) {
+    var result;
+    var count = 0;
+    for (var prop in obj)
+        if (Math.random() < 1/++count)
+           result = prop;
+    return result;
+}
+
+function particle(id,room,x,y,color) {
+	this.id = id
+	this.x = x
+	this.y = y
+	this.xspeed = Math.random()*4-2
+	this.yspeed = Math.random()*4-2
+	this.life = 100
+	this.color = color
+	this.room = room
+	this.room.particles[id] = this
+}
+particle.prototype.render = function(ctx) {
+	ctx.fillStyle = this.color;
+	ctx.beginPath();
+	ctx.arc(this.x, this.y, this.life/50, 0, 2 * Math.PI);
+	ctx.fill();
+	this.life -= 1
+	this.x += this.xspeed
+	this.y += this.yspeed
+	this.xspeed *= .95
+	this.yspeed *= .95
+	if (this.life<=0) this.destroy()
+}
+particle.prototype.destroy = function() {
+	this.room.particleCount -= 1
+	this.room.particles[this.id] = this.room.particles[this.room.particleCount]
+	this.room.particles[this.id].id = this.id
+}
+
+
 function room(width, height) {
 	this.tiles = {}
 	this.width = width
@@ -178,15 +230,26 @@ function room(width, height) {
 		}
 	}
 	this.players = {}
+	this.particles = []
+	this.particleCount = 0;
 }
 room.prototype.findTile = function(x,y) {
 	var tile_id = "tile("+Math.floor(x/renderTileSize)*renderTileSize+","+Math.floor(y/renderTileSize)*renderTileSize+")"
 	return this.tiles[tile_id]
 }
+room.prototype.addParticle = function(x,y,color) {
+	id = this.particleCount
+
+	this.particleCount += 1
+
+	p = new particle(id,this,x,y,color)
+}
 room.prototype.render = function(ctx) {
 	renderDetails = {"ms":new Date(),"skips":0,"renders":0}
 	ctx.strokeStyle = "black";
 	ctx.strokeRect(0, 0, room.width, room.height);
+
+
 
 	padding = 10
 	for (id in renderable) {
@@ -203,6 +266,10 @@ room.prototype.render = function(ctx) {
 		}
 		renderDetails.renders += 1
 		objectToRender.render(ctx)
+	}
+
+	for(var i=0; i<this.particleCount;i++) {
+		this.particles[i].render(ctx)
 	}
 	renderDetails.ms = (new Date()) - renderDetails.ms
 }
@@ -252,7 +319,6 @@ function draw_leaderboard(ctx, room) {
 		ctx.fillText(m, camera.width,i*20+20)
 		ctx.strokeText(m, camera.width,i*20+20)
 	}
-	console.log(JSON.stringify(playersWithScore))
 	
 }
 
@@ -280,6 +346,9 @@ pellet.prototype.render = function(ctx) {
 	ctx.fill();
 }
 pellet.prototype.remove = function() {
+	for(var i=0;i<5;i+=1) {
+		currentRoom.addParticle(v.x,v.y,p.color)
+	}
 	myTile = currentRoom.findTile(this.x,this.y)
 	myTile.remove(this)
 }
@@ -354,20 +423,32 @@ actor.prototype.render = function(ctx) {
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	ctx.fillStyle = this.owner==myplayer.id ? "#009900" : "#990000";
+	ctx.save();
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
-	ctx.fill();
+	ctx.clip();
+	ctx.drawImage(felt,this.x-radius,this.y-radius, radius*2, radius*2);
 
-	ctx.fillStyle = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
+	ctx.globalCompositeOperation = "multiply";
+	ctx.fillStyle = this.color = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
 	ctx.beginPath();
-	ctx.arc(this.x, this.y, radius*.8, 0, 2 * Math.PI);
+	ctx.fillRect(this.x-radius,this.y-radius,radius*2,radius*2)
 	ctx.fill();
+	ctx.globalCompositeOperation = "source-over";
+
+	ctx.restore();
+
+	ctx.lineWidth = radius*.1;
+	ctx.strokeStyle = this.color;
+	ctx.beginPath();
+	ctx.arc(this.x, this.y, radius, 0, 2 * Math.PI);
+	ctx.stroke();
+	ctx.lineWidth = 1;
 
 	ctx.textAlign = "center";
 	ctx.fillStyle = "white";
 	ctx.strokeStyle = "black";
-	ctx.font = "28px serif";
+	ctx.font = "28px sans serif";
 	ctx.textBaseline = "bottom";
 	n = currentRoom.players[this.owner].name
 	n = n ? n : "Microbe"
@@ -380,6 +461,7 @@ actor.prototype.render = function(ctx) {
  	ctx.strokeText(this.mass, this.x, this.y);
 }
 actor.prototype.step = function() {
+	room = currentRoom
 	if (this.owner==myplayer.id) {
 		onCanvasX = this.x - camera.x
 		onCanvasY = this.y - camera.y
@@ -407,6 +489,15 @@ actor.prototype.step = function() {
 
 		this.x += dx
 		this.y += dy
+
+		if (dx!==0||dy!==0) {
+			if (Math.random()*1000 < this.mass) {
+				a = Math.atan2(dy,dx) + Math.random()*Math.PI-Math.PI/2
+				dx = Math.cos(a)*this.radius()
+				dy = Math.sin(a)*this.radius()
+				room.addParticle(this.x-dx,this.y-dy,this.color)
+			}
+		}
 
 		for (i in myplayer.owns) {
 			b = myplayer.owns[i]
@@ -440,11 +531,22 @@ actor.prototype.step = function() {
 		if (distSinceLU > 4 || Math.random() < .1) {
 			mov = {type:"move",x:this.x,y:this.y,id:this.id}
 			ws.send(JSON.stringify(mov))
-			console.log(mov)
 			this.lastUpdateX = this.x
 			this.lastUpdateY = this.y
 		}
 	} else {
+		dx = this.x - this.lastUpdateX
+		dy = this.y - this.lastUpdateY
+
+		if (dx!==0||dy!==0) {
+			if (Math.random()*1500 < this.mass) {
+				a = Math.atan2(dy,dx) + Math.random()*Math.PI-Math.PI/2
+				dx = Math.cos(a)*this.radius()
+				dy = Math.sin(a)*this.radius()
+				room.addParticle(this.x-dx,this.y-dy,this.color)
+			}
+		}
+
 		this.x = (this.x*3+this.lastUpdateX)/4
 		this.y = (this.y*3+this.lastUpdateY)/4
 	}
