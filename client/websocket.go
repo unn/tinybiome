@@ -42,13 +42,13 @@ func (s *Server) Accept(ws *websocket.Conn) {
 	if !reject {
 		log.Println("New Client", ip)
 		room.Accept(NewJsonProtocol(ws))
+		s.Lock.Lock()
+		delete(s.IPS, ip)
+		s.Lock.Unlock()
 	} else {
 		log.Println("REJECTING", ip)
 	}
 
-	s.Lock.Lock()
-	delete(s.IPS, ip)
-	s.Lock.Unlock()
 }
 
 func (s *Server) AddRoom(r *Room) {
