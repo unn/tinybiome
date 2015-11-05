@@ -1,5 +1,7 @@
 var currentRoom;
 var myplayer;
+var tileSize = 50;
+var hidingBbox = true;
 
 var felt = document.createElement('IMG');
 felt.src = 'imgs/felt.jpg';
@@ -80,7 +82,6 @@ function readMessage(v) {
 		p.mass = v.mass
 		break;
 	case "multi":
-		console.log("MULTI", v.parts)
 		for(var i=0;i<v.parts.length;i++) {
 			readMessage(v.parts[i])
 		}
@@ -90,7 +91,7 @@ function readMessage(v) {
 }
 
 renderTiles = {}
-renderTileSize = 250
+renderTileSize = 500
 tilePadding = 10
 
 function player(room, id) {
@@ -204,8 +205,17 @@ function particle(id,room,x,y,color) {
 particle.prototype.render = function(ctx) {
 	ctx.fillStyle = this.color;
 	ctx.beginPath();
-	ctx.arc(this.x, this.y, this.life/50, 0, 2 * Math.PI);
+	r = this.life/50
+	ctx.moveTo(this.x,this.y-r)
+	ctx.lineTo(this.x-r*.8,this.y-r*.55)
+	ctx.lineTo(this.x-r*.8,this.y+r*.55)
+	ctx.lineTo(this.x,this.y+r)
+	ctx.lineTo(this.x+r*.8,this.y+r*.55)
+	ctx.lineTo(this.x+r*.8,this.y-r*.55)
+	ctx.lineTo(this.x,this.y-r)
 	ctx.fill();
+}
+particle.prototype.step = function(ctx) {
 	this.life -= 1
 	this.x += this.xspeed
 	this.y += this.yspeed
@@ -269,7 +279,13 @@ room.prototype.render = function(ctx) {
 	}
 
 	for(var i=0; i<this.particleCount;i++) {
-		this.particles[i].render(ctx)
+		p = this.particles[i]
+		p.step()
+		if (p.x < camera.x - padding || p.y < camera.y - padding
+			|| p.x > camera.x + camera.width + padding
+			|| p.y > camera.y + camera.height + padding)
+			continue
+		p.render(ctx)
 	}
 	renderDetails.ms = (new Date()) - renderDetails.ms
 }
@@ -342,7 +358,14 @@ pellet.prototype.radius = function() {
 pellet.prototype.render = function(ctx) {
 	ctx.fillStyle = this.color;
 	ctx.beginPath();
-	ctx.arc(this.x, this.y, this._radius, 0, 2 * Math.PI);
+	r = this._radius
+	ctx.moveTo(this.x,this.y-r)
+	ctx.lineTo(this.x-r*.8,this.y-r*.55)
+	ctx.lineTo(this.x-r*.8,this.y+r*.55)
+	ctx.lineTo(this.x,this.y+r)
+	ctx.lineTo(this.x+r*.8,this.y+r*.55)
+	ctx.lineTo(this.x+r*.8,this.y-r*.55)
+	ctx.lineTo(this.x,this.y-r)
 	ctx.fill();
 }
 pellet.prototype.remove = function() {
@@ -621,8 +644,6 @@ document.onkeyup = function(e) {
 
 }
 
-tileSize = 50;
-hidingBbox = true;
 
 
 function render() {

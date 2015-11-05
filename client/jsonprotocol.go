@@ -124,15 +124,15 @@ func (s *JsonProtocol) WriteDestroyPellet(pellet *Pellet) {
 }
 
 func (s *JsonProtocol) WriteNewPlayer(player *Player) {
-	str := `{"type":"addplayer","id":%d,"name":"%s"}`
-	dat := fmt.Sprintf(str, player.ID, player.Name)
-	s.send(dat)
+	o := map[string]interface{}{"type": "addplayer",
+		"id": player.ID, "name": player.Name}
+	s.W.Encode(o)
 }
 
 func (s *JsonProtocol) WriteNamePlayer(player *Player) {
-	str := `{"type":"nameplayer","id":%d,"name":"%s"}`
-	dat := fmt.Sprintf(str, player.ID, player.Name)
-	s.send(dat)
+	o := map[string]interface{}{"type": "nameplayer",
+		"id": player.ID, "name": player.Name}
+	s.W.Encode(o)
 }
 
 func (s *JsonProtocol) WriteDestroyPlayer(player *Player) {
