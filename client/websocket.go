@@ -13,11 +13,16 @@ func NewServer() *Server {
 	return &Server{}
 }
 
+var allowedHosts = map[string]struct{}{
+	"http://www.tinybio.me": struct{}{},
+	"http://localhost:8080": struct{}{},
+}
+
 func (s *Server) Accept(ws *websocket.Conn) {
 	room := s.Room
 
 	log.Println("New Client", ws.RemoteAddr())
-	if ws.RemoteAddr().String() == "http://www.tinybio.me" {
+	if _, found := allowedHosts[ws.RemoteAddr().String()]; found {
 		room.Accept(NewJsonProtocol(ws))
 	}
 }

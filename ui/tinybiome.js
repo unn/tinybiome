@@ -76,6 +76,8 @@ function readMessage(v) {
 		}
 		p.lastUpdateX = v.x
 		p.lastUpdateY = v.y
+		p.xspeed = v.xs
+		p.yspeed = v.ys
 		break;
 	case "mass":
 		p = actors[v.id]
@@ -483,96 +485,80 @@ actor.prototype.render = function(ctx) {
  	ctx.fillText(this.mass, this.x, this.y);
  	ctx.strokeText(this.mass, this.x, this.y);
 }
-actor.prototype.step = function() {
+actor.prototype.clientStep = function(seconds) {
+	onCanvasX = this.x - camera.x
+	onCanvasY = this.y - camera.y
+
+	mdx = mousex - onCanvasX
+	mdy = mousey - onCanvasY
+
+	dist = Math.sqrt(mdx*mdx+mdy*mdy);
+	maxSpeed = 4/(Math.pow(.46*this.mass,.1))
+
+	// mass between 10 - 500000
+	// 
+
+	if (dist>=10) {
+		newDist = Math.sqrt(dist-10);
+		if (newDist>maxSpeed) {
+			newDist = maxSpeed
+		}
+		dx = mdx/dist*newDist;
+		dy = mdy/dist*newDist;
+	} else {
+		dx = 0
+		dy = 0
+	}
+
+	this.xspeed = dx / 10
+	this.yspeed = dy / 10
+
+	for (i in myplayer.owns) {
+		b = myplayer.owns[i]
+		if (this == b) {
+			continue
+		}
+		dx = b.x - this.x
+		dy = b.y - this.y
+		dist = Math.sqrt(dx*dx + dy*dy)
+		if (dist == 0) {
+			dist = .01
+		}
+		allowedDist = this.radius() + b.radius()
+		depth = allowedDist - dist
+		if (depth > 0) {
+			if (this.mergetime > (new Date()) || b.mergetime > (new Date())) {
+				dx = dx / dist * depth
+				dy = dy / dist * depth
+				this.x -= dx
+				this.y -= dy
+			}
+		}
+	}
+
+}
+actor.prototype.step = function(seconds) {
 	room = currentRoom
 	if (this.owner==myplayer.id) {
-		onCanvasX = this.x - camera.x
-		onCanvasY = this.y - camera.y
-
-		mdx = mousex - onCanvasX
-		mdy = mousey - onCanvasY
-
-		dist = Math.sqrt(mdx*mdx+mdy*mdy);
-		maxSpeed = 4/(Math.pow(.46*this.mass,.1))
-
-		// mass between 10 - 500000
-		// 
-
-		if (dist>=10) {
-			newDist = Math.sqrt(dist-10);
-			if (newDist>maxSpeed) {
-				newDist = maxSpeed
-			}
-			dx = mdx/dist*newDist;
-			dy = mdy/dist*newDist;
-		} else {
-			dx = 0
-			dy = 0
-		}
-
-		this.x += dx
-		this.y += dy
-
-		if (dx!==0||dy!==0) {
-			if (Math.random()*1000 < this.mass) {
-				a = Math.atan2(dy,dx) + Math.random()*Math.PI-Math.PI/2
-				dx = Math.cos(a)*this.radius()
-				dy = Math.sin(a)*this.radius()
-				room.addParticle(this.x-dx,this.y-dy,this.color)
-			}
-		}
-
-		for (i in myplayer.owns) {
-			b = myplayer.owns[i]
-			if (this == b) {
-				continue
-			}
-			dx = b.x - this.x
-			dy = b.y - this.y
-			dist = Math.sqrt(dx*dx + dy*dy)
-			if (dist == 0) {
-				dist = .01
-			}
-			allowedDist = this.radius() + b.radius()
-			depth = allowedDist - dist
-			if (depth > 0) {
-				if (this.mergetime > (new Date()) || b.mergetime > (new Date())) {
-					dx = dx / dist * depth
-					dy = dy / dist * depth
-					this.x -= dx
-					this.y -= dy
-				}
-			}
-		}
-
-		this.x = median(this.x, 0, room.width);
-		this.y = median(this.y, 0, room.height);
-
-		dx = this.lastUpdateX-this.x
-		dy = this.lastUpdateY-this.y
-		distSinceLU = Math.sqrt(dx*dx+dy*dy)
-		if (distSinceLU > 4 || Math.random() < .1) {
-			mov = {type:"move",x:this.x,y:this.y,id:this.id}
-			ws.send(JSON.stringify(mov))
-			this.lastUpdateX = this.x
-			this.lastUpdateY = this.y
-		}
-	} else {
-		dx = this.x - this.lastUpdateX
-		dy = this.y - this.lastUpdateY
-
-		if (dx!==0||dy!==0) {
-			if (Math.random()*1500 < this.mass) {
-				a = Math.atan2(dy,dx) + Math.random()*Math.PI-Math.PI/2
-				dx = Math.cos(a)*this.radius()
-				dy = Math.sin(a)*this.radius()
-				room.addParticle(this.x-dx,this.y-dy,this.color)
-			}
-		}
-
-		this.x = (this.x*3+this.lastUpdateX)/4
-		this.y = (this.y*3+this.lastUpdateY)/4
+		this.clientStep(seconds)
 	}
+
+	dx = this.x - this.lastUpdateX
+	dy = this.y - this.lastUpdateY
+
+	if (dx!==0||dy!==0) {
+		if (Math.random()*1500 < this.mass) {
+			a = Math.atan2(dy,dx) + Math.random()*Math.PI-Math.PI/2
+			dx = Math.cos(a)*this.radius()
+			dy = Math.sin(a)*this.radius()
+			room.addParticle(this.x-dx,this.y-dy,this.color)
+		}
+	}
+
+	this.x += this.xspeed
+	this.y += this.yspeed
+	this.x = median(this.x, 0, room.width);
+	this.y = median(this.y, 0, room.height);
 }
 actor.prototype.remove = function() {
 	delete renderable[this.id]
@@ -713,12 +699,16 @@ function render() {
 	window.requestAnimationFrame(render)
 }
 
+lastStep = (new Date())
 function step() {
 	var actor;
+	now = (new Date())
+	diff = (now - lastStep) / 1000
 	for (id in actors) {
 		actor = actors[id]
-		actor.step()
+		actor.step(diff)
 	}
+	lastStep = now
 
 
 }

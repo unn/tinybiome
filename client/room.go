@@ -27,10 +27,10 @@ type Room struct {
 	emuLock sync.RWMutex
 }
 
-func (r *Room) run() {
+func (r *Room) run(d time.Duration) {
 	r.createPellets()
 	r.addDecay()
-	r.sendUpdates()
+	r.sendUpdates(d)
 }
 
 func NewRoom() *Room {
@@ -41,8 +41,11 @@ func NewRoom() *Room {
 	}
 
 	go func() {
+		lastTick := time.Now()
 		for range r.ticker.C {
-			r.run()
+			now := time.Now()
+			r.run(now.Sub(lastTick))
+			lastTick = now
 		}
 	}()
 	return r
@@ -78,7 +81,13 @@ func (r *Room) addDecay() {
 	done()
 }
 
-func (r *Room) sendUpdates() {
+func (r *Room) sendUpdates(d time.Duration) {
+	for _, actor := range r.Actors[:r.HighestID] {
+		if actor == nil {
+			continue
+		}
+		actor.Tick(d)
+	}
 	for _, player := range r.Players {
 		if player == nil {
 			continue

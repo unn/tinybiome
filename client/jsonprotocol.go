@@ -69,7 +69,8 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 		pid := int(decoded["id"].(float64))
 		p := r.getActor(pid)
 		if p != nil {
-			p.Move(int(decoded["x"].(float64)), int(decoded["y"].(float64)))
+			p.XSpeed = decoded["xs"].(float64)
+			p.YSpeed = decoded["ys"].(float64)
 		}
 	case "split":
 		for _, a := range p.Owns {
@@ -84,7 +85,7 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 				return nil
 			}
 		}
-		p.NewActor(rand.Intn(r.Width), rand.Intn(r.Height), r.StartMass)
+		p.NewActor(rand.Float64()*float64(r.Width), rand.Float64()*float64(r.Height), float64(r.StartMass))
 	}
 	return nil
 }
@@ -106,7 +107,7 @@ func (s *JsonProtocol) WriteRoom(r *Room) {
 }
 
 func (s *JsonProtocol) WriteNewActor(actor *Actor) {
-	newPlayer := `{"type":"new","x":%d,"y":%d,"id":%d,"mass":%d,"owner":%d}`
+	newPlayer := `{"type":"new","x":%f,"y":%f,"id":%d,"mass":%f,"owner":%d}`
 	dat := fmt.Sprintf(newPlayer, actor.X, actor.Y, actor.ID, actor.Mass, actor.Player.ID)
 	s.send(dat)
 }
@@ -154,13 +155,13 @@ func (s *JsonProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *JsonProtocol) WriteMoveActor(actor *Actor) {
-	delPlayer := `{"type":"move","id":%d,"x":%d,"y":%d}`
-	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y)
+	delPlayer := `{"type":"move","id":%d,"x":%f,"y":%f,"xs":%f,"xy":%f}`
+	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.XSpeed, actor.YSpeed)
 	s.send(dat)
 }
 
 func (s *JsonProtocol) WriteSetMassActor(actor *Actor) {
-	delPlayer := `{"type":"mass","id":%d,"mass":%d}`
+	delPlayer := `{"type":"mass","id":%d,"mass":%f}`
 	dat := fmt.Sprintf(delPlayer, actor.ID, actor.Mass)
 	s.send(dat)
 }

@@ -11,7 +11,7 @@ import (
 func init() {
 	runtime.SetBlockProfileRate(1)
 	room := client.NewRoom()
-	room.SetDimensions(3000, 3000)
+	room.SetDimensions(500, 500)
 	cli := client.NewServer()
 	cli.AddRoom(room)
 	handler := websocket.Handler(cli.Accept)
