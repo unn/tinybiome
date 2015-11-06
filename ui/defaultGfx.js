@@ -119,11 +119,9 @@ gfx.renderMineral = function(ctx, x, y, color, radius) {
 	ctx.fillStyle = color;
 	r = radius
 	ctx.moveTo(x,y-r)
-	ctx.lineTo(x-r*.8,y-r*.55)
-	ctx.lineTo(x-r*.8,y+r*.55)
+	ctx.lineTo(x-r,y)
 	ctx.lineTo(x,y+r)
-	ctx.lineTo(x+r*.8,y+r*.55)
-	ctx.lineTo(x+r*.8,y-r*.55)
+	ctx.lineTo(x+r,y)
 	ctx.lineTo(x,y-r)
 	ctx.fill();
 }

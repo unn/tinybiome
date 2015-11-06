@@ -2,7 +2,7 @@ var currentRoom;
 var myplayer;
 var hidingBbox = true;
 
-renderTileSize = 200
+renderTileSize = 512
 tilePadding = 10
 
 function player(room, id) {
@@ -93,11 +93,13 @@ renderTile.prototype.render = function(ctx) {
   	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
 
   	// if (this.room.findTile(mousex-camera.x,mousey-camera.y)==this) {
-  	if (this.contains(mousex+camera.x,mousey+camera.y)) {
-	  	ctx.strokeStyle = "rgba(0,0,0,.2)";
-	  	ctx.strokeRect(this.x,this.y,renderTileSize,renderTileSize)
-	  	ctx.strokeRect(this.x-tilePadding,this.y-tilePadding,tilePadding*2+renderTileSize,tilePadding*2+renderTileSize)
-  }
+  	if (debugMode) {
+	  	if (this.contains(mousex+camera.x,mousey+camera.y)) {
+		  	ctx.strokeStyle = "rgba(0,0,0,.2)";
+		  	ctx.strokeRect(this.x,this.y,renderTileSize,renderTileSize)
+		  	ctx.strokeRect(this.x-tilePadding,this.y-tilePadding,tilePadding*2+renderTileSize,tilePadding*2+renderTileSize)
+	  }
+	 }
 }
 renderTile.prototype.rerender = function() {
 	this.ctx.clearRect(0, 0, renderTileSize+tilePadding*2, renderTileSize+tilePadding*2);
@@ -159,9 +161,7 @@ function particle(id,room,x,y,color) {
 	this.room.particles[id] = this
 }
 particle.prototype.render = function(ctx) {
-	if (this.x>camera.x && this.y>camera.y && this.x<camera.x+camera.width && this.y<camera.y+camera.height) {
-		gfx.renderParticle(ctx, this.x, this.y, this.life, this.color)
-	}
+	gfx.renderParticle(ctx, this.x, this.y, this.life, this.color)
 }
 particle.prototype.step = function(ctx) {
 	this.life -= 1
@@ -209,36 +209,49 @@ room.prototype.addParticle = function(x,y,color) {
 	return p
 }
 room.prototype.render = function(ctx) {
-	renderDetails = {"ms":new Date(),"skips":0,"renders":0}
+	start = (new Date())
 	gfx.renderRoom(ctx,this.width,this.height)
 
 	padding = 10
 	for (id in renderable) {
 		objectToRender = renderable[id]
 		bbox = objectToRender.bbox()
+		isTile = false
+		if ( objectToRender instanceof renderTile) {
+			isTile = true
+		}
 		if (hidingBbox) {
 			if (bbox[2] < camera.x - padding || bbox[3] < camera.y - padding
 				|| bbox[0] > camera.x + camera.width + padding
 				|| bbox[1] > camera.y + camera.height + padding) {
-				renderDetails.skips += 1
+				if (isTile) {
+					graphicsCounts.tileSkips += 1
+				}
 				continue
 			}
 
 		}
-		renderDetails.renders += 1
 		objectToRender.render(ctx)
+		if (isTile) {
+			graphicsCounts.tiles += 1
+		}
 	}
 
+	startP = (new Date())
+	graphicsCounts.renderTime += startP - start
 	for(var i=0; i<this.particleCount;i++) {
 		p = this.particles[i]
 		p.step()
 		if (p.x < camera.x - padding || p.y < camera.y - padding
 			|| p.x > camera.x + camera.width + padding
-			|| p.y > camera.y + camera.height + padding)
-			continue
+			|| p.y > camera.y + camera.height + padding) {
+				graphicsCounts.particleSkips += 1
+				continue
+		}
+		graphicsCounts.particles += 1
 		p.render(ctx)
 	}
-	renderDetails.ms = (new Date()) - renderDetails.ms
+	graphicsCounts.particleTime += (new Date()) - startP
 }
 room.prototype.findCollisions = function(actor) {
 	rts = renderTileSize
@@ -419,7 +432,8 @@ actor.prototype.step = function(seconds) {
 	distance = allowed * seconds * this.speed
 	mdx = Math.cos(this.direction) * distance
 	mdy = Math.sin(this.direction) * distance
-	if (Math.random()*1500 < this.mass*seconds*100*this.speed) {
+	particleChance = 1-1/((10 * seconds)*this.speed*this.radius())
+	if (Math.random()<particleChance) {
 		a = this.direction + Math.random()*Math.PI-Math.PI/2
 		dx = Math.cos(a)*this.radius()
 		dy = Math.sin(a)*this.radius()

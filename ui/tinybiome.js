@@ -2,6 +2,7 @@ var currentRoom;
 var myplayer;
 var tileSize = 50;
 var hidingBbox = true;
+var debugMode = false;
 
 var felt = document.createElement('IMG');
 felt.src = 'imgs/felt.jpg';
@@ -244,6 +245,9 @@ document.onkeydown = function(e) {
     	canSplit = false
     	writeSplit()
     }
+    if (e.keyCode == '144') {
+    	debugMode = true
+    }
 	if (e.keyCode == '68') {
     	load_graphics_file("dark.js")
     }
@@ -275,7 +279,27 @@ function load_graphics_file(name) {
 	gfx_loaded[name] = true
 }
 
+var renderCycles = 0
+var graphicsCounts
 function render() {
+	renderCycles -= 1
+	if (renderCycles <= 0) {
+		if (graphicsCounts) {
+			graphicsCounts.tiles /= 100
+			graphicsCounts.particles /= 100
+			graphicsCounts.tileSkips /= 100
+			graphicsCounts.particleSkips /= 100
+			graphicsCounts.renderTime /= 100
+			graphicsCounts.particleTime /= 100
+			if (debugMode) {
+				console.log(JSON.stringify(graphicsCounts))
+			}
+		}
+		graphicsCounts = {tiles:0, particles:0, tileSkips:0, 
+			particleSkips: 0, renderTime:0,
+			particleTime: 0}
+		renderCycles = 100
+	}
 	if (myplayer) {
 		l = Object.keys(myplayer.owns).length
 		if (l>0) {
@@ -291,6 +315,8 @@ function render() {
 
 			camera.x = (camX / l - camera.width / 2 + camera.x) / 2;
 			camera.y = (camY / l - camera.height / 2 + camera.y) / 2;
+			camera.x = Math.floor(camera.x)
+			camera.y = Math.floor(camera.y)
 		}
 	}
 

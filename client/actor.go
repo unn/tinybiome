@@ -198,8 +198,9 @@ func (a *Actor) Split() {
 		return
 	}
 	a.Player.Net.MultiStart()
-	a.Player.NewActor(a.X-1, a.Y-1, a.Mass*.45)
-	a.Player.NewActor(a.X+1, a.Y+1, a.Mass*.45)
+	a.Player.NewActor(a.X, a.Y, a.Mass*.45)
+	b := a.Player.NewActor(a.X, a.Y, a.Mass*.45)
+
 	a.Remove()
 	a.Player.Net.MultiSend()
 }
