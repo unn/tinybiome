@@ -73,6 +73,7 @@ function readMessage(v) {
 		p.x = v.x
 		p.y = v.y
 		p.direction = v.d
+		p.speed = v.s
 		break;
 	case "mass":
 		p = actors[v.id]
@@ -180,8 +181,8 @@ function render() {
 				camY += p.y;
 			}
 
-			camera.x = camX / l - camera.width / 2;
-			camera.y = camY / l - camera.height / 2;
+			camera.x = (camX / l - camera.width / 2 + camera.x) / 2;
+			camera.y = (camY / l - camera.height / 2 + camera.y) / 2;
 		}
 	}
 

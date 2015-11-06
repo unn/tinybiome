@@ -56,6 +56,7 @@ type Actor struct {
 	X          float64
 	Y          float64
 	Direction  float64
+	Speed      float64
 	moved      bool
 	Mass       float64
 	Player     *Player
@@ -144,7 +145,7 @@ func (a *Actor) Move(x, y float64) {
 
 func (a *Actor) Tick(d time.Duration) {
 	allowed := 100 / (math.Pow(.46*a.Mass, .1))
-	distance := allowed * d.Seconds()
+	distance := allowed * d.Seconds() * a.Speed
 
 	dx := math.Cos(a.Direction) * distance
 	dy := math.Sin(a.Direction) * distance

@@ -36,7 +36,7 @@ func (r *Room) run(d time.Duration) {
 
 func NewRoom() *Room {
 	r := &Room{
-		ticker:    time.NewTicker(time.Millisecond * 10),
+		ticker:    time.NewTicker(time.Millisecond * 50),
 		StartMass: 100,
 		MergeTime: 10,
 	}

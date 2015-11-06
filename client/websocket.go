@@ -11,12 +11,12 @@ import (
 type Server struct {
 	Room *Room
 	Lock sync.RWMutex
-	IPS  map[string]struct{}
+	IPS  map[string]int
 	WSH  websocket.Handler
 }
 
 func NewServer() *Server {
-	cli := &Server{IPS: map[string]struct{}{}}
+	cli := &Server{IPS: map[string]int{}}
 	cli.WSH = websocket.Handler(cli.Accept)
 	return cli
 }
@@ -31,13 +31,16 @@ func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
 	ip, _, _ := net.SplitHostPort(a)
 
 	s.Lock.Lock()
-	if _, found := s.IPS[ip]; found {
-		res.WriteHeader(400)
-		s.Lock.Unlock()
-		log.Println("REJECTING", ip)
-		return
+	if n, found := s.IPS[ip]; found {
+		if n >= 2 {
+			res.WriteHeader(400)
+			s.Lock.Unlock()
+			log.Println("REJECTING", ip)
+			return
+		}
+		s.IPS[ip] = n + 1
 	} else {
-		s.IPS[ip] = struct{}{}
+		s.IPS[ip] = 0
 	}
 
 	s.Lock.Unlock()
@@ -47,7 +50,7 @@ func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
 
 	log.Println("CLIENT LEAVING", ip)
 	s.Lock.Lock()
-	delete(s.IPS, ip)
+	s.IPS[ip] -= 1
 	s.Lock.Unlock()
 }
 

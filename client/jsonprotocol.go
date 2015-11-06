@@ -50,7 +50,7 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 	r := p.room
 	decoded := map[string]interface{}{}
 	err := s.R.Decode(&decoded)
-	if time.Since(s.T) > 1*time.Second {
+	if time.Since(s.T) > 100*time.Millisecond {
 		s.T = time.Now()
 		s.Count = 0
 	}
@@ -68,9 +68,15 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 	case "move":
 		pid := int(decoded["id"].(float64))
 		p := r.getActor(pid)
-		log.Println("MOVE", decoded)
 		if p != nil {
 			p.Direction = decoded["d"].(float64)
+			p.Speed = decoded["s"].(float64)
+			if p.Speed > 1 {
+				p.Speed = 1
+			}
+			if p.Speed < 0 {
+				p.Speed = 0
+			}
 		}
 	case "split":
 		for _, a := range p.Owns {
@@ -155,8 +161,8 @@ func (s *JsonProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *JsonProtocol) WriteMoveActor(actor *Actor) {
-	delPlayer := `{"type":"move","id":%d,"x":%f,"y":%f,"d":%f}`
-	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.Direction)
+	delPlayer := `{"type":"move","id":%d,"x":%f,"y":%f,"d":%f,"s":%f}`
+	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.Direction, actor.Speed)
 	s.send(dat)
 }
 
