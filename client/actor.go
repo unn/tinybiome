@@ -215,8 +215,6 @@ func (a *Actor) Remove() {
 	}
 	a.Player.EditLock.Unlock()
 
-	a.Player.Net.WriteOwns(a.Player)
-
 	r := a.Player.room
 	done := r.Write("Removing actor")
 	r.Actors[a.ID] = nil
