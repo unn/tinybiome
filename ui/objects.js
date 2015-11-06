@@ -197,6 +197,7 @@ room.prototype.findTile = function(ox,oy) {
 	x = Math.floor(ox/renderTileSize)*renderTileSize
 	y = Math.floor(oy/renderTileSize)*renderTileSize
 	var tile_id = renderTile.id(x,y)
+
 	return this.tiles[tile_id]
 }
 room.prototype.addParticle = function(x,y,color) {
@@ -285,7 +286,7 @@ pellet.prototype.render = function(ctx) {
 }
 pellet.prototype.remove = function() {
 	for(var i=0;i<4;i+=1) {
-		currentRoom.addParticle(v.x,v.y,p.color)
+		currentRoom.addParticle(this.x,this.y,p.color)
 	}
 	myTile = currentRoom.findTile(this.x,this.y)
 	if (!myTile) {
@@ -303,6 +304,7 @@ renderable = {}
 activeRenders = {}
 
 function actor(id, owner, x, y) {
+	console.log("CREATING ACTOR",id,"BY",owner.name,"AT",x,y)
 	this.id = id
 	this.x = x
 	this.y = y
@@ -404,9 +406,7 @@ actor.prototype.clientStep = function(seconds) {
 
 	now = (new Date())
 	if (now-this.lastupdate>50) {
-		mov = {type:"move",id:this.id,d:this.direction,s:this.speed}
-		ws.send(JSON.stringify(mov))
-		this.lastupdate = (new Date())
+		writeMove(this.id,this.direction,this.speed)
 	}
 
 }
@@ -416,7 +416,7 @@ actor.prototype.step = function(seconds) {
 		this.clientStep(seconds)
 	}
 
-	allowed = 100 / (Math.pow(.46*this.mass, .1))
+	allowed = 100 / (Math.pow(.46*this.mass, .2))
 	distance = allowed * seconds * this.speed
 	mdx = Math.cos(this.direction) * distance
 	mdy = Math.sin(this.direction) * distance

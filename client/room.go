@@ -15,15 +15,15 @@ const MaxPellets = 20000
 const TickLen = 50
 
 type Room struct {
-	Width       int
-	Height      int
-	StartMass   int
-	MergeTime   int
+	Width       int64
+	Height      int64
+	StartMass   int64
+	MergeTime   int64
 	Actors      [MaxEnts]*Actor
 	Players     [MaxPlayers]*Player
-	HighestID   int
+	HighestID   int64
 	Pellets     [MaxPellets]*Pellet
-	PelletCount int
+	PelletCount int64
 
 	ticker  *time.Ticker
 	emuLock sync.RWMutex
@@ -70,13 +70,12 @@ func (r *Room) updatePositions(d time.Duration) {
 }
 func (r *Room) createPellets(d time.Duration) {
 	perSecond := (1 - math.Pow(float64(r.PelletCount)/float64(MaxPellets), 2)) * float64(r.Width*r.Height) / 100
-	log.Println("PELS PER SECOND", perSecond)
-	for i := 0; i < int(d.Seconds()*perSecond); i++ {
+	for i := int64(0); i < int64(d.Seconds()*perSecond); i++ {
 		if r.PelletCount < MaxPellets {
 			newPel := &Pellet{
-				X:    rand.Intn(r.Width),
-				Y:    rand.Intn(r.Height),
-				Type: rand.Intn(2),
+				X:    int64(rand.Intn(int(r.Width))),
+				Y:    int64(rand.Intn(int(r.Height))),
+				Type: int64(rand.Intn(2)),
 				room: r,
 			}
 			newPel.Create()
@@ -128,9 +127,9 @@ func (r *Room) sendUpdates(d time.Duration) {
 	}
 }
 
-func (r *Room) SetDimensions(x, y int) {
-	r.Width = x
-	r.Height = y
+func (r *Room) SetDimensions(x, y int64) {
+	r.Width = int64(x)
+	r.Height = int64(y)
 }
 
 func (r *Room) Accept(p Protocol) {
@@ -171,10 +170,11 @@ func (r *Room) Accept(p Protocol) {
 	player.Remove()
 }
 
-func (r *Room) getId(a *Actor) int {
+func (r *Room) getId(a *Actor) int64 {
 	done := r.Write("Getting new ID")
 	defer done()
-	for id, found := range r.Actors {
+	for id64, found := range r.Actors {
+		id := int64(id64)
 		if found == nil {
 			if id+1 > r.HighestID {
 				r.HighestID = id + 1
@@ -187,10 +187,11 @@ func (r *Room) getId(a *Actor) int {
 	return -1
 }
 
-func (r *Room) getPlayerId(p *Player) int {
+func (r *Room) getPlayerId(p *Player) int64 {
 	done := r.Write("Getting new PID")
 	defer done()
-	for id, found := range r.Players {
+	for a, found := range r.Players {
+		id := int64(a)
 		if found == nil {
 			r.Players[id] = p
 			return id
@@ -200,7 +201,7 @@ func (r *Room) getPlayerId(p *Player) int {
 	return -1
 }
 
-func (r *Room) getActor(id int) *Actor {
+func (r *Room) getActor(id int64) *Actor {
 	done := r.Read("Looking up Actor")
 	defer done()
 	return r.Actors[id]

@@ -6,7 +6,17 @@ var hidingBbox = true;
 var felt = document.createElement('IMG');
 felt.src = 'imgs/felt.jpg';
 
+DataView.prototype.getUTF8String = function(offset, length) {
+    var utf16 = new ArrayBuffer(length * 2);
+    var utf16View = new Uint16Array(utf16);
+    for (var i = 0; i < length; ++i) {
+        utf16View[i] = this.getUint8(offset + i);
+    }
+    return String.fromCharCode.apply(null, utf16View);
+};
+
 	ws = new WebSocket("ws://"+document.location.hostname+":5000");
+	ws.binaryType = "arraybuffer";
 	ws.onerror = function() {
 		ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
 	}
@@ -14,29 +24,39 @@ felt.src = 'imgs/felt.jpg';
 		ohno("Websocket Closed?")
 	}
 	ws.onmessage = function(m) {
-		v = JSON.parse(m.data)
-		readMessage(v)
+		dv = new DataView(m.data)
+		off = 0
+		while (off < dv.byteLength) {
+			off = readMessage(dv, off)
+		}
 	}
 
-
-function readMessage(v) {
-	switch (v["type"]) {
-	case "new":
-		console.log("CREATING ACTOR", v.id, "OWNED BY", v.owner)
-		p = new actor(v.id, v.owner, v.x, v.y)
-		p.mass = v.mass
+function readMessage(dv, off) {
+	t = dv.getUint8(off)
+	switch (t) {
+	case 0: // JOIN
+		room = new room(dv.getInt32(off+1, true),dv.getInt32(off+5, true))
+		currentRoom = room
+		room.startmass = dv.getInt32(off+9, true)
+		room.mergetime = dv.getInt32(off+13, true)
+		off = off + 17
+		console.log(room);
 		break;
-	case "del":
-		console.log("REMOVING ACTOR", v.id)
-		p = actors[v.id]
-		p.remove()
-
+	case 1: // CREATE ACTOR
+		p = new actor(dv.getInt32(off+1, true), dv.getInt32(off+17, true), dv.getFloat32(off+5, true), dv.getFloat32(off+9, true))
+		p.mass =dv.getFloat32(off+13, true)
+		off = off + 21
+		console.log("CREATING ACTOR",p.id,"BY",p.owner,"AT",p.x,p.y)
 		break;
-	case "addpel":
-		p = new pellet(v.x, v.y, v.style)
+	case 2:
+		p = new pellet(dv.getInt32(off+1, true, true), dv.getInt32(off+5, true, true), dv.getInt32(off+9, true, true))
+		off = off + 13
 		break
-	case "delpel":
-		p = currentRoom.findTile(v.x,v.y).find(v.x,v.y)
+	case 3:
+		dx = dv.getInt32(off+1, true)
+		dy = dv.getInt32(off+5, true)
+		off = off + 9
+		p = currentRoom.findTile(dx,dy).find(dx,dy)
 
 		if (p) {
 			p.remove()	
@@ -44,50 +64,103 @@ function readMessage(v) {
 			console.log("COULDNT FIND", v.x,v.y)
 		}
 		break
-
-	case "addplayer":
-		console.log("CREATING PLAYER", v.id)
-		p = (new player(currentRoom, v.id))
-		p.name = v.name ? v.name : "";
+	case 4:
+		id = dv.getInt32(off+1, true)
+		len = dv.getInt32(off+5, true)
+		name = dv.getUTF8String(off+9,len)
+		off = off + 9 + len + 1
+		console.log("CREATING PLAYER", id)
+		p = (new player(currentRoom, id))
+		p.name = name ? name : "";
 		break
-	case "delplayer":
-		console.log("CREATING PLAYER", v.id)
-		currentRoom.players[v.id].remove()
+	case 5:
+		id = dv.getInt32(off+1, true)
+		len = dv.getInt32(off+5, true)
+		name = dv.getUTF8String(off+9,len)
+		off = off + 9 + len + 1
+		console.log("RENAMING PLAYER", id)
+		currentRoom.players[id].name=name
 		break
-	case "nameplayer":
-		currentRoom.players[v.id].name=v.name
-		break
-	case "own":
-		console.log("NOW OWNS", v.id)
-		myplayer = currentRoom.players[v.id]
-		break;
-	case "room":
-		room = new room(v.width,v.height)
-		currentRoom = room
-		room.startmass = v.mass
-		room.mergetime = v.mergetime
-		console.log(room);
-		break;
-	case "move":
-		p = actors[v.id]
-		p.x = v.x
-		p.y = v.y
-		p.direction = v.d
-		p.speed = v.s
-		break;
-	case "mass":
-		p = actors[v.id]
-		p.mass = v.mass
-		break;
-	case "multi":
-		for(var i=0;i<v.parts.length;i++) {
-			readMessage(v.parts[i])
-		}
+	case 6:
+		id = dv.getInt32(off+1, true)
+		off = off + 5
+		console.log("DESTROYING PLAYER", id)
+		currentRoom.players[id].remove()
 		break
 
+	case 7:
+		id = dv.getInt32(off+1, true)
+		off = off + 5
+		console.log("NOW OWNS", id)
+		myplayer = currentRoom.players[id]
+		break;
+	case 8:
+		id = dv.getInt32(off+1, true)
+		off = off + 5
+		console.log("REMOVING ACTOR", id)
+		p = actors[id]
+		p.remove()
+
+		break;
+	case 9: //move actor
+		id = dv.getInt32(off+1, true)
+		x = dv.getFloat32(off+5, true)
+		y = dv.getFloat32(off+9, true)
+		d = dv.getFloat32(off+13, true)
+		s = dv.getFloat32(off+17, true)
+		off = off + 21
+		p = actors[id]
+		p.x = x
+		p.y = y
+		p.direction = d
+		p.speed = s
+		break;
+	case 10:
+		id = dv.getInt32(off+1, true)
+		mass = dv.getFloat32(off+5, true)
+		off = off + 9
+		p = actors[id]
+		p.mass = mass
+		break;
+	default:
+		console.log("ERROR READING", t)
 	}
+	return off
 }
+mab = new DataView(new ArrayBuffer(13))
+mab.setUint8(0,1,true)
+sab = new DataView(new ArrayBuffer(1))
+sab.setUint8(0,2,true)
 
+function writeJoin(name) {
+	asString = stringToUint(name)
+	ab = new ArrayBuffer(1+4+asString)
+	dv = new DataView(ab)
+	dv.setUint8(0,0,true)
+	dv.setInt32(1,asString.length,true)
+	for(var i=0;i<asString.length;i+=1) {
+		dv.setUint8(5+i, asString[i],true)
+	}
+	ws.send(ab)
+}
+function writeMove(id,d,s) {
+	mab.setInt32(1,id,true)
+	mab.setFloat32(5,d,true)
+	mab.setFloat32(9,s,true)
+	ws.send(mab)
+}
+function writeSplit() {
+	ws.send(sab)
+}
+function stringToUint(string) {
+    var string = btoa(unescape(encodeURIComponent(string))),
+        charList = string.split(''),
+        uintArray = [];
+    for (var i = 0; i < charList.length; i++) {
+        uintArray.push(charList[i].charCodeAt(0));
+    }
+    return uintArray;
+}
 function rgb(r, g, b){
   return "rgb("+Math.floor(r)+","+Math.floor(g)+","+Math.floor(b)+")";
 }
@@ -104,8 +177,7 @@ window.onload = function() {
 	document.getElementById("loginButton").onclick = function() {
 		console.log("JOINING")
 		n = document.getElementById("name").value;
-		join = {type:"join",name:n}
-		ws.send(JSON.stringify(join))
+		writeJoin(n)
 	}
 }
 
@@ -136,8 +208,7 @@ document.onkeydown = function(e) {
 
 	if (canSplit && e.keyCode == '32') {
     	canSplit = false
-    	split = {type:"split"}
-    	ws.send(JSON.stringify(split))
+    	writeSplit()
     }
 	if (e.keyCode == '68') {
     	load_graphics_file("dark.js")

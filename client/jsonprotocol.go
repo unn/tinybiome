@@ -66,7 +66,7 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 
 	switch decoded["type"] {
 	case "move":
-		pid := int(decoded["id"].(float64))
+		pid := int64(decoded["id"].(float64))
 		p := r.getActor(pid)
 		if p != nil {
 			p.Direction = decoded["d"].(float64)

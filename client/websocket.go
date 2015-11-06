@@ -59,8 +59,9 @@ func (s *Server) Accept(ws *websocket.Conn) {
 		return
 	}
 
+	ws.PayloadType = websocket.BinaryFrame
 	room := s.Room
-	room.Accept(NewJsonProtocol(ws))
+	room.Accept(NewBinaryProtocol(ws))
 
 }
 

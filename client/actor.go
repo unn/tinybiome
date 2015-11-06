@@ -10,12 +10,12 @@ import (
 
 // types: 0 vitamind, 1 mineral
 type Pellet struct {
-	X    int
-	Y    int
+	X    int64
+	Y    int64
 	room *Room
-	ID   int
-	Mass int
-	Type int
+	ID   int64
+	Mass int64
+	Type int64
 }
 
 func (p *Pellet) Create() {
@@ -52,7 +52,7 @@ func (p *Pellet) Remove() {
 }
 
 type Actor struct {
-	ID         int
+	ID         int64
 	X          float64
 	Y          float64
 	Direction  float64
@@ -74,7 +74,7 @@ func (a *Actor) Decay() {
 	if a.DecayLevel > a.Mass {
 		a.DecayLevel = a.Mass
 	}
-	a.Mass -= a.DecayLevel / 1000
+	a.Mass -= a.DecayLevel / 2000
 	if a.Mass != m {
 		a.Player.Net.WriteSetMassActor(a)
 	}
@@ -144,7 +144,7 @@ func (a *Actor) Move(x, y float64) {
 }
 
 func (a *Actor) Tick(d time.Duration) {
-	allowed := 100 / (math.Pow(.46*a.Mass, .1))
+	allowed := 100 / (math.Pow(.46*a.Mass, .2))
 	distance := allowed * d.Seconds() * a.Speed
 
 	dx := math.Cos(a.Direction) * distance
@@ -229,7 +229,7 @@ func (a *Actor) Remove() {
 }
 
 type Player struct {
-	ID       int
+	ID       int64
 	Net      Protocol
 	room     *Room
 	Owns     [MaxOwns]*Actor
