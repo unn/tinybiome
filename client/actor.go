@@ -52,13 +52,17 @@ func (p *Pellet) Remove() {
 }
 
 type Actor struct {
-	ID         int64
-	X          float64
-	Y          float64
-	Direction  float64
-	Speed      float64
-	moved      bool
-	Mass       float64
+	ID        int64
+	X         float64
+	Y         float64
+	Direction float64
+	Speed     float64
+	moved     bool
+	Mass      float64
+
+	XSpeed float64
+	YSpeed float64
+
 	Player     *Player
 	MergeTime  time.Time
 	radius     float64
@@ -69,12 +73,12 @@ type Actor struct {
 func (a *Actor) Decay() {
 	m := a.Mass
 	if a.DecayLevel < a.Mass {
-		a.DecayLevel += 1
+		a.DecayLevel += a.Mass / 10000
 	}
 	if a.DecayLevel > a.Mass {
 		a.DecayLevel = a.Mass
 	}
-	a.Mass -= a.DecayLevel / 2000
+	a.Mass -= a.DecayLevel
 	if a.Mass != m {
 		a.Player.Net.WriteSetMassActor(a)
 	}
@@ -143,12 +147,20 @@ func (a *Actor) Move(x, y float64) {
 	a.Y = math.Max(0, a.Y)
 }
 
+var friction = .1
+
 func (a *Actor) Tick(d time.Duration) {
 	allowed := 100 / (math.Pow(.46*a.Mass, .2))
 	distance := allowed * d.Seconds() * a.Speed
 
 	dx := math.Cos(a.Direction) * distance
 	dy := math.Sin(a.Direction) * distance
+
+	a.XSpeed = math.Pow(friction, d.Seconds()) * a.XSpeed
+	a.YSpeed = math.Pow(friction, d.Seconds()) * a.YSpeed
+	a.X += a.XSpeed
+	a.Y += a.YSpeed
+
 	a.Move(a.X+dx, a.Y+dy)
 
 }
@@ -198,10 +210,19 @@ func (a *Actor) Split() {
 		return
 	}
 	a.Player.Net.MultiStart()
-	a.Player.NewActor(a.X, a.Y, a.Mass*.45)
-	a.Player.NewActor(a.X, a.Y, a.Mass*.45)
-
 	a.Remove()
+	nb := a.Player.NewActor(a.X, a.Y, a.Mass*.45)
+	nb.Direction = a.Direction
+	nb.Speed = a.Speed
+
+	b := a.Player.NewActor(a.X, a.Y, a.Mass*.45)
+
+	b.Direction = a.Direction
+	b.Speed = a.Speed
+	distance := b.Radius() * 2
+	b.XSpeed = math.Cos(a.Direction) * distance
+	b.YSpeed = math.Sin(a.Direction) * distance
+
 	a.Player.Net.MultiSend()
 }
 
