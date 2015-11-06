@@ -151,9 +151,9 @@ func (r *Room) Accept(p Protocol) {
 		p.WriteNewActor(oActor)
 	}
 	p.WritePelletsIncoming(r.Pellets[:r.PelletCount])
-	p.MultiSend()
 	took := time.Since(start)
 	done()
+	p.MultiSend()
 
 	player := r.NewPlayer(p)
 	log.Println(player, "IN LIST", r.Actors[:r.HighestID], "possible actors")

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"log"
 	"math/rand"
@@ -28,6 +29,8 @@ func NewBinaryProtocol(ws io.ReadWriter) Protocol {
 		Flush: true})
 }
 
+var invalidProto = errors.New("Invalid Protocol")
+
 // runs in a goroutine
 func (s *BinaryProtocol) GetMessage(p *Player) error {
 	r := p.room
@@ -43,6 +46,9 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		log.Println(p, "SENT LENGTH", strSize)
 		if strSize > 100 {
 			strSize = 100
+		}
+		if strSize < 0 {
+			return invalidProto
 		}
 		nameBytes := make([]byte, strSize)
 		s.R.Read(nameBytes)
@@ -168,8 +174,10 @@ func WriteFloat32(w io.Writer, i float64) {
 
 // sends updates
 func (s *BinaryProtocol) WriteRoom(r *Room) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(0)
 	WriteInt32(s.W, r.Width)
 	WriteInt32(s.W, r.Height)
@@ -179,8 +187,10 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 }
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(1)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.X)
@@ -194,8 +204,10 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(2)
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
@@ -204,8 +216,10 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(3)
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
@@ -216,8 +230,10 @@ func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(4)
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
@@ -231,8 +247,10 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(5)
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
@@ -246,8 +264,10 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(6)
 	WriteInt32(s.W, player.ID)
 	s.done()
@@ -257,8 +277,10 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteOwns(player *Player) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(7)
 	WriteInt32(s.W, player.ID)
 	s.done()
@@ -268,8 +290,10 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(8)
 	WriteInt32(s.W, actor.ID)
 	s.done()
@@ -279,8 +303,10 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(9)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.X)
@@ -294,8 +320,10 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 	s.W.WriteByte(10)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.Mass)
@@ -306,8 +334,10 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	if s.Flush {
+		s.Lock.Lock()
+		defer s.Lock.Unlock()
+	}
 
 	s.W.WriteByte(11)
 	WriteInt32(s.W, int64(len(pellets)))
@@ -322,6 +352,7 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 
 func (s *BinaryProtocol) MultiStart() {
 	s.W = bufio.NewWriterSize(s.RW, 1024*1024*10)
+	s.Lock.Lock()
 	s.Flush = false
 }
 
@@ -332,4 +363,5 @@ func (s *BinaryProtocol) MultiSend() {
 	s.W.Flush()
 	s.Flush = true
 	s.W = bufio.NewWriterSize(s.RW, 1024*10)
+	s.Lock.Unlock()
 }

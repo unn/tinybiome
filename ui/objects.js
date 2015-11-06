@@ -89,8 +89,22 @@ renderTile.prototype.render = function(ctx) {
 		this.rerender()
 	}
 
-	
+	myArea = this.bbox()
+	screenArea = camera.bbox()
+	myArea[0] = Math.max(myArea[0], screenArea[0])
+	myArea[1] = Math.max(myArea[1], screenArea[1])
+	myArea[2] = Math.min(myArea[2], screenArea[2])
+	myArea[3] = Math.min(myArea[3], screenArea[3])
+
   	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
+
+  	sArea = [myArea[0]-this.x,myArea[1]-this.y,myArea[2]-this.x,myArea[3]-this.y]
+  	tArea = [myArea[0]+tilePadding,myArea[1]+tilePadding,myArea[2]-tilePadding,myArea[3]-tilePadding]
+
+  	ctx.strokeStyle = "rgba(0,0,0,.2)";
+  	// TODO: try optimizing drawImage to clip within camera area
+	// ctx.drawImage(this.canvas, sArea[0], sArea[1], sArea[2]-sArea[0],sArea[3]-sArea[1],
+	// 	tArea[0], tArea[1], tArea[2]-tArea[0],tArea[3]-tArea[1])
 
   	// if (this.room.findTile(mousex-camera.x,mousey-camera.y)==this) {
   	if (debugMode) {

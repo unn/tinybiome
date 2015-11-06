@@ -229,6 +229,9 @@ window.onresize = function() {
 }
 
 var camera = {x:0,y:0,width:c.width,height:c.height};
+camera.bbox = function() {
+	return [camera.x,camera.y,camera.x+camera.width,camera.y+camera.height]
+}
 var ctx = c.getContext("2d");
 
 var mousex = c.width/2;
@@ -248,12 +251,14 @@ document.onkeydown = function(e) {
     if (e.keyCode == '144') {
     	debugMode = true
     }
-	if (e.keyCode == '68') {
-    	load_graphics_file("dark.js")
-    }
-	if (e.keyCode == '69') {
-    	load_graphics_file("tristans.js")
-    }
+    if (debugMode) {
+		if (e.keyCode == '68') {
+	    	load_graphics_file("dark.js")
+	    }
+		if (e.keyCode == '69') {
+	    	load_graphics_file("tristans.js")
+	    }
+	}
 
 }
 document.onkeyup = function(e) {
