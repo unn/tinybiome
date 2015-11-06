@@ -12,7 +12,7 @@ const MaxEnts = 256 * 256
 const MaxPlayers = 1024
 const MaxOwns = 16
 const MaxPellets = 20000
-const TickLen = 50
+const TickLen = 25
 
 type Room struct {
 	Width       int64

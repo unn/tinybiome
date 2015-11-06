@@ -78,7 +78,10 @@ func (a *Actor) Decay() {
 	if a.DecayLevel > a.Mass {
 		a.DecayLevel = a.Mass
 	}
-	a.Mass -= a.DecayLevel
+	a.Mass -= a.DecayLevel / 5
+	if a.Mass < 20 {
+		a.Mass = 20
+	}
 	if a.Mass != m {
 		a.Player.Net.WriteSetMassActor(a)
 	}
@@ -206,22 +209,35 @@ func (a *Actor) String() string {
 }
 
 func (a *Actor) Split() {
-	if a.Mass < 30 {
+	if a.Mass < 40 {
+		return
+	}
+	emptySlots := 0
+	for _, n := range a.Player.Owns {
+		if n == nil {
+			emptySlots += 1
+		}
+	}
+	if emptySlots < 2 {
 		return
 	}
 	a.Player.Net.MultiStart()
 	a.Remove()
-	nb := a.Player.NewActor(a.X, a.Y, a.Mass*.45)
+	nb := a.Player.NewActor(a.X, a.Y, a.Mass*.5)
 	nb.Direction = a.Direction
 	nb.Speed = a.Speed
 
-	b := a.Player.NewActor(a.X, a.Y, a.Mass*.45)
+	distance := nb.Radius() * 3
+	XSpeed := math.Cos(a.Direction)
+	YSpeed := math.Sin(a.Direction)
+
+	b := a.Player.NewActor(a.X+XSpeed*nb.Radius(), a.Y+YSpeed*nb.Radius(), a.Mass*.5)
 
 	b.Direction = a.Direction
 	b.Speed = a.Speed
-	distance := b.Radius() * 2
-	b.XSpeed = math.Cos(a.Direction) * distance
-	b.YSpeed = math.Sin(a.Direction) * distance
+
+	b.XSpeed = XSpeed * distance
+	b.YSpeed = YSpeed * distance
 
 	a.Player.Net.MultiSend()
 }
