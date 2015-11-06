@@ -2,6 +2,7 @@ package client
 
 import (
 	"log"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -10,7 +11,7 @@ import (
 const MaxEnts = 256 * 256
 const MaxPlayers = 1024
 const MaxOwns = 16
-const MaxPellets = 50000
+const MaxPellets = 20000
 const TickLen = 50
 
 type Room struct {
@@ -30,7 +31,7 @@ type Room struct {
 
 func (r *Room) run(d time.Duration) {
 	r.updatePositions(d)
-	r.createPellets()
+	r.createPellets(d)
 	r.addDecay()
 	r.sendUpdates(d)
 }
@@ -67,15 +68,19 @@ func (r *Room) updatePositions(d time.Duration) {
 		actor.Tick(d)
 	}
 }
-func (r *Room) createPellets() {
-	if r.PelletCount < MaxPellets {
-		newPel := &Pellet{
-			X:    rand.Intn(r.Width),
-			Y:    rand.Intn(r.Height),
-			Type: rand.Intn(2),
-			room: r,
+func (r *Room) createPellets(d time.Duration) {
+	perSecond := (1 - math.Pow(float64(r.PelletCount)/float64(MaxPellets), 2)) * float64(r.Width*r.Height) / 100
+	log.Println("PELS PER SECOND", perSecond)
+	for i := 0; i < int(d.Seconds()*perSecond); i++ {
+		if r.PelletCount < MaxPellets {
+			newPel := &Pellet{
+				X:    rand.Intn(r.Width),
+				Y:    rand.Intn(r.Height),
+				Type: rand.Intn(2),
+				room: r,
+			}
+			newPel.Create()
 		}
-		newPel.Create()
 	}
 }
 

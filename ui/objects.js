@@ -2,7 +2,7 @@ var currentRoom;
 var myplayer;
 var hidingBbox = true;
 
-renderTileSize = 500
+renderTileSize = 200
 tilePadding = 10
 
 function player(room, id) {
@@ -59,7 +59,6 @@ function renderTile(room,x,y) {
 	this.x = x
 	this.y = y
 	this.id = renderTile.id(x,y)
-	console.log("New render tile",this.id)
 	renderable[this.id] = this
 	room.tiles[this.id] = this
 	this.canRender = false
@@ -93,27 +92,30 @@ renderTile.prototype.render = function(ctx) {
 	
   	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
 
-  	if (this.room.findTile(mousex-camera.x,mousey-camera.y)==this) {
-  	// if (this.contains(mousex+camera.x,mousey+camera.y)) {
+  	// if (this.room.findTile(mousex-camera.x,mousey-camera.y)==this) {
+  	if (this.contains(mousex+camera.x,mousey+camera.y)) {
 	  	ctx.strokeStyle = "rgba(0,0,0,.2)";
 	  	ctx.strokeRect(this.x,this.y,renderTileSize,renderTileSize)
 	  	ctx.strokeRect(this.x-tilePadding,this.y-tilePadding,tilePadding*2+renderTileSize,tilePadding*2+renderTileSize)
   }
 }
 renderTile.prototype.rerender = function() {
-	this.ctx.clearRect(0, 0, c.width, c.height);
+	this.ctx.clearRect(0, 0, renderTileSize+tilePadding*2, renderTileSize+tilePadding*2);
 	this.ctx.save()
 	this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
 
 	for (id in this.renderables) {
 		objectToRender = this.renderables[id]
+		if (!this.contains(objectToRender.x,objectToRender.y))  {
+			console.log("WTF",this,objectToRender)
+		}
 		objectToRender.render(this.ctx)
 	}
 	this.ctx.restore()
 	this.dirty = false
 }
 renderTile.prototype.contains = function(x,y) {
-	return (this.x<x && this.y<y && this.x+renderTileSize>=x && this.y+renderTileSize>=y)
+	return (this.x<=x && this.y<=y && this.x+renderTileSize>x && this.y+renderTileSize>y)
 }
 renderTile.prototype.bbox = function() {
 	return [this.x-tilePadding,this.y-tilePadding,
@@ -258,7 +260,11 @@ function pellet(x,y,style) {
 	this.x = x
 	this.y = y
 	this.id = ""+x+","+y
-	currentRoom.findTile(x,y).add(this)
+	mytile = currentRoom.findTile(x,y)
+	if (!mytile.contains(x,y)) {
+		console.log("WTF", this.id,mytile)
+	}
+	mytile.add(this)
 	this._radius = 3
 	if (this.style==0) {
 		this.color = rgb(Math.random()*100,Math.random()*100,255)

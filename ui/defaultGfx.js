@@ -18,11 +18,11 @@ gfx.renderBackground = function(ctx, x, y, width, height) {
 	ctx.beginPath();
 
 
-	for (var curX=x-offsetX; curX<x+width-offsetX; curX+=tileSize) {
+	for (var curX=x-offsetX; curX<x+width+tileSize-offsetX; curX+=tileSize) {
 		ctx.moveTo(curX,y);
 		ctx.lineTo(curX,y+height);
 	}
-	for (var curY=Math.max(y-offsetY,0); curY<y+height-offsetY; curY+=tileSize) {
+	for (var curY=Math.max(y-offsetY,0); curY<y+height+tileSize-offsetY; curY+=tileSize) {
 		ctx.moveTo(x,curY);
 		ctx.lineTo(x+width,curY);
 	}
