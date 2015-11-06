@@ -70,14 +70,9 @@ function readMessage(v) {
 		break;
 	case "move":
 		p = actors[v.id]
-		if (p.owner == myplayer.id) {
-			p.x = v.x
-			p.y = v.y
-		}
-		p.lastUpdateX = v.x
-		p.lastUpdateY = v.y
-		p.xspeed = v.xs
-		p.yspeed = v.ys
+		p.x = v.x
+		p.y = v.y
+		p.direction = v.d
 		break;
 	case "mass":
 		p = actors[v.id]

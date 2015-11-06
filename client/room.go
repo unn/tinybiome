@@ -28,6 +28,7 @@ type Room struct {
 }
 
 func (r *Room) run(d time.Duration) {
+	r.updatePositions(d)
 	r.createPellets()
 	r.addDecay()
 	r.sendUpdates(d)
@@ -57,7 +58,14 @@ func (r *Room) Read(title string) func() {
 func (r *Room) Write(title string) func() {
 	return NewLockTracker(title, &r.emuLock, false)
 }
-
+func (r *Room) updatePositions(d time.Duration) {
+	for _, actor := range r.Actors[:r.HighestID] {
+		if actor == nil {
+			continue
+		}
+		actor.Tick(d)
+	}
+}
 func (r *Room) createPellets() {
 	if r.PelletCount < MaxPellets {
 		newPel := &Pellet{
@@ -82,12 +90,6 @@ func (r *Room) addDecay() {
 }
 
 func (r *Room) sendUpdates(d time.Duration) {
-	for _, actor := range r.Actors[:r.HighestID] {
-		if actor == nil {
-			continue
-		}
-		actor.Tick(d)
-	}
 	for _, player := range r.Players {
 		if player == nil {
 			continue
@@ -98,9 +100,6 @@ func (r *Room) sendUpdates(d time.Duration) {
 				continue
 			}
 			if actor.moved {
-				if actor.Player == player {
-					continue
-				}
 				player.Net.WriteMoveActor(actor)
 				player.Net.WriteSetMassActor(actor)
 			}

@@ -68,9 +68,9 @@ func (s *JsonProtocol) GetMessage(p *Player) error {
 	case "move":
 		pid := int(decoded["id"].(float64))
 		p := r.getActor(pid)
+		log.Println("MOVE", decoded)
 		if p != nil {
-			p.XSpeed = decoded["xs"].(float64)
-			p.YSpeed = decoded["ys"].(float64)
+			p.Direction = decoded["d"].(float64)
 		}
 	case "split":
 		for _, a := range p.Owns {
@@ -155,8 +155,8 @@ func (s *JsonProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *JsonProtocol) WriteMoveActor(actor *Actor) {
-	delPlayer := `{"type":"move","id":%d,"x":%f,"y":%f,"xs":%f,"xy":%f}`
-	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.XSpeed, actor.YSpeed)
+	delPlayer := `{"type":"move","id":%d,"x":%f,"y":%f,"d":%f}`
+	dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.Direction)
 	s.send(dat)
 }
 

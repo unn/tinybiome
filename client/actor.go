@@ -55,8 +55,7 @@ type Actor struct {
 	ID         int
 	X          float64
 	Y          float64
-	XSpeed     float64
-	YSpeed     float64
+	Direction  float64
 	moved      bool
 	Mass       float64
 	Player     *Player
@@ -87,21 +86,8 @@ func (a *Actor) Radius() float64 {
 }
 
 func (a *Actor) Move(x, y float64) {
-	dx := x - a.X
-	dy := y - a.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
-	allowed := 1.2 * (4 / (math.Pow(.46*a.Mass, .1)))
-	frames := time.Since(a.LastUpdate).Seconds() * 1000 / (1000 / 60)
-	allowed = allowed * frames
-	a.LastUpdate = time.Now()
-	if dist > allowed {
-		dx = dx / dist * allowed
-		dy = dy / dist * allowed
-	}
-
-	a.X += dx
-	a.Y += dy
-
+	a.X = x
+	a.Y = y
 	consumes := []*Actor{}
 	done := a.Player.room.Read("Moving player")
 	for _, b := range a.Player.room.Actors[:a.Player.room.HighestID] {
@@ -150,8 +136,19 @@ func (a *Actor) Move(x, y float64) {
 		a.ConsumePellet(pellets[i])
 	}
 	a.moved = true
+	a.X = math.Min(float64(a.Player.room.Width), a.X)
+	a.Y = math.Min(float64(a.Player.room.Height), a.Y)
+	a.X = math.Max(0, a.X)
+	a.Y = math.Max(0, a.Y)
 }
+
 func (a *Actor) Tick(d time.Duration) {
+	allowed := 100 / (math.Pow(.46*a.Mass, .1))
+	distance := allowed * d.Seconds()
+
+	dx := math.Cos(a.Direction) * distance
+	dy := math.Sin(a.Direction) * distance
+	a.Move(a.X+dx, a.Y+dy)
 
 }
 
