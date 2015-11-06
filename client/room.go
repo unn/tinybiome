@@ -10,7 +10,8 @@ import (
 const MaxEnts = 256 * 256
 const MaxPlayers = 1024
 const MaxOwns = 16
-const MaxPellets = 5000
+const MaxPellets = 50000
+const TickLen = 50
 
 type Room struct {
 	Width       int
@@ -36,7 +37,7 @@ func (r *Room) run(d time.Duration) {
 
 func NewRoom() *Room {
 	r := &Room{
-		ticker:    time.NewTicker(time.Millisecond * 50),
+		ticker:    time.NewTicker(time.Millisecond * TickLen),
 		StartMass: 100,
 		MergeTime: 10,
 	}
@@ -90,6 +91,13 @@ func (r *Room) addDecay() {
 }
 
 func (r *Room) sendUpdates(d time.Duration) {
+	nPlayers := 0
+	for _, player := range r.Players {
+		if player == nil {
+			continue
+		}
+		nPlayers += 1
+	}
 	for _, player := range r.Players {
 		if player == nil {
 			continue
@@ -105,6 +113,7 @@ func (r *Room) sendUpdates(d time.Duration) {
 			}
 		}
 		player.Net.MultiSend()
+		time.Sleep(time.Millisecond * time.Duration(TickLen/nPlayers))
 	}
 	for _, actor := range r.Actors[:r.HighestID] {
 		if actor == nil {

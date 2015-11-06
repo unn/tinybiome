@@ -142,6 +142,9 @@ document.onkeydown = function(e) {
 	if (e.keyCode == '68') {
     	load_graphics_file("dark.js")
     }
+	if (e.keyCode == '69') {
+    	load_graphics_file("tristans.js")
+    }
 
 }
 document.onkeyup = function(e) {
@@ -223,6 +226,23 @@ function render() {
 	}
 
 	window.requestAnimationFrame(render)
+}
+
+function draw_leaderboard(ctx, room) {
+	var playersWithScore = []
+	for(k in room.players) {
+		p = room.players[k]
+		s = 0
+		for(i in p.owns) {
+			a = p.owns[i];
+			s += a.mass
+		}
+		n = p.name ? p.name : "Microbe"
+		playersWithScore.push([n,Math.floor(s)])
+	}
+	playersWithScore.sort(function(a,b){return b[1]-a[1]})
+
+	gfx.renderLeaderBoard(ctx, playersWithScore, camera.width-400, 0, 400, 800)
 }
 
 lastStep = (new Date())
