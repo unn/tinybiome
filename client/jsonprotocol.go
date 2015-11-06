@@ -23,6 +23,7 @@ type Protocol interface {
 	WriteSetMassActor(*Actor)
 	WriteNewPellet(*Pellet)
 	WriteDestroyPellet(*Pellet)
+	WritePelletsIncoming([]*Pellet)
 
 	MultiStart()
 	MultiSteal(Protocol)
@@ -170,6 +171,12 @@ func (s *JsonProtocol) WriteSetMassActor(actor *Actor) {
 	delPlayer := `{"type":"mass","id":%d,"mass":%f}`
 	dat := fmt.Sprintf(delPlayer, actor.ID, actor.Mass)
 	s.send(dat)
+}
+
+func (s *JsonProtocol) WritePelletsIncoming(p []*Pellet) {
+	// delPlayer := `{"type":"mass","id":%d,"mass":%f}`
+	// dat := fmt.Sprintf(delPlayer, actor.ID, actor.Mass)
+	// s.send(dat)
 }
 
 func (s *JsonProtocol) MultiStart() {

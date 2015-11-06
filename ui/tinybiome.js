@@ -7,12 +7,11 @@ var felt = document.createElement('IMG');
 felt.src = 'imgs/felt.jpg';
 
 DataView.prototype.getUTF8String = function(offset, length) {
-    var utf16 = new ArrayBuffer(length * 2);
-    var utf16View = new Uint16Array(utf16);
+    var utf16View = [];
     for (var i = 0; i < length; ++i) {
-        utf16View[i] = this.getUint8(offset + i);
+        utf16View.push( this.getUint8(offset + i) );
     }
-    return String.fromCharCode.apply(null, utf16View);
+    return ab2str(utf16View)
 };
 
 	ws = new WebSocket("ws://"+document.location.hostname+":5000");
@@ -35,18 +34,23 @@ function readMessage(dv, off) {
 	t = dv.getUint8(off)
 	switch (t) {
 	case 0: // JOIN
-		room = new room(dv.getInt32(off+1, true),dv.getInt32(off+5, true))
-		currentRoom = room
-		room.startmass = dv.getInt32(off+9, true)
-		room.mergetime = dv.getInt32(off+13, true)
+		var newroom;
+		newroom = new room(dv.getInt32(off+1, true),dv.getInt32(off+5, true))
+		currentRoom = newroom
+		newroom.startmass = dv.getInt32(off+9, true)
+		newroom.mergetime = dv.getInt32(off+13, true)
 		off = off + 17
-		console.log(room);
+		console.log(newroom);
 		break;
 	case 1: // CREATE ACTOR
-		p = new actor(dv.getInt32(off+1, true), dv.getInt32(off+17, true), dv.getFloat32(off+5, true), dv.getFloat32(off+9, true))
+		id = dv.getInt32(off+1, true)
+		owner = dv.getInt32(off+17, true)
+		x = dv.getFloat32(off+5, true)
+		y = dv.getFloat32(off+9, true)
+		console.log("CREATING ACTOR",id,"BY",owner,"AT",x,y)
+		p = new actor(id, owner, x, y)
 		p.mass =dv.getFloat32(off+13, true)
 		off = off + 21
-		console.log("CREATING ACTOR",p.id,"BY",p.owner,"AT",p.x,p.y)
 		break;
 	case 2:
 		p = new pellet(dv.getInt32(off+1, true, true), dv.getInt32(off+5, true, true), dv.getInt32(off+9, true, true))
@@ -61,15 +65,15 @@ function readMessage(dv, off) {
 		if (p) {
 			p.remove()	
 		} else {
-			console.log("COULDNT FIND", v.x,v.y)
+			console.log("COULDNT FIND", dx, dy)
 		}
 		break
 	case 4:
 		id = dv.getInt32(off+1, true)
 		len = dv.getInt32(off+5, true)
 		name = dv.getUTF8String(off+9,len)
-		off = off + 9 + len + 1
-		console.log("CREATING PLAYER", id)
+		off = off + 9 + len
+		console.log("CREATING PLAYER", id, "NAME(",len,")",name)
 		p = (new player(currentRoom, id))
 		p.name = name ? name : "";
 		break
@@ -77,7 +81,7 @@ function readMessage(dv, off) {
 		id = dv.getInt32(off+1, true)
 		len = dv.getInt32(off+5, true)
 		name = dv.getUTF8String(off+9,len)
-		off = off + 9 + len + 1
+		off = off + 9 + len
 		console.log("RENAMING PLAYER", id)
 		currentRoom.players[id].name=name
 		break
@@ -122,6 +126,23 @@ function readMessage(dv, off) {
 		p = actors[id]
 		p.mass = mass
 		break;
+	case 11:
+		amt = dv.getInt32(off+1, true)
+		console.log("MULTI PELLET", amt)
+		o = off + 5
+		for(var i=0;i<amt;i++) {
+			x = dv.getInt32(o, true, true)
+			y = dv.getInt32(o+4, true, true)
+			style = dv.getInt32(o+8, true, true)
+			if (Math.random()<.0001) {
+				console.log("CREATING PELLET", x, y, style)
+			}
+			p = new pellet(x, y, style)
+			o += 12
+		}
+		
+		off = off + 5 + amt * 12
+		break
 	default:
 		console.log("ERROR READING", t)
 	}
@@ -133,8 +154,8 @@ sab = new DataView(new ArrayBuffer(1))
 sab.setUint8(0,2,true)
 
 function writeJoin(name) {
-	asString = stringToUint(name)
-	ab = new ArrayBuffer(1+4+asString)
+	asString = str2ab(name)
+	ab = new ArrayBuffer(1+4+asString.length)
 	dv = new DataView(ab)
 	dv.setUint8(0,0,true)
 	dv.setInt32(1,asString.length,true)
@@ -152,13 +173,26 @@ function writeMove(id,d,s) {
 function writeSplit() {
 	ws.send(sab)
 }
+
+function ab2str(buf) {
+  return String.fromCharCode.apply(null, buf);
+}
+function str2ab(str) {
+	uintArray = []
+	for (var i=0, strLen=str.length; i<strLen; i++) {
+		uintArray.push(str.charCodeAt(i));
+	}
+	return uintArray;
+}
+
 function stringToUint(string) {
-    var string = btoa(unescape(encodeURIComponent(string))),
+    var string = btoa(string),
         charList = string.split(''),
         uintArray = [];
     for (var i = 0; i < charList.length; i++) {
         uintArray.push(charList[i].charCodeAt(0));
     }
+    console.log("NAME",uintArray)
     return uintArray;
 }
 function rgb(r, g, b){

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -16,11 +17,12 @@ type BinaryProtocol struct {
 	Flush bool
 	T     time.Time
 	Count int
+	Lock  sync.RWMutex
 }
 
 func NewBinaryProtocol(ws io.ReadWriter) Protocol {
 	return Protocol(&BinaryProtocol{RW: ws,
-		W:     bufio.NewWriterSize(ws, 1024*1024*1024),
+		W:     bufio.NewWriterSize(ws, 1024*10),
 		R:     bufio.NewReaderSize(ws, 1024*1024),
 		T:     time.Now(),
 		Flush: true})
@@ -38,6 +40,10 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		size := make([]byte, 4)
 		s.R.Read(size)
 		strSize := *(*int32)(unsafe.Pointer(&size[0]))
+		log.Println(p, "SENT LENGTH", strSize)
+		if strSize > 100 {
+			strSize = 100
+		}
 		nameBytes := make([]byte, strSize)
 		s.R.Read(nameBytes)
 		name := string(nameBytes)
@@ -162,6 +168,8 @@ func WriteFloat32(w io.Writer, i float64) {
 
 // sends updates
 func (s *BinaryProtocol) WriteRoom(r *Room) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(0)
 	WriteInt32(s.W, r.Width)
 	WriteInt32(s.W, r.Height)
@@ -171,6 +179,8 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 }
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(1)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.X)
@@ -184,6 +194,8 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(2)
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
@@ -192,6 +204,8 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(3)
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
@@ -202,6 +216,8 @@ func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(4)
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
@@ -215,6 +231,8 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(5)
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
@@ -228,6 +246,8 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(6)
 	WriteInt32(s.W, player.ID)
 	s.done()
@@ -237,6 +257,8 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteOwns(player *Player) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(7)
 	WriteInt32(s.W, player.ID)
 	s.done()
@@ -246,6 +268,8 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(8)
 	WriteInt32(s.W, actor.ID)
 	s.done()
@@ -255,6 +279,8 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(9)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.X)
@@ -268,6 +294,8 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.W.WriteByte(10)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.Mass)
@@ -277,7 +305,23 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 	// _ = dat
 }
 
+func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
+	s.Lock.Lock()
+	defer s.Lock.Unlock()
+
+	s.W.WriteByte(11)
+	WriteInt32(s.W, int64(len(pellets)))
+	for _, pel := range pellets {
+		WriteInt32(s.W, pel.X)
+		WriteInt32(s.W, pel.Y)
+		WriteInt32(s.W, pel.Type)
+	}
+
+	s.done()
+}
+
 func (s *BinaryProtocol) MultiStart() {
+	s.W = bufio.NewWriterSize(s.RW, 1024*1024*10)
 	s.Flush = false
 }
 
@@ -287,4 +331,5 @@ func (s *BinaryProtocol) MultiSteal(p Protocol) {
 func (s *BinaryProtocol) MultiSend() {
 	s.W.Flush()
 	s.Flush = true
+	s.W = bufio.NewWriterSize(s.RW, 1024*10)
 }

@@ -133,9 +133,10 @@ func (r *Room) SetDimensions(x, y int64) {
 }
 
 func (r *Room) Accept(p Protocol) {
-
 	p.WriteRoom(r)
 	done := r.Read("Sending all existing actors and pellets")
+
+	start := time.Now()
 	p.MultiStart()
 	for _, oPlayer := range r.Players {
 		if oPlayer == nil {
@@ -149,16 +150,15 @@ func (r *Room) Accept(p Protocol) {
 		}
 		p.WriteNewActor(oActor)
 	}
-	for _, pel := range r.Pellets[:r.PelletCount] {
-		p.WriteNewPellet(pel)
-	}
+	p.WritePelletsIncoming(r.Pellets[:r.PelletCount])
 	p.MultiSend()
+	took := time.Since(start)
 	done()
 
 	player := r.NewPlayer(p)
 	log.Println(player, "IN LIST", r.Actors[:r.HighestID], "possible actors")
 
-	log.Println(player, "INITIAL SYNC COMPLETE")
+	log.Println(player, "INITIAL SYNC COMPLETE IN", took)
 
 	for {
 		reason := p.GetMessage(player)

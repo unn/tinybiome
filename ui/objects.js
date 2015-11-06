@@ -304,7 +304,6 @@ renderable = {}
 activeRenders = {}
 
 function actor(id, owner, x, y) {
-	console.log("CREATING ACTOR",id,"BY",owner.name,"AT",x,y)
 	this.id = id
 	this.x = x
 	this.y = y
