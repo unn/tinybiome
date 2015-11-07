@@ -238,8 +238,8 @@ func (a *Actor) Split() {
 	XSpeed := math.Cos(a.Direction)
 	YSpeed := math.Sin(a.Direction)
 
-	b := a.Player.NewActor(a.X+XSpeed*nb.Radius(), a.Y+YSpeed*nb.Radius(), a.Mass*.5)
 	a.Remove()
+	b := a.Player.NewActor(a.X+XSpeed*nb.Radius(), a.Y+YSpeed*nb.Radius(), a.Mass*.5)
 	a.Player.EditLock.Unlock()
 
 	b.Direction = a.Direction
