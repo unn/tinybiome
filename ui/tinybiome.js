@@ -3,6 +3,7 @@ var myplayer;
 var tileSize = 50;
 var hidingBbox = true;
 var debugMode = false;
+var camPad = 200
 
 var felt = document.createElement('IMG');
 felt.src = 'imgs/felt.jpg';
@@ -268,6 +269,19 @@ document.onkeyup = function(e) {
 
 }
 
+function handleScroll(e) {
+	console.log(e)
+	camPad += e.deltaY/4
+	if (camPad>200) {
+		camPad = 200
+	}
+	if (camPad < 10) {
+		camPad = 10
+	}
+}
+canvas.addEventListener("mousewheel", handleScroll, false);
+canvas.addEventListener("DOMMouseScroll", handleScroll, false);
+
 var gfx = {}
 var gfx_loaded = {"default.js":true}
 
@@ -307,7 +321,6 @@ function render() {
 	ctx.save()
 
 	if (myplayer) {
-		camPad = 200
 		size = myplayer.bbox()
 		size[0] -= camPad
 		size[1] -= camPad
@@ -385,8 +398,10 @@ function draw_leaderboard(ctx, room) {
 			a = p.owns[i];
 			s += a.mass
 		}
-		n = p.name ? p.name : "Microbe"
-		playersWithScore.push([n,Math.floor(s)])
+		if (s!=0) {
+			n = p.name ? p.name : "Microbe"
+			playersWithScore.push([n,Math.floor(s)])
+		}
 	}
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
 	gfx.renderLeaderBoard(ctx, playersWithScore, canvas.width-400, 0, 400, 800)

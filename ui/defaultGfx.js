@@ -127,7 +127,6 @@ gfx.renderMineral = function(ctx, x, y, color, radius) {
 }
 
 gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
-
 	pxHeight = 28
 	ctx.lineWidth = 1;
 	ctx.textAlign = "right";
@@ -136,16 +135,19 @@ gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
 	ctx.strokeStyle = "black"
 	ctx.font = pxHeight+"px sans serif";
 
-	l = "Top 8/"+leaders.length+":"
-	ctx.fillText(l, x+width,0)
-	ctx.strokeText(l, x+width,0)
-
+	total = leaders.length
 	if (leaders.length <= 0) {
 		return
 	}
 	if (leaders.length > 8) {
 		leaders.length = 8
 	}
+
+	l = "Top "+leaders.length+"/"+total+":"
+	ctx.fillText(l, x+width,0)
+	ctx.strokeText(l, x+width,0)
+
+
 
 	for(var i=0; i<leaders.length; i+=1) {
 		n = leaders[i][0]
