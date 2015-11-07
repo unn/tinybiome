@@ -177,14 +177,14 @@ function particle(id,room,x,y,color) {
 particle.prototype.render = function(ctx) {
 	gfx.renderParticle(ctx, this.x, this.y, this.life, this.color)
 }
-particle.prototype.step = function(ctx) {
-	this.life -= 1
-	this.x += this.xspeed
-	this.y += this.yspeed
-	this.xspeed *= .98
-	this.yspeed *= .98
-	this.xspeed += Math.random()*.1-.05
-	this.yspeed += Math.random()*.1-.05
+particle.prototype.step = function(seconds) {
+	this.life -= (10*16)*seconds
+	this.x += (this.xspeed*16)*seconds
+	this.y += (this.yspeed*16)*seconds
+	this.xspeed *= Math.pow(.90, seconds)
+	this.yspeed *= Math.pow(.90, seconds)
+	this.xspeed += (Math.random()*.1-.05)*16*seconds
+	this.yspeed += (Math.random()*.1-.05)*16*seconds
 	if (this.life<=0) this.destroy()
 }
 particle.prototype.destroy = function() {
@@ -206,6 +206,12 @@ function room(width, height) {
 	this.players = {}
 	this.particles = []
 	this.particleCount = 0;
+}
+room.prototype.step = function(seconds) {
+	for(var i=0; i<this.particleCount;i++) {
+		p = this.particles[i]
+		p.step(seconds)
+	}
 }
 room.prototype.findTile = function(ox,oy) {
 	x = Math.floor(ox/renderTileSize)*renderTileSize
@@ -255,7 +261,6 @@ room.prototype.render = function(ctx) {
 	graphicsCounts.renderTime += startP - start
 	for(var i=0; i<this.particleCount;i++) {
 		p = this.particles[i]
-		p.step()
 		if (p.x < camera.x - padding || p.y < camera.y - padding
 			|| p.x > camera.x + camera.width + padding
 			|| p.y > camera.y + camera.height + padding) {

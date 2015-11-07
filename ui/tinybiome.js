@@ -377,9 +377,12 @@ function draw_leaderboard(ctx, room) {
 		playersWithScore.push([n,Math.floor(s)])
 	}
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
-	playersWithScore.length = 8
-
-	gfx.renderLeaderBoard(ctx, playersWithScore, camera.width-400, 0, 400, 800)
+	if (playersWithScore.length > 8) {
+		playersWithScore.length = 8
+	}
+	if (playersWithScore.length > 0) {
+		gfx.renderLeaderBoard(ctx, playersWithScore, camera.width-400, 0, 400, 800)
+	}
 }
 
 lastStep = (new Date())
@@ -390,6 +393,9 @@ function step() {
 	for (id in actors) {
 		actor = actors[id]
 		actor.step(diff)
+	}
+	if (currentRoom) {
+		currentRoom.step(diff)
 	}
 	lastStep = now
 
