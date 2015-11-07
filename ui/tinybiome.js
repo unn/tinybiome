@@ -377,6 +377,7 @@ function draw_leaderboard(ctx, room) {
 		playersWithScore.push([n,Math.floor(s)])
 	}
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
+	playersWithScore.length = 8
 
 	gfx.renderLeaderBoard(ctx, playersWithScore, camera.width-400, 0, 400, 800)
 }

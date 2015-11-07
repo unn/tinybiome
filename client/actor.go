@@ -78,7 +78,7 @@ func (a *Actor) Decay() {
 	if a.DecayLevel > a.Mass {
 		a.DecayLevel = a.Mass
 	}
-	a.Mass -= a.DecayLevel / 5
+	a.Mass -= a.DecayLevel / 15
 	if a.Mass < 20 {
 		a.Mass = 20
 	}
@@ -188,6 +188,7 @@ func (a *Actor) CanEat(b *Actor) bool {
 func (a *Actor) Consume(b *Actor) {
 	log.Println(a, "CONSUMES", b)
 	a.Mass += b.Mass * .9
+	a.DecayLevel = 0
 	a.RecalcRadius()
 	b.Remove()
 	a.Player.Net.WriteSetMassActor(a)
