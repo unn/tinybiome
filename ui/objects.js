@@ -101,6 +101,7 @@ renderTile.prototype.render = function(ctx) {
 	myArea[2] = Math.min(myArea[2], screenArea[2])
 	myArea[3] = Math.min(myArea[3], screenArea[3])
 
+	// ctx.imageSmoothingEnabled = false
   	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
 
   	sArea = [myArea[0]-this.x,myArea[1]-this.y,myArea[2]-this.x,myArea[3]-this.y]
@@ -303,7 +304,7 @@ function pellet(x,y,style) {
 		console.log("WTF", this.id,mytile)
 	}
 	mytile.add(this)
-	this._radius = 3
+	this._radius = 1.9
 	if (this.style==0) {
 		this.color = rgb(Math.random()*100,Math.random()*100,255)
 	}
