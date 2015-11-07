@@ -30,6 +30,7 @@ func NewBinaryProtocol(ws io.ReadWriter) Protocol {
 }
 
 var invalidProto = errors.New("Invalid Protocol")
+var hackAttempt = errors.New("Hack Attempt")
 
 // runs in a goroutine
 func (s *BinaryProtocol) GetMessage(p *Player) error {
@@ -60,7 +61,9 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		}
 		p.Rename(name)
 		log.Println(name, "JOINED")
+		p.EditLock.Lock()
 		p.NewActor(rand.Float64()*float64(r.Width), rand.Float64()*float64(r.Height), float64(r.StartMass))
+		p.EditLock.Unlock()
 	case 1:
 		parts := make([]byte, 12)
 		s.R.Read(parts)
@@ -80,7 +83,8 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 				}
 			} else {
 				log.Println(a, "APPARENTLY NOT OWNED BY", p)
-				return invalidProto
+				return nil
+				return hackAttempt
 			}
 		} else {
 			return nil

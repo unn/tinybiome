@@ -190,7 +190,9 @@ func (a *Actor) Consume(b *Actor) {
 	a.Mass += b.Mass * .9
 	a.DecayLevel = 0
 	a.RecalcRadius()
+	b.Player.EditLock.Lock()
 	b.Remove()
+	b.Player.EditLock.Unlock()
 	a.Player.Net.WriteSetMassActor(a)
 }
 
@@ -244,14 +246,12 @@ func (a *Actor) Split() {
 }
 
 func (a *Actor) Remove() {
-	a.Player.EditLock.Lock()
 	for n, oActor := range a.Player.Owns {
 		if oActor == a {
 			a.Player.Owns[n] = nil
 			break
 		}
 	}
-	a.Player.EditLock.Unlock()
 
 	r := a.Player.room
 	done := r.Write("Removing actor")
@@ -292,20 +292,19 @@ func (p *Player) NewActor(x, y, mass float64) *Actor {
 	}
 	done()
 
-	p.EditLock.Lock()
 	for n, a := range p.Owns {
 		if a == nil {
 			p.Owns[n] = actor
 			break
 		}
 	}
-	p.EditLock.Unlock()
 
 	return actor
 }
 
 func (p *Player) Remove() {
 	r := p.room
+	p.EditLock.Lock()
 	for _, actor := range r.Actors {
 		if actor == nil {
 			continue
@@ -314,6 +313,7 @@ func (p *Player) Remove() {
 			actor.Remove()
 		}
 	}
+	p.EditLock.Unlock()
 	done := r.Write("Removing player")
 	r.Players[p.ID] = nil
 	for _, oPlayer := range r.Players {

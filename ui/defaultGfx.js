@@ -136,7 +136,7 @@ gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
 	ctx.strokeStyle = "black"
 	ctx.font = pxHeight+"px sans serif";
 
-	l = ""+leaders.length+" players on now! Top 8:"
+	l = "Top 8/"+leaders.length+":"
 	ctx.fillText(l, x+width,0)
 	ctx.strokeText(l, x+width,0)
 
