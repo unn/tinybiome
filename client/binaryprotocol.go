@@ -12,21 +12,21 @@ import (
 )
 
 type BinaryProtocol struct {
-	RW    io.ReadWriter
-	W     *bufio.Writer
-	R     *bufio.Reader
-	Flush bool
-	T     time.Time
-	Count int
-	Lock  sync.RWMutex
+	RW            io.ReadWriter
+	W             *bufio.Writer
+	R             *bufio.Reader
+	isTransaction bool
+	T             time.Time
+	Count         int
+	Lock          sync.RWMutex
 }
 
 func NewBinaryProtocol(ws io.ReadWriter) Protocol {
 	return Protocol(&BinaryProtocol{RW: ws,
-		W:     bufio.NewWriterSize(ws, 1024*10),
-		R:     bufio.NewReaderSize(ws, 1024*1024),
-		T:     time.Now(),
-		Flush: true})
+		W:             bufio.NewWriterSize(ws, 1024*10),
+		R:             bufio.NewReaderSize(ws, 1024*1024),
+		T:             time.Now(),
+		isTransaction: false})
 }
 
 var invalidProto = errors.New("Invalid Protocol")
@@ -67,16 +67,23 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		pid := int64(*(*int32)(unsafe.Pointer(&parts[0])))
 		d := *(*float32)(unsafe.Pointer(&parts[4]))
 		s := *(*float32)(unsafe.Pointer(&parts[8]))
-		p := r.getActor(pid)
-		if p != nil {
-			p.Direction = float64(d)
-			p.Speed = float64(s)
-			if p.Speed > 1 {
-				p.Speed = 1
+		a := r.getActor(pid)
+		if a != nil {
+			if a.Player == p {
+				a.Direction = float64(d)
+				a.Speed = float64(s)
+				if a.Speed > 1 {
+					a.Speed = 1
+				}
+				if a.Speed < 0 {
+					a.Speed = 0
+				}
+			} else {
+				log.Println(a, "APPARENTLY NOT OWNED BY", p)
+				return invalidProto
 			}
-			if p.Speed < 0 {
-				p.Speed = 0
-			}
+		} else {
+			return nil
 		}
 	case 2:
 		for _, a := range p.Owns {
@@ -136,7 +143,7 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 }
 
 func (s *BinaryProtocol) done() {
-	if s.Flush {
+	if !s.isTransaction {
 		s.W.Flush()
 	} else {
 		s.check()
@@ -174,8 +181,9 @@ func WriteFloat32(w io.Writer, i float64) {
 
 // sends updates
 func (s *BinaryProtocol) WriteRoom(r *Room) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
+		log.Println("WRITING ROOM")
 		defer s.Lock.Unlock()
 	}
 	s.W.WriteByte(0)
@@ -187,7 +195,7 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 }
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -204,7 +212,7 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -216,7 +224,7 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -230,7 +238,7 @@ func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -247,7 +255,7 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -264,7 +272,7 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -277,7 +285,7 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteOwns(player *Player) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -290,7 +298,7 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -303,7 +311,7 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -320,7 +328,7 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -334,7 +342,7 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
-	if s.Flush {
+	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
 	}
@@ -350,18 +358,15 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 	s.done()
 }
 
-func (s *BinaryProtocol) MultiStart() {
-	s.W = bufio.NewWriterSize(s.RW, 1024*1024*10)
-	s.Lock.Lock()
-	s.Flush = false
+func (s *BinaryProtocol) Transaction() ProtocolDown {
+	a := &BinaryProtocol{RW: s.RW,
+		W:             bufio.NewWriterSize(s.RW, 1024*1024*10),
+		R:             bufio.NewReaderSize(s.RW, 1024*1024),
+		T:             time.Now(),
+		isTransaction: true}
+	return a
 }
 
-func (s *BinaryProtocol) MultiSteal(p Protocol) {
-}
-
-func (s *BinaryProtocol) MultiSend() {
+func (s *BinaryProtocol) Done() {
 	s.W.Flush()
-	s.Flush = true
-	s.W = bufio.NewWriterSize(s.RW, 1024*10)
-	s.Lock.Unlock()
 }

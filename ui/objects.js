@@ -37,6 +37,7 @@ player.prototype.bbox = function() {
 	xr = 0
 	yr = 0
 	
+	found = false
 	for (i in this.owns) {
 		b = this.owns[i]
 		bb = b.bbox()
@@ -44,6 +45,10 @@ player.prototype.bbox = function() {
 		if (bb[1]<y) y = bb[1]
 		if (bb[2]>xr) xr = bb[2]
 		if (bb[3]>yr) yr = bb[3]
+		found = true
+	}
+	if (!found) {
+		return [xr,yr,x,y]
 	}
 
 	return [x-4,y-4,xr+4,yr+4]
@@ -342,6 +347,9 @@ function actor(id, owner, x, y) {
 	this.direction = 0
 	this.speed = 0
 
+	this.xs = x
+	this.ys = y
+
 	this.mass = room.startmass
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
@@ -375,8 +383,8 @@ actor.prototype.bbox = function() {
 	return bb
 }
 actor.prototype.postRender = function() {
-	onCanvasX = this.x - camera.x
-	onCanvasY = this.y - camera.y
+	onCanvasX = (this.x - camera.x)*camera.xscale
+	onCanvasY = (this.y - camera.y)*camera.yscale
 	dx = mousex-onCanvasX
 	dy = mousey-onCanvasY
 	dist = Math.sqrt(dx*dx+dy*dy)
@@ -395,14 +403,16 @@ actor.prototype.render = function(ctx) {
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
+	this.x = (this.xs+this.x)/2
+	this.y = (this.ys+this.y)/2
 	this.color = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
 	n = currentRoom.players[this.owner].name
 	n = n ? n : "Microbe"
 	gfx.renderPlayer(ctx,this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 }
 actor.prototype.clientStep = function(seconds) {
-	onCanvasX = this.x - camera.x
-	onCanvasY = this.y - camera.y
+	onCanvasX = (this.x - camera.x)*camera.xscale
+	onCanvasY = (this.y - camera.y)*camera.yscale
 
 	mdx = mousex - onCanvasX
 	mdy = mousey - onCanvasY

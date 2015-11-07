@@ -115,8 +115,8 @@ function readMessage(dv, off) {
 		s = dv.getFloat32(off+17, true)
 		off = off + 21
 		p = actors[id]
-		p.x = x
-		p.y = y
+		p.xs = x
+		p.ys = y
 		p.direction = d
 		p.speed = s
 		break;
@@ -200,7 +200,7 @@ function rgb(r, g, b){
   return "rgb("+Math.floor(r)+","+Math.floor(g)+","+Math.floor(b)+")";
 }
 
-var c = document.getElementById("playarea");
+var canvas = document.getElementById("playarea");
 function ohno(x) {
 	var errs = document.getElementById("err");
 	errs.innerHTML = x;
@@ -221,22 +221,20 @@ window.onresize = function() {
     popup.style.left = ""+String(window.innerWidth/2 - popup.offsetWidth/2)+"px";
     popup.style.top = ""+String(window.innerHeight/2 - popup.offsetHeight/2)+"px";
     console.log("Left",window.innerWidth/2 - popup.innerWidth/2);
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;   
-    camera.width = c.width;
-    camera.height = c.height;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;   
     console.log("New Cam",camera)
 }
 
-var camera = {x:0,y:0,width:c.width,height:c.height};
+var camera = {x:0,y:0,width:canvas.width,height:canvas.height,xscale:1,yscale:1};
 camera.bbox = function() {
-	return [camera.x,camera.y,camera.x+camera.width,camera.y+camera.height]
+	return [camera.x,camera.y,camera.x+canvas.width,camera.y+camera.height]
 }
-var ctx = c.getContext("2d");
+var ctx = canvas.getContext("2d");
 
-var mousex = c.width/2;
-var mousey = c.height/2;
-c.onmousemove = function(e) {
+var mousex = canvas.width/2;
+var mousey = canvas.height/2;
+canvas.onmousemove = function(e) {
 	mousex = e.offsetX;
 	mousey = e.offsetY;
 }
@@ -305,29 +303,43 @@ function render() {
 			particleTime: 0}
 		renderCycles = 100
 	}
+	gfx.renderArea(ctx,canvas.width,canvas.height)
+	ctx.save()
+
 	if (myplayer) {
-		l = Object.keys(myplayer.owns).length
-		if (l>0) {
-			camX = 0;
-			camY = 0;
+		camPad = 200
+		size = myplayer.bbox()
+		size[0] -= camPad
+		size[1] -= camPad
+		size[2] += camPad
+		size[3] += camPad
 
-			for (i in myplayer.owns) {
-				p = myplayer.owns[i]
-
-				camX += p.x;
-				camY += p.y;
-			}
-
-			camera.x = (camX / l - camera.width / 2 + camera.x) / 2;
-			camera.y = (camY / l - camera.height / 2 + camera.y) / 2;
-			camera.x = Math.floor(camera.x)
-			camera.y = Math.floor(camera.y)
+		width = size[2]-size[0]
+		height = size[3]-size[1]
+		ratio = canvas.width/canvas.height
+		haveRatio = width/height
+		if (haveRatio<ratio) {
+			width = width/haveRatio*ratio
 		}
+		if (haveRatio>ratio) {
+			height = height/haveRatio*ratio
+		}
+		midPointX = (size[2]+size[0])/2
+		midPointY = (size[3]+size[1])/2
+
+		camera.x = (midPointX -width/2 + camera.x*3) / 4;
+		camera.y = (midPointY -height/2 + camera.y*3) / 4;
+
+		camera.width = (width+camera.width)/2
+		camera.height = (height+camera.height)/2
+
+		camera.xscale = canvas.width/camera.width
+		camera.yscale = canvas.height/camera.height
+		ctx.scale(camera.xscale,camera.yscale)
+		ctx.translate(-camera.x,-camera.y)
 	}
 
-	gfx.renderArea(ctx,camera.width,camera.height)
-	ctx.save()
-	ctx.translate(-camera.x,-camera.y)
+	
 
 	x = camera.x<0 ? 0 : camera.x
 	y = camera.y<0 ? 0 : camera.y
@@ -377,12 +389,7 @@ function draw_leaderboard(ctx, room) {
 		playersWithScore.push([n,Math.floor(s)])
 	}
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
-	if (playersWithScore.length > 8) {
-		playersWithScore.length = 8
-	}
-	if (playersWithScore.length > 0) {
-		gfx.renderLeaderBoard(ctx, playersWithScore, camera.width-400, 0, 400, 800)
-	}
+	gfx.renderLeaderBoard(ctx, playersWithScore, canvas.width-400, 0, 400, 800)
 }
 
 lastStep = (new Date())

@@ -127,26 +127,34 @@ gfx.renderMineral = function(ctx, x, y, color, radius) {
 }
 
 gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
-	ctx.lineWidth = .7;
+
+	pxHeight = 28
+	ctx.lineWidth = 1;
 	ctx.textAlign = "right";
 	ctx.textBaseline = "top";
 	ctx.fillStyle = "white";
 	ctx.strokeStyle = "black"
-	ctx.font = "20px sans serif";
-	ctx.lineWidth = 1;
+	ctx.font = pxHeight+"px sans serif";
 
-	l = "Leaderboard"
+	l = ""+leaders.length+" players on now! Top 8:"
 	ctx.fillText(l, x+width,0)
 	ctx.strokeText(l, x+width,0)
 
+	if (leaders.length <= 0) {
+		return
+	}
+	if (leaders.length > 8) {
+		leaders.length = 8
+	}
+
 	for(var i=0; i<leaders.length; i+=1) {
 		n = leaders[i][0]
-		ctx.fillText(n, x+width - 100,i*20+20)
-		ctx.strokeText(n, x+width - 100,i*20+20)
+		ctx.fillText(n, x+width - 100,i*pxHeight+pxHeight)
+		ctx.strokeText(n, x+width - 100,i*pxHeight+pxHeight)
 
 		m = leaders[i][1]
-		ctx.fillText(m, x+width,i*20+20)
-		ctx.strokeText(m, x+width,i*20+20)
+		ctx.fillText(m, x+width,i*pxHeight+pxHeight)
+		ctx.strokeText(m, x+width,i*pxHeight+pxHeight)
 	}
 	
 }

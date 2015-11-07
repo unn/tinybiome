@@ -32,7 +32,7 @@ func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
 
 	s.Lock.Lock()
 	if n, found := s.IPS[ip]; found {
-		if n >= 2 {
+		if n >= 8 {
 			res.WriteHeader(400)
 			s.Lock.Unlock()
 			log.Println("REJECTING", ip)

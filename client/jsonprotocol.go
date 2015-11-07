@@ -10,8 +10,7 @@ import (
 	"time"
 )
 
-type Protocol interface {
-	GetMessage(*Player) error
+type ProtocolDown interface {
 	WriteNewActor(*Actor)
 	WriteDestroyActor(*Actor)
 	WriteNewPlayer(*Player)
@@ -24,10 +23,13 @@ type Protocol interface {
 	WriteNewPellet(*Pellet)
 	WriteDestroyPellet(*Pellet)
 	WritePelletsIncoming([]*Pellet)
+	Done()
+}
 
-	MultiStart()
-	MultiSteal(Protocol)
-	MultiSend()
+type Protocol interface {
+	ProtocolDown
+	GetMessage(*Player) error
+	Transaction() ProtocolDown
 }
 
 type JsonProtocol struct {
@@ -179,15 +181,12 @@ func (s *JsonProtocol) WritePelletsIncoming(p []*Pellet) {
 	// s.send(dat)
 }
 
-func (s *JsonProtocol) MultiStart() {
+func (s *JsonProtocol) Transaction() ProtocolDown {
 	s.Buffer = make([]string, 0)
+	return nil
 }
 
-func (s *JsonProtocol) MultiSteal(p Protocol) {
-	s.Buffer = p.(*JsonProtocol).Buffer
-}
-
-func (s *JsonProtocol) MultiSend() {
+func (s *JsonProtocol) Done() {
 	if len(s.Buffer) > 0 {
 		dat := `{"type":"multi","parts":[` + strings.Join(s.Buffer, ",") + `]}`
 		s.RW.Write([]byte(dat))

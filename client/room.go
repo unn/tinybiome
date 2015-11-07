@@ -11,7 +11,7 @@ import (
 const MaxEnts = 256 * 256
 const MaxPlayers = 1024
 const MaxOwns = 16
-const MaxPellets = 20000
+const MaxPellets = 10000
 const TickLen = 25
 
 type Room struct {
@@ -106,17 +106,17 @@ func (r *Room) sendUpdates(d time.Duration) {
 		if player == nil {
 			continue
 		}
-		player.Net.MultiStart()
+		t := player.Net.Transaction()
 		for _, actor := range r.Actors[:r.HighestID] {
 			if actor == nil {
 				continue
 			}
 			if actor.moved {
-				player.Net.WriteMoveActor(actor)
-				player.Net.WriteSetMassActor(actor)
+				t.WriteMoveActor(actor)
+				t.WriteSetMassActor(actor)
 			}
 		}
-		player.Net.MultiSend()
+		t.Done()
 		time.Sleep(time.Millisecond * time.Duration(TickLen/nPlayers))
 	}
 	for _, actor := range r.Actors[:r.HighestID] {
@@ -137,23 +137,23 @@ func (r *Room) Accept(p Protocol) {
 	done := r.Read("Sending all existing actors and pellets")
 
 	start := time.Now()
-	p.MultiStart()
+	t := p.Transaction()
 	for _, oPlayer := range r.Players {
 		if oPlayer == nil {
 			continue
 		}
-		p.WriteNewPlayer(oPlayer)
+		t.WriteNewPlayer(oPlayer)
 	}
 	for _, oActor := range r.Actors[:r.HighestID] {
 		if oActor == nil {
 			continue
 		}
-		p.WriteNewActor(oActor)
+		t.WriteNewActor(oActor)
 	}
-	p.WritePelletsIncoming(r.Pellets[:r.PelletCount])
+	t.WritePelletsIncoming(r.Pellets[:r.PelletCount])
 	took := time.Since(start)
 	done()
-	p.MultiSend()
+	t.Done()
 
 	player := r.NewPlayer(p)
 	log.Println(player, "IN LIST", r.Actors[:r.HighestID], "possible actors")
@@ -204,6 +204,12 @@ func (r *Room) getPlayerId(p *Player) int64 {
 func (r *Room) getActor(id int64) *Actor {
 	done := r.Read("Looking up Actor")
 	defer done()
+	if id < 0 {
+		return nil
+	}
+	if id > r.HighestID {
+		return nil
+	}
 	return r.Actors[id]
 }
 

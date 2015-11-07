@@ -222,25 +222,25 @@ func (a *Actor) Split() {
 	if emptySlots < 2 {
 		return
 	}
-	a.Player.Net.MultiStart()
-	a.Remove()
+
+	a.Player.EditLock.Lock()
 	nb := a.Player.NewActor(a.X, a.Y, a.Mass*.5)
 	nb.Direction = a.Direction
 	nb.Speed = a.Speed
 
-	distance := nb.Radius() * 3
+	distance := nb.Radius() * 1
 	XSpeed := math.Cos(a.Direction)
 	YSpeed := math.Sin(a.Direction)
 
 	b := a.Player.NewActor(a.X+XSpeed*nb.Radius(), a.Y+YSpeed*nb.Radius(), a.Mass*.5)
+	a.Remove()
+	a.Player.EditLock.Unlock()
 
 	b.Direction = a.Direction
 	b.Speed = a.Speed
 
 	b.XSpeed = XSpeed * distance
 	b.YSpeed = YSpeed * distance
-
-	a.Player.Net.MultiSend()
 }
 
 func (a *Actor) Remove() {
