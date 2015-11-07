@@ -187,8 +187,12 @@ func (a *Actor) CanEat(b *Actor) bool {
 
 func (a *Actor) Consume(b *Actor) {
 	log.Println(a, "CONSUMES", b)
-	a.Mass += b.Mass * .9
-	a.DecayLevel = 0
+	if a.Player == b.Player {
+		a.Mass += b.Mass
+	} else {
+		a.Mass += b.Mass * .65
+		a.DecayLevel = 0
+	}
 	a.RecalcRadius()
 	b.Player.EditLock.Lock()
 	b.Remove()
@@ -221,7 +225,7 @@ func (a *Actor) Split() {
 			emptySlots += 1
 		}
 	}
-	if emptySlots < 2 {
+	if emptySlots < 1 {
 		return
 	}
 
@@ -277,7 +281,7 @@ type Player struct {
 func (p *Player) NewActor(x, y, mass float64) *Actor {
 	r := p.room
 	actor := &Actor{X: x, Y: y, Player: p, Mass: mass,
-		MergeTime: time.Now().Add(time.Duration(r.MergeTime) * time.Second)}
+		MergeTime: time.Now().Add(time.Duration(float64(r.MergeTime)*(1+mass/2000)) * time.Second)}
 	actor.RecalcRadius()
 	id := r.getId(actor)
 	actor.ID = id
