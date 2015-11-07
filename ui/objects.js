@@ -399,7 +399,8 @@ actor.prototype.postRender = function() {
 		ctx.stroke();
 	}
 }
-actor.prototype.radius = function() {return Math.sqrt(this.mass/Math.PI)}
+
+actor.prototype.radius = function() {return Math.pow(this.mass/Math.PI, currentRoom.sizemultiplier)}
 actor.prototype.render = function(ctx) {
 	radius = this.radius()
 	// a = pi * r^2

@@ -195,6 +195,7 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 	WriteInt32(s.W, r.Height)
 	WriteInt32(s.W, r.StartMass)
 	WriteInt32(s.W, r.MergeTime)
+	WriteFloat32(s.W, r.SizeMultiplier)
 	s.done()
 }
 

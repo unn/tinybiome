@@ -37,21 +37,29 @@ function readMessage(dv, off) {
 	switch (t) {
 	case 0: // JOIN
 		var newroom;
-		newroom = new room(dv.getInt32(off+1, true),dv.getInt32(off+5, true))
+		console.log("NEW ROOM INCOMING")
+		width = dv.getInt32(off+1, true)
+		height = dv.getInt32(off+5, true)
+		newroom = new room(width,height)
+		newroom.sizemultiplier = .7
+		
 		currentRoom = newroom
 		newroom.startmass = dv.getInt32(off+9, true)
 		newroom.mergetime = dv.getInt32(off+13, true)
-		off = off + 17
-		console.log(newroom);
+		newroom.sizemultiplier = dv.getFloat32(off+17, true)
+		
+		off = off + 21
+		console.log("NEW ROOM",{width:width,height:height,sm:newroom.sizemultiplier})
 		break;
 	case 1: // CREATE ACTOR
 		id = dv.getInt32(off+1, true)
-		owner = dv.getInt32(off+17, true)
 		x = dv.getFloat32(off+5, true)
 		y = dv.getFloat32(off+9, true)
+		mass = dv.getFloat32(off+13, true)
+		owner = dv.getInt32(off+17, true)
 		console.log("CREATING ACTOR",id,"BY",owner,"AT",x,y)
 		p = new actor(id, owner, x, y)
-		p.mass =dv.getFloat32(off+13, true)
+		p.mass = mass
 		off = off + 21
 		break;
 	case 2:

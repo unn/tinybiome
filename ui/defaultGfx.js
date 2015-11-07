@@ -1,6 +1,16 @@
-var felt = document.createElement('IMG');
-felt.src = 'imgs/felt.jpg';
-var tileSize = 50;
+var cellImg = new Image();
+cellImg.onload = function() {
+	cellImg.loaded = true
+	cellImgWidth = cellImg.width / mPlier
+	cellImgHeight = cellImg.height / mPlier
+}
+cellImg.loaded = false;
+cellImg.pattern = false;
+cellImg.src = 'imgs/cells.jpg';
+
+mPlier = 5
+
+var tileSize = 100;
 
 gfx.renderRoom = function(ctx, width, height) {
 	ctx.strokeStyle = "black";
@@ -70,7 +80,28 @@ gfx.renderPlayer = function(ctx, x, y, color, name, mass, radius) {
 	ctx.beginPath();
 	ctx.arc(x, y, radius, 0, 2 * Math.PI);
 	ctx.clip();
-	ctx.drawImage(felt,x-radius,y-radius, radius*2, radius*2);
+
+
+	if (cellImg.loaded) {
+		if (!cellImg.pattern) {
+			cellImg.pattern = ctx.createPattern(cellImg, 'repeat');
+		}
+		ctx.fillStyle = cellImg.pattern;
+		pX = x-radius
+		pY = y-radius
+		sX = radius*2
+		sY = radius*2
+		pX = Math.floor(pX/cellImgWidth)*cellImgWidth
+		pY = Math.floor(pY/cellImgHeight)*cellImgHeight
+		sX = Math.floor((pX+sX)/cellImgWidth)*cellImgWidth
+		sY = Math.floor((pY+sY)/cellImgHeight)*cellImgHeight
+		ctx.save()
+		ctx.translate(x-radius,y-radius);
+		ctx.scale(.2,.2)
+		ctx.fillRect(0,0,(radius*2/.2),(radius*2/.2));
+		// ctx.translate(-(x-radius),-(y-radius));
+		ctx.restore()
+	}
 
 	ctx.globalCompositeOperation = "multiply";
 	ctx.fillStyle = color;

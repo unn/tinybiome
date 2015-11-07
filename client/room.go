@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -15,15 +16,16 @@ const MaxPellets = 10000
 const TickLen = 25
 
 type Room struct {
-	Width       int64
-	Height      int64
-	StartMass   int64
-	MergeTime   int64
-	Actors      [MaxEnts]*Actor
-	Players     [MaxPlayers]*Player
-	HighestID   int64
-	Pellets     [MaxPellets]*Pellet
-	PelletCount int64
+	Width          int64
+	Height         int64
+	StartMass      int64
+	MergeTime      int64
+	Actors         [MaxEnts]*Actor
+	Players        [MaxPlayers]*Player
+	HighestID      int64
+	Pellets        [MaxPellets]*Pellet
+	PelletCount    int64
+	SizeMultiplier float64
 
 	ticker  *time.Ticker
 	emuLock sync.RWMutex
@@ -38,10 +40,12 @@ func (r *Room) run(d time.Duration) {
 
 func NewRoom() *Room {
 	r := &Room{
-		ticker:    time.NewTicker(time.Millisecond * TickLen),
-		StartMass: 100,
-		MergeTime: 10,
+		ticker:         time.NewTicker(time.Millisecond * TickLen),
+		StartMass:      100,
+		MergeTime:      10,
+		SizeMultiplier: .75,
 	}
+	log.Println(r)
 
 	go func() {
 		lastTick := time.Now()
@@ -53,7 +57,9 @@ func NewRoom() *Room {
 	}()
 	return r
 }
-
+func (r *Room) String() string {
+	return fmt.Sprintf(`Room (MUL:%f,MAS:%d)`, r.SizeMultiplier, r.StartMass)
+}
 func (r *Room) Read(title string) func() {
 	return NewLockTracker(title, &r.emuLock, true)
 }
@@ -226,6 +232,14 @@ func (r *Room) NewPlayer(p Protocol) *Player {
 	done()
 	player.Net.WriteOwns(player)
 	return player
+}
+
+func (r *Room) MergeTimeFromMass(mass float64) time.Duration {
+	s := float64(r.MergeTime) * (1 + mass/2000)
+	d := time.Duration(s*1000) * time.Millisecond
+	log.Println("MERGE TIME FOR", mass, "=", s, "SECONDS =", d)
+
+	return d
 }
 
 type lockTracker struct {
