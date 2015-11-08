@@ -2,7 +2,7 @@ var currentRoom;
 var myplayer;
 var hidingBbox = true;
 
-renderTileSize = 512
+renderTileSize = 64
 tilePadding = 10
 
 function player(room, id) {
@@ -70,14 +70,26 @@ function renderTile(room,x,y) {
 	this.renderables = {}
 	this.dirty = false
 	this.room = room
+	this.freeadd = true
 }
 renderTile.prototype.add = function(particle) {
 	if (particle.id in this.renderables) {
 		console.log("Duplicate Pellet", particle)
 		return
 	}
+
 	this.renderables[particle.id] = particle
-	this.dirty = true
+
+
+	if (this.freeadd) {
+		particle.render(this.ctx)
+		this.ctx.save()
+		this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
+		this.ctx.restore()
+	} else {
+		this.dirty = true
+	}
+
 }
 renderTile.prototype.remove = function(particle) {
 	if (!this.renderables[particle.id]) {

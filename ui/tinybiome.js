@@ -151,7 +151,14 @@ function readMessage(dv, off) {
 	case 11:
 		amt = dv.getInt32(off+1, true)
 		if (amt<1000000) {
+			try {
+				for(i in currentRoom.tiles) {
+					currentRoom.tiles[i].freeadd = false
+				}
+			}
+			catch(e) { console.log(e) }
 			console.log("MULTI PELLET", amt)
+
 			o = off + 5
 			for(var i=0;i<amt;i++) {
 				x = dv.getInt32(o, true)
@@ -163,6 +170,14 @@ function readMessage(dv, off) {
 				p = new pellet(x, y, style)
 				o += 12
 			}
+
+
+			try {
+				for(i in currentRoom.tiles) {
+					currentRoom.tiles[i].freeadd = true
+				}
+			}
+			catch(e) { }
 		} else {
 			console.log("ERROR SIZE", amt)
 		}
