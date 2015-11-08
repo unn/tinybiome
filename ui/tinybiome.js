@@ -129,7 +129,7 @@ function readMessage(dv, off) {
 		p.direction = d
 		p.speed = s
 		break;
-	case 10:
+	case 10: // change mass
 		id = dv.getInt32(off+1, true)
 		mass = dv.getFloat32(off+5, true)
 		off = off + 9

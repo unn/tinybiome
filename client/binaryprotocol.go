@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log"
-	"math/rand"
 	"sync"
 	"time"
 	"unsafe"
@@ -19,14 +18,16 @@ type BinaryProtocol struct {
 	T             time.Time
 	Count         int
 	Lock          sync.RWMutex
+	Logging       bool
 }
 
 func NewBinaryProtocol(ws io.ReadWriter) Protocol {
 	return Protocol(&BinaryProtocol{RW: ws,
 		W:             bufio.NewWriterSize(ws, 1024*10),
-		R:             bufio.NewReaderSize(ws, 1024*1024),
+		R:             bufio.NewReaderSize(ws, 1024*4),
 		T:             time.Now(),
-		isTransaction: false})
+		isTransaction: false,
+		Logging:       false})
 }
 
 var invalidProto = errors.New("Invalid Protocol")
@@ -34,7 +35,6 @@ var hackAttempt = errors.New("Hack Attempt")
 
 // runs in a goroutine
 func (s *BinaryProtocol) GetMessage(p *Player) error {
-	r := p.room
 	act, e := s.R.ReadByte()
 	if e != nil {
 		return e
@@ -44,7 +44,9 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		size := make([]byte, 4)
 		s.R.Read(size)
 		strSize := *(*int32)(unsafe.Pointer(&size[0]))
-		log.Println(p, "SENT LENGTH", strSize)
+		if s.Logging {
+			log.Println(p, "SENT JOIN")
+		}
 		if strSize > 100 {
 			strSize = 100
 		}
@@ -54,95 +56,24 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		nameBytes := make([]byte, strSize)
 		s.R.Read(nameBytes)
 		name := string(nameBytes)
-		for _, n := range p.Owns {
-			if n != nil {
-				return nil
-			}
-		}
-		p.Rename(name)
-		log.Println(name, "JOINED")
-		p.EditLock.Lock()
-		p.NewActor(rand.Float64()*float64(r.Width), rand.Float64()*float64(r.Height), float64(r.StartMass))
-		p.EditLock.Unlock()
+		p.Join(name)
 	case 1:
 		parts := make([]byte, 12)
 		s.R.Read(parts)
-		pid := int64(*(*int32)(unsafe.Pointer(&parts[0])))
+		pid := *(*int32)(unsafe.Pointer(&parts[0]))
 		d := *(*float32)(unsafe.Pointer(&parts[4]))
-		s := *(*float32)(unsafe.Pointer(&parts[8]))
-		a := r.getActor(pid)
-		if a != nil {
-			if a.Player == p {
-				a.Direction = float64(d)
-				a.Speed = float64(s)
-				if a.Speed > 1 {
-					a.Speed = 1
-				}
-				if a.Speed < 0 {
-					a.Speed = 0
-				}
-			} else {
-				log.Println(a, "APPARENTLY NOT OWNED BY", p)
-				return nil
-				return hackAttempt
-			}
-		} else {
-			return nil
+		speed := *(*float32)(unsafe.Pointer(&parts[8]))
+		if s.Logging {
+			log.Println(p, "SENT DIRECTION", pid, d, speed)
 		}
+		p.UpdateDirection(pid, d, speed)
 	case 2:
-		for _, a := range p.Owns {
-			if a != nil {
-				a.Split()
-			}
+		if s.Logging {
+			log.Println(p, "SENT SPLIT")
 		}
+		p.Split()
+
 	}
-	return nil
-	// r := p.room
-	// decoded := map[string]interface{}{}
-	// err := s.R.Decode(&decoded)
-	// if time.Since(s.T) > 100*time.Millisecond {
-	// 	s.T = time.Now()
-	// 	s.Count = 0
-	// }
-	// s.Count += 1
-
-	// if err != nil {
-	// 	return err
-	// }
-	// if s.Count > 100 {
-	// 	log.Println("DROPPING")
-	// 	return nil
-	// }
-
-	// switch decoded["type"] {
-	// case "move":
-	// 	pid := int(decoded["id"].(float64))
-	// 	p := r.getActor(pid)
-	// 	if p != nil {
-	// 		p.Direction = decoded["d"].(float64)
-	// 		p.Speed = decoded["s"].(float64)
-	// 		if p.Speed > 1 {
-	// 			p.Speed = 1
-	// 		}
-	// 		if p.Speed < 0 {
-	// 			p.Speed = 0
-	// 		}
-	// 	}
-	// case "split":
-	// 	for _, a := range p.Owns {
-	// 		if a != nil {
-	// 			a.Split()
-	// 		}
-	// 	}
-	// case "join":
-	// 	p.Rename(decoded["name"].(string))
-	// 	for _, n := range p.Owns {
-	// 		if n != nil {
-	// 			return nil
-	// 		}
-	// 	}
-	// 	p.NewActor(rand.Float64()*float64(r.Width), rand.Float64()*float64(r.Height), float64(r.StartMass))
-	// }
 	return nil
 }
 
@@ -185,6 +116,9 @@ func WriteFloat32(w io.Writer, i float64) {
 
 // sends updates
 func (s *BinaryProtocol) WriteRoom(r *Room) {
+	if s.Logging {
+		log.Println("SENDING WriteRoom", r)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		log.Println("WRITING ROOM")
@@ -200,6 +134,9 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 }
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
+	if s.Logging {
+		log.Println("SENDING WriteNewActor", actor)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -217,6 +154,9 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
+	if s.Logging {
+		log.Println("SENDING WriteNewPellet", pellet)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -229,6 +169,9 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
+	if s.Logging {
+		log.Println("SENDING WriteDestroyPellet", pellet)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -243,6 +186,9 @@ func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
+	if s.Logging {
+		log.Println("SENDING WriteNewPlayer", player)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -260,6 +206,9 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
+	if s.Logging {
+		log.Println("SENDING WriteNamePlayer", player)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -277,6 +226,9 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
+	if s.Logging {
+		log.Println("SENDING WriteDestroyPlayer", player)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -290,6 +242,9 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteOwns(player *Player) {
+	if s.Logging {
+		log.Println("SENDING WriteOwns", player)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -303,6 +258,9 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
+	if s.Logging {
+		log.Println("SENDING WriteDestroyActor", actor)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -316,6 +274,9 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
+	if s.Logging {
+		log.Println("SENDING WriteMoveActor", actor)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -333,6 +294,9 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
+	if s.Logging {
+		log.Println("SENDING WriteSetMassActor", actor)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -347,6 +311,9 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
+	if s.Logging {
+		log.Println("SENDING WritePelletsIncoming", pellets)
+	}
 	if !s.isTransaction {
 		s.Lock.Lock()
 		defer s.Lock.Unlock()
@@ -363,12 +330,13 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 	s.done()
 }
 
-func (s *BinaryProtocol) Transaction() ProtocolDown {
+func (s *BinaryProtocol) Transaction(logging bool, size int) ProtocolDown {
 	a := &BinaryProtocol{RW: s.RW,
-		W:             bufio.NewWriterSize(s.RW, 1024*1024*10),
-		R:             bufio.NewReaderSize(s.RW, 1024*1024),
+		W:             bufio.NewWriterSize(s.RW, size),
+		R:             nil,
 		T:             time.Now(),
-		isTransaction: true}
+		isTransaction: true,
+		Logging:       logging}
 	return a
 }
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"sync"
 	"time"
 )
 
@@ -20,7 +19,6 @@ type Pellet struct {
 
 func (p *Pellet) Create() {
 	p.Mass = 3
-	done := p.room.Write("Creating Pellet")
 	if p.room.PelletCount < MaxPellets {
 		for _, b := range p.room.Players {
 			if b == nil {
@@ -32,10 +30,8 @@ func (p *Pellet) Create() {
 		p.room.Pellets[p.ID] = p
 		p.room.PelletCount += 1
 	}
-	done()
 }
 func (p *Pellet) Remove() {
-	done := p.room.Write("Removing Pellet")
 	for _, b := range p.room.Players {
 		if b == nil {
 			continue
@@ -46,9 +42,6 @@ func (p *Pellet) Remove() {
 	r.PelletCount -= 1
 	r.Pellets[p.ID] = r.Pellets[r.PelletCount]
 	r.Pellets[p.ID].ID = p.ID
-
-	done()
-
 }
 
 type Actor struct {
@@ -96,11 +89,7 @@ func (a *Actor) Radius() float64 {
 	return a.radius
 }
 
-func (a *Actor) Move(x, y float64) {
-	a.X = x
-	a.Y = y
-
-	done := a.Player.room.Read("Eating pellets")
+func (a *Actor) CheckCollisions() {
 	pellets := []*Pellet{}
 	r := a.Player.room
 	for _, p := range r.Pellets[:r.PelletCount] {
@@ -113,8 +102,6 @@ func (a *Actor) Move(x, y float64) {
 		}
 	}
 
-	done()
-
 	if len(pellets) > 0 {
 		for i := 0; i < len(pellets); i += 1 {
 			a.ConsumePellet(pellets[i])
@@ -122,7 +109,6 @@ func (a *Actor) Move(x, y float64) {
 	}
 
 	consumes := []*Actor{}
-	done = a.Player.room.Read("Moving player")
 	for _, b := range a.Player.room.Actors[:a.Player.room.HighestID] {
 		if b == a || b == nil {
 			continue
@@ -151,14 +137,11 @@ func (a *Actor) Move(x, y float64) {
 			}
 		}
 	}
-	done()
 
 	if len(consumes) > 0 {
-		eating := a.Player.room.Write("Eating other actors")
 		for i := 0; i < len(consumes); i += 1 {
 			a.Consume(consumes[i])
 		}
-		eating()
 	}
 	a.moved = true
 	a.X = math.Min(float64(a.Player.room.Width), a.X)
@@ -181,7 +164,8 @@ func (a *Actor) Tick(d time.Duration) {
 	a.X += a.XSpeed
 	a.Y += a.YSpeed
 
-	a.Move(a.X+dx, a.Y+dy)
+	a.X += dx
+	a.Y += dy
 
 }
 
@@ -227,9 +211,7 @@ func (a *Actor) Consume(b *Actor) {
 		a.DecayLevel = 0
 	}
 	a.RecalcRadius()
-	b.Player.EditLock.Lock()
 	b.Remove()
-	b.Player.EditLock.Unlock()
 	a.Player.Net.WriteSetMassActor(a)
 }
 
@@ -262,7 +244,6 @@ func (a *Actor) Split() {
 		return
 	}
 
-	a.Player.EditLock.Lock()
 	nb := a.Player.NewActor(a.X, a.Y, a.Mass*.5)
 	nb.Direction = a.Direction
 	nb.Speed = a.Speed
@@ -273,7 +254,6 @@ func (a *Actor) Split() {
 
 	a.Remove()
 	b := a.Player.NewActor(a.X+XSpeed*nb.Radius(), a.Y+YSpeed*nb.Radius(), a.Mass*.5)
-	a.Player.EditLock.Unlock()
 
 	b.Direction = a.Direction
 	b.Speed = a.Speed
@@ -298,83 +278,4 @@ func (a *Actor) Remove() {
 		}
 		player.Net.WriteDestroyActor(a)
 	}
-}
-
-type Player struct {
-	ID       int64
-	Net      Protocol
-	room     *Room
-	Owns     [MaxOwns]*Actor
-	EditLock sync.RWMutex
-	Name     string
-}
-
-func (p *Player) NewActor(x, y, mass float64) *Actor {
-	r := p.room
-	actor := &Actor{X: x, Y: y, Player: p, Mass: mass,
-		MergeTime: time.Now().Add(r.MergeTimeFromMass(mass))}
-	actor.RecalcRadius()
-	id := r.getId(actor)
-	actor.ID = id
-	log.Println("NEW ACTOR", actor)
-
-	done := r.Read("Updating players on new actor")
-	for _, oPlayer := range r.Players {
-		if oPlayer == nil {
-			continue
-		}
-		oPlayer.Net.WriteNewActor(actor)
-	}
-	done()
-
-	for n, a := range p.Owns {
-		if a == nil {
-			p.Owns[n] = actor
-			break
-		}
-	}
-
-	return actor
-}
-
-func (p *Player) Remove() {
-	r := p.room
-	p.EditLock.Lock()
-	done := r.Write("Removing player and players actors")
-	for _, actor := range r.Actors {
-		if actor == nil {
-			continue
-		}
-		if actor.Player == p {
-			actor.Remove()
-		}
-	}
-	p.EditLock.Unlock()
-	r.Players[p.ID] = nil
-	for _, oPlayer := range r.Players {
-		if oPlayer == nil {
-			continue
-		}
-		oPlayer.Net.WriteDestroyPlayer(p)
-	}
-	done()
-}
-
-func (p *Player) String() string {
-	return fmt.Sprintf("#%d (%s)", p.ID, p.Name)
-}
-
-func (p *Player) Rename(n string) {
-	if len(n) > 100 {
-		n = n[:100]
-	}
-	p.Name = n
-	done := p.room.Read("Updating name to player")
-	for _, oPlayer := range p.room.Players {
-		if oPlayer == nil {
-			continue
-		}
-		oPlayer.Net.WriteNamePlayer(p)
-	}
-	done()
 }

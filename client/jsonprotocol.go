@@ -29,7 +29,7 @@ type ProtocolDown interface {
 type Protocol interface {
 	ProtocolDown
 	GetMessage(*Player) error
-	Transaction() ProtocolDown
+	Transaction(bool, int) ProtocolDown
 }
 
 type JsonProtocol struct {
@@ -181,7 +181,7 @@ func (s *JsonProtocol) WritePelletsIncoming(p []*Pellet) {
 	// s.send(dat)
 }
 
-func (s *JsonProtocol) Transaction() ProtocolDown {
+func (s *JsonProtocol) Transaction(bool, int) ProtocolDown {
 	s.Buffer = make([]string, 0)
 	return nil
 }
