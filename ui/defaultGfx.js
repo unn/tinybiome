@@ -97,8 +97,8 @@ gfx.renderPlayer = function(ctx, x, y, color, name, mass, radius) {
 		sY = Math.floor((pY+sY)/cellImgHeight)*cellImgHeight
 		ctx.save()
 		ctx.translate(x-radius,y-radius);
-		ctx.scale(.2,.2)
-		ctx.fillRect(0,0,(radius*2/.2),(radius*2/.2));
+		ctx.scale(.3,.3)
+		ctx.fillRect(0,0,(radius*2/.3),(radius*2/.3));
 		// ctx.translate(-(x-radius),-(y-radius));
 		ctx.restore()
 	}

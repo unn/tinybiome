@@ -43,7 +43,7 @@ func NewRoom() *Room {
 		ticker:         time.NewTicker(time.Millisecond * TickLen),
 		StartMass:      100,
 		MergeTime:      10,
-		SizeMultiplier: .75,
+		SizeMultiplier: .65,
 	}
 	log.Println(r)
 
