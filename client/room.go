@@ -16,16 +16,17 @@ const MaxPellets = 10000
 const TickLen = 25
 
 type Room struct {
-	Width          int64
-	Height         int64
-	StartMass      int64
-	MergeTime      int64
-	Actors         [MaxEnts]*Actor
-	Players        [MaxPlayers]*Player
-	HighestID      int64
-	Pellets        [MaxPellets]*Pellet
-	PelletCount    int64
-	SizeMultiplier float64
+	Width           int64
+	Height          int64
+	StartMass       int64
+	MergeTime       int64
+	Actors          [MaxEnts]*Actor
+	Players         [MaxPlayers]*Player
+	HighestID       int64
+	Pellets         [MaxPellets]*Pellet
+	PelletCount     int64
+	SizeMultiplier  float64
+	SpeedMultiplier float64
 
 	ticker     *time.Ticker
 	ChangeLock sync.RWMutex
@@ -33,10 +34,11 @@ type Room struct {
 
 func NewRoom() *Room {
 	r := &Room{
-		ticker:         time.NewTicker(time.Millisecond * TickLen),
-		StartMass:      100,
-		MergeTime:      10,
-		SizeMultiplier: .55,
+		ticker:          time.NewTicker(time.Millisecond * TickLen),
+		StartMass:       50,
+		MergeTime:       10,
+		SizeMultiplier:  .65,
+		SpeedMultiplier: .3,
 	}
 	log.Println(r)
 
@@ -56,7 +58,7 @@ func (r *Room) run(d time.Duration) {
 	r.ChangeLock.Lock()
 	r.createPellets(d)
 	r.checkCollisions()
-	r.addDecay()
+	r.addDecay(d)
 	r.updatePositions(d)
 	r.sendUpdates(d)
 	for _, player := range r.Players {
@@ -101,12 +103,12 @@ func (r *Room) createPellets(d time.Duration) {
 	}
 }
 
-func (r *Room) addDecay() {
+func (r *Room) addDecay(d time.Duration) {
 	for _, actor := range r.Actors[:r.HighestID] {
 		if actor == nil {
 			continue
 		}
-		actor.Decay()
+		actor.Decay(d)
 	}
 }
 

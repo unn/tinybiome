@@ -51,8 +51,9 @@ function readMessage(dv, off) {
 		newroom.startmass = dv.getInt32(off+9, true)
 		newroom.mergetime = dv.getInt32(off+13, true)
 		newroom.sizemultiplier = dv.getFloat32(off+17, true)
+		newroom.speedmultiplier = dv.getFloat32(off+21, true)
 		
-		off = off + 21
+		off = off + 25
 		console.log("NEW ROOM",{width:width,height:height,sm:newroom.sizemultiplier})
 		break;
 	case 1: // CREATE ACTOR

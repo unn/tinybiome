@@ -113,20 +113,27 @@ renderTile.prototype.render = function(ctx) {
 		this.rerender()
 	}
 
-	myArea = this.bbox()
-	screenArea = camera.bbox()
-	myArea[0] = Math.max(myArea[0], screenArea[0])
-	myArea[1] = Math.max(myArea[1], screenArea[1])
-	myArea[2] = Math.min(myArea[2], screenArea[2])
-	myArea[3] = Math.min(myArea[3], screenArea[3])
+	if (renderTileSize*camera.xscale > 100 || renderTileSize*camera.yscale > 100) {
+		for(i in this.renderables) {
+			r = this.renderables[i]
+			r.render(ctx)
+		}
+	} else {
 
-	// ctx.imageSmoothingEnabled = false
-  	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
+		myArea = this.bbox()
+		screenArea = camera.bbox()
+		myArea[0] = Math.max(myArea[0], screenArea[0])
+		myArea[1] = Math.max(myArea[1], screenArea[1])
+		myArea[2] = Math.min(myArea[2], screenArea[2])
+		myArea[3] = Math.min(myArea[3], screenArea[3])
 
-  	sArea = [myArea[0]-this.x,myArea[1]-this.y,myArea[2]-this.x,myArea[3]-this.y]
-  	tArea = [myArea[0]+tilePadding,myArea[1]+tilePadding,myArea[2]-tilePadding,myArea[3]-tilePadding]
+		// ctx.imageSmoothingEnabled = false
+	  	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
 
-  	ctx.strokeStyle = "rgba(0,0,0,.2)";
+	  	sArea = [myArea[0]-this.x,myArea[1]-this.y,myArea[2]-this.x,myArea[3]-this.y]
+	  	tArea = [myArea[0]+tilePadding,myArea[1]+tilePadding,myArea[2]-tilePadding,myArea[3]-tilePadding]
+
+	  }
   	// TODO: try optimizing drawImage to clip within camera area
 	// ctx.drawImage(this.canvas, sArea[0], sArea[1], sArea[2]-sArea[0],sArea[3]-sArea[1],
 	// 	tArea[0], tArea[1], tArea[2]-tArea[0],tArea[3]-tArea[1])
@@ -480,7 +487,7 @@ actor.prototype.step = function(seconds) {
 		this.clientStep(seconds)
 	}
 
-	allowed = 100 / (Math.pow(.46*this.mass, .2))
+	allowed = 10000 / (room.speedmultiplier * (this.mass + 50))
 	distance = allowed * seconds * this.speed
 	mdx = Math.cos(this.direction) * distance
 	mdy = Math.sin(this.direction) * distance

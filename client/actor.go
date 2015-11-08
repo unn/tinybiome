@@ -63,23 +63,19 @@ type Actor struct {
 	DecayLevel float64
 }
 
-func (a *Actor) Decay() {
-	m := a.Mass
-	if a.DecayLevel < a.Mass {
-		a.DecayLevel += (a.Mass - 200) / 10000
+func (a *Actor) Decay(d time.Duration) {
+	if a.Mass > 150 {
+		a.DecayLevel += (a.Mass - 150) / 1000000
 	}
-	if a.DecayLevel > a.Mass {
-		a.DecayLevel = a.Mass
+	if a.DecayLevel < -1 {
+		a.DecayLevel = -1
 	}
-	if a.DecayLevel < 0 {
-		a.DecayLevel = 0
+	if a.DecayLevel > 1 {
+		a.DecayLevel = 1
 	}
-	a.Mass -= a.DecayLevel / 15
-	if a.Mass < 20 {
-		a.Mass = 20
-	}
-	if a.Mass != m {
-		a.Player.Net.WriteSetMassActor(a)
+
+	if a.DecayLevel > 0 {
+		a.Mass -= a.DecayLevel
 	}
 }
 func (a *Actor) RecalcRadius() {
@@ -152,7 +148,7 @@ func (a *Actor) CheckCollisions() {
 var friction = .1
 
 func (a *Actor) Tick(d time.Duration) {
-	allowed := 100 / (math.Pow(.5*a.Mass, .1))
+	allowed := 10000 / (a.Player.room.SpeedMultiplier * (a.Mass + 50))
 	distance := allowed * d.Seconds() * a.Speed
 
 	dx := math.Cos(a.Direction) * distance
@@ -207,7 +203,7 @@ func (a *Actor) Consume(b *Actor) {
 		a.MergeTime = a.MergeTime.Add(a.Player.room.MergeTimeFromMass(b.Mass))
 	} else {
 		a.Mass += b.Mass * .65
-		a.DecayLevel = 0
+		a.DecayLevel -= b.Mass / a.Mass
 	}
 	a.RecalcRadius()
 	b.Remove()
@@ -215,7 +211,7 @@ func (a *Actor) Consume(b *Actor) {
 
 func (a *Actor) ConsumePellet(b *Pellet) {
 	if b.Type == 0 {
-		a.DecayLevel /= 2
+		a.DecayLevel -= 10 * float64(b.Mass) / a.Mass
 	} else {
 		a.Mass += float64(b.Mass) * .9
 	}
