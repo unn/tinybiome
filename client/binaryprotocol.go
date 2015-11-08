@@ -35,7 +35,7 @@ type Protocol interface {
 }
 
 type BinaryProtocol struct {
-	RW            io.ReadWriter
+	RW            io.ReadWriteCloser
 	W             *bytes.Buffer
 	R             *bufio.Reader
 	isTransaction bool
@@ -44,9 +44,10 @@ type BinaryProtocol struct {
 	Lock          sync.RWMutex
 	Logging       bool
 	WriteChan     chan []byte
+	Disconnected  bool
 }
 
-func NewBinaryProtocol(ws io.ReadWriter) Protocol {
+func NewBinaryProtocol(ws io.ReadWriteCloser) Protocol {
 	return Protocol(&BinaryProtocol{
 		RW:            ws,
 		W:             bytes.NewBuffer(nil),
@@ -59,9 +60,13 @@ func NewBinaryProtocol(ws io.ReadWriter) Protocol {
 
 var invalidProto = errors.New("Invalid Protocol")
 var hackAttempt = errors.New("Hack Attempt")
+var Disconnected = errors.New("Disconnected")
 
 // runs in a goroutine
 func (s *BinaryProtocol) GetMessage(p *Player) error {
+	if s.Disconnected {
+		return Disconnected
+	}
 	act, e := s.R.ReadByte()
 	if e != nil {
 		return e
@@ -294,7 +299,16 @@ func (s *BinaryProtocol) Save() {
 	s.Lock.Lock()
 	oldW := s.W
 	s.W = bytes.NewBuffer(nil)
-	s.WriteChan <- oldW.Bytes()
+	if len(s.WriteChan) > 10 {
+		log.Println("HIGH WRITECHAN", len(s.WriteChan))
+	}
+	if len(s.WriteChan) > 50 {
+		s.Disconnected = true
+		s.RW.Close()
+
+	} else {
+		s.WriteChan <- oldW.Bytes()
+	}
 	s.W.Reset()
 	s.Lock.Unlock()
 }
