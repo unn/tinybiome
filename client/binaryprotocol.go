@@ -78,17 +78,13 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 }
 
 func (s *BinaryProtocol) done() {
-	if !s.isTransaction {
+	if s.W.Available() < 100 {
 		s.W.Flush()
-	} else {
-		s.check()
 	}
 }
 
 func (s *BinaryProtocol) check() {
-	if s.W.Available() < 100 {
-		s.W.Flush()
-	}
+
 }
 
 func WriteBytes(w io.Writer, p unsafe.Pointer, l int) {
@@ -119,27 +115,17 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 	if s.Logging {
 		log.Println("SENDING WriteRoom", r)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		log.Println("WRITING ROOM")
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(0)
 	WriteInt32(s.W, r.Width)
 	WriteInt32(s.W, r.Height)
 	WriteInt32(s.W, r.StartMass)
 	WriteInt32(s.W, r.MergeTime)
 	WriteFloat32(s.W, r.SizeMultiplier)
-	s.done()
 }
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteNewActor", actor)
-	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
 	}
 	s.W.WriteByte(1)
 	WriteInt32(s.W, actor.ID)
@@ -147,7 +133,6 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 	WriteFloat32(s.W, actor.Y)
 	WriteFloat32(s.W, actor.Mass)
 	WriteInt32(s.W, actor.Player.ID)
-	s.done()
 	// newPlayer := `{"type":"new","x":%f,"y":%f,"id":%d,"mass":%f,"owner":%d}`
 	// dat := fmt.Sprintf(newPlayer, actor.X, actor.Y, actor.ID, actor.Mass, actor.Player.ID)
 	// _ = dat
@@ -157,29 +142,19 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 	if s.Logging {
 		log.Println("SENDING WriteNewPellet", pellet)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(2)
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
 	WriteInt32(s.W, pellet.Type)
-	s.done()
 }
 
 func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 	if s.Logging {
 		log.Println("SENDING WriteDestroyPellet", pellet)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(3)
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
-	s.done()
 	// str := `{"type":"delpel","x":%d,"y":%d}`
 	// dat := fmt.Sprintf(str, pellet.X, pellet.Y)
 	// _ = dat
@@ -189,17 +164,12 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteNewPlayer", player)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(4)
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
 	l := len(b)
 	WriteInt32(s.W, int64(l))
 	s.W.Write(b)
-	s.done()
 	// o := map[string]interface{}{"type": "addplayer",
 	// 	"id": player.ID, "name": player.Name}
 	// s.W.Encode(o)
@@ -209,17 +179,12 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteNamePlayer", player)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(5)
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
 	l := len(b)
 	WriteInt32(s.W, int64(l))
 	s.W.Write(b)
-	s.done()
 	// o := map[string]interface{}{"type": "nameplayer",
 	// 	"id": player.ID, "name": player.Name}
 	// s.W.Encode(o)
@@ -229,13 +194,8 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteDestroyPlayer", player)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(6)
 	WriteInt32(s.W, player.ID)
-	s.done()
 	// str := `{"type":"delplayer","id":%d}`
 	// dat := fmt.Sprintf(str, player.ID)
 	// _ = dat
@@ -245,13 +205,8 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteOwns", player)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(7)
 	WriteInt32(s.W, player.ID)
-	s.done()
 	// ownsPlayer := `{"type":"own","id":%d}`
 	// dat := fmt.Sprintf(ownsPlayer, player.ID)
 	// _ = dat
@@ -261,13 +216,8 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteDestroyActor", actor)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(8)
 	WriteInt32(s.W, actor.ID)
-	s.done()
 	// delPlayer := `{"type":"del","id":%d}`
 	// dat := fmt.Sprintf(delPlayer, actor.ID)
 	// _ = dat
@@ -277,17 +227,12 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteMoveActor", actor)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(9)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.X)
 	WriteFloat32(s.W, actor.Y)
 	WriteFloat32(s.W, actor.Direction)
 	WriteFloat32(s.W, actor.Speed)
-	s.done()
 	// delPlayer := `{"type":"move","id":%d,"x":%f,"y":%f,"d":%f,"s":%f}`
 	// dat := fmt.Sprintf(delPlayer, actor.ID, actor.X, actor.Y, actor.Direction, actor.Speed)
 	// _ = dat
@@ -297,14 +242,9 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteSetMassActor", actor)
 	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
-	}
 	s.W.WriteByte(10)
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.Mass)
-	s.done()
 	// delPlayer := `{"type":"mass","id":%d,"mass":%f}`
 	// dat := fmt.Sprintf(delPlayer, actor.ID, actor.Mass)
 	// _ = dat
@@ -313,10 +253,6 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 	if s.Logging {
 		log.Println("SENDING WritePelletsIncoming", pellets)
-	}
-	if !s.isTransaction {
-		s.Lock.Lock()
-		defer s.Lock.Unlock()
 	}
 
 	s.W.WriteByte(11)
@@ -327,7 +263,6 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 		WriteInt32(s.W, pel.Type)
 	}
 
-	s.done()
 }
 
 func (s *BinaryProtocol) Transaction(logging bool, size int) ProtocolDown {

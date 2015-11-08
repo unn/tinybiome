@@ -104,13 +104,6 @@ func (r *Room) addDecay() {
 }
 
 func (r *Room) sendUpdates(d time.Duration) {
-	nPlayers := 0
-	for _, player := range r.Players {
-		if player == nil {
-			continue
-		}
-		nPlayers += 1
-	}
 	for _, player := range r.Players {
 		if player == nil {
 			continue
@@ -246,10 +239,11 @@ func (p *Player) Sync() {
 
 	t.WriteOwns(p)
 
-	go p.SendUpdates()
-
 	r.ChangeLock.Unlock()
+	log.Println(p, "SENDING")
 	t.Done()
+	go p.SendUpdates()
+	log.Println(p, "STARTING LOOP")
 	p.ReceiveUpdates()
 	p.Remove()
 }
@@ -266,13 +260,12 @@ func (p *Player) ReceiveUpdates() {
 }
 
 func (p *Player) SendUpdates() {
-	t := p.Net.Transaction(false, 1024*10)
 	for {
 		p.room.Changes.L.Lock()
 		p.room.Changes.Wait()
 		p.room.Changes.L.Unlock()
 		if p.Connected {
-			t.Done()
+			p.Net.Done()
 		} else {
 			break
 		}

@@ -405,8 +405,6 @@ actor.prototype.render = function(ctx) {
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	this.x = (this.xs+this.x)/2
-	this.y = (this.ys+this.y)/2
 	this.color = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
 	n = currentRoom.players[this.owner].name
 	n = n ? n : "Microbe"
@@ -454,6 +452,10 @@ actor.prototype.clientStep = function(seconds) {
 
 }
 actor.prototype.step = function(seconds) {
+
+	this.x = (this.xs+this.x)/2
+	this.y = (this.ys+this.y)/2
+	
 	room = currentRoom
 	if (this.owner==myplayer.id) {
 		this.clientStep(seconds)
@@ -476,6 +478,7 @@ actor.prototype.step = function(seconds) {
 
 	this.x += mdx
 	this.y += mdy
+
 
 	this.x = median(this.x, 0, room.width);
 	this.y = median(this.y, 0, room.height);

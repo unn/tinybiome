@@ -129,7 +129,6 @@ func (a *Actor) CheckCollisions() {
 				a.YSpeed = ((a.YSpeed - dy/dist*depth/2*b.Mass/tot) + a.YSpeed) / 2
 				b.XSpeed = ((b.XSpeed + dx/dist*depth/2*a.Mass/tot) + b.XSpeed) / 2
 				b.YSpeed = ((b.YSpeed + dy/dist*depth/2*a.Mass/tot) + b.YSpeed) / 2
-				a.Player.Net.WriteMoveActor(a)
 			}
 			if (dist < a.Radius() || dist < b.Radius()) && a.CanEat(b) {
 				log.Println(a, "EATS", b)
@@ -212,7 +211,6 @@ func (a *Actor) Consume(b *Actor) {
 	}
 	a.RecalcRadius()
 	b.Remove()
-	a.Player.Net.WriteSetMassActor(a)
 }
 
 func (a *Actor) ConsumePellet(b *Pellet) {
@@ -223,7 +221,6 @@ func (a *Actor) ConsumePellet(b *Pellet) {
 	}
 	a.RecalcRadius()
 	b.Remove()
-	a.Player.Net.WriteSetMassActor(a)
 }
 
 func (a *Actor) String() string {

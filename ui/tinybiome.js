@@ -5,9 +5,6 @@ var hidingBbox = true;
 var debugMode = false;
 var camPad = 200
 
-var felt = document.createElement('IMG');
-felt.src = 'imgs/felt.jpg';
-
 DataView.prototype.getUTF8String = function(offset, length) {
     var utf16View = [];
     for (var i = 0; i < length; ++i) {
