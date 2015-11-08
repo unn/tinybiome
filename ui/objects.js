@@ -81,10 +81,13 @@ renderTile.prototype.add = function(particle) {
 	this.renderables[particle.id] = particle
 
 
-	if (this.freeadd) {
-		particle.render(this.ctx)
+	if (this.freeadd && false) {
+		// TODO: figure out why this optimization doesn't work
 		this.ctx.save()
+		this.scale(camera.xscale,camera.yscale)
+		this.translate(-camera.x,-camera.y)
 		this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
+		particle.render(this.ctx)
 		this.ctx.restore()
 	} else {
 		this.dirty = true
