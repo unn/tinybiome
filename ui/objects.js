@@ -72,6 +72,10 @@ function renderTile(room,x,y) {
 	this.room = room
 }
 renderTile.prototype.add = function(particle) {
+	if (particle.id in this.renderables) {
+		console.log("Duplicate Pellet", particle)
+		return
+	}
 	this.renderables[particle.id] = particle
 	this.dirty = true
 }
@@ -455,7 +459,7 @@ actor.prototype.step = function(seconds) {
 
 	this.x = (this.xs+this.x)/2
 	this.y = (this.ys+this.y)/2
-	
+
 	room = currentRoom
 	if (this.owner==myplayer.id) {
 		this.clientStep(seconds)

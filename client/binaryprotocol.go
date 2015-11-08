@@ -2,31 +2,58 @@ package client
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"log"
+	"math"
 	"sync"
 	"time"
 	"unsafe"
 )
 
+type ProtocolDown interface {
+	WriteNewActor(*Actor)
+	WriteDestroyActor(*Actor)
+	WriteNewPlayer(*Player)
+	WriteDestroyPlayer(*Player)
+	WriteNamePlayer(*Player)
+	WriteOwns(*Player)
+	WriteRoom(*Room)
+	WriteMoveActor(*Actor)
+	WriteSetMassActor(*Actor)
+	WriteNewPellet(*Pellet)
+	WriteDestroyPellet(*Pellet)
+	WritePelletsIncoming([]*Pellet)
+	Flush() error
+	Save()
+}
+
+type Protocol interface {
+	ProtocolDown
+	GetMessage(*Player) error
+}
+
 type BinaryProtocol struct {
 	RW            io.ReadWriter
-	W             *bufio.Writer
+	W             *bytes.Buffer
 	R             *bufio.Reader
 	isTransaction bool
 	T             time.Time
 	Count         int
 	Lock          sync.RWMutex
 	Logging       bool
+	WriteChan     chan []byte
 }
 
 func NewBinaryProtocol(ws io.ReadWriter) Protocol {
-	return Protocol(&BinaryProtocol{RW: ws,
-		W:             bufio.NewWriterSize(ws, 1024*10),
+	return Protocol(&BinaryProtocol{
+		RW:            ws,
+		W:             bytes.NewBuffer(nil),
 		R:             bufio.NewReaderSize(ws, 1024*4),
 		T:             time.Now(),
 		isTransaction: false,
+		WriteChan:     make(chan []byte, 100),
 		Logging:       false})
 }
 
@@ -62,7 +89,14 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		s.R.Read(parts)
 		pid := *(*int32)(unsafe.Pointer(&parts[0]))
 		d := *(*float32)(unsafe.Pointer(&parts[4]))
+		if math.IsNaN(float64(d)) {
+			d = 0
+		}
+
 		speed := *(*float32)(unsafe.Pointer(&parts[8]))
+		if math.IsNaN(float64(speed)) {
+			speed = 0
+		}
 		if s.Logging {
 			log.Println(p, "SENT DIRECTION", pid, d, speed)
 		}
@@ -72,19 +106,10 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 			log.Println(p, "SENT SPLIT")
 		}
 		p.Split()
-
+	default:
+		log.Println("READ ERROR, TYPE", act)
 	}
 	return nil
-}
-
-func (s *BinaryProtocol) done() {
-	if s.W.Available() < 100 {
-		s.W.Flush()
-	}
-}
-
-func (s *BinaryProtocol) check() {
-
 }
 
 func WriteBytes(w io.Writer, p unsafe.Pointer, l int) {
@@ -252,7 +277,7 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 
 func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 	if s.Logging {
-		log.Println("SENDING WritePelletsIncoming", pellets)
+		log.Println("SENDING WritePelletsIncoming", len(pellets))
 	}
 
 	s.W.WriteByte(11)
@@ -265,16 +290,31 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 
 }
 
-func (s *BinaryProtocol) Transaction(logging bool, size int) ProtocolDown {
-	a := &BinaryProtocol{RW: s.RW,
-		W:             bufio.NewWriterSize(s.RW, size),
-		R:             nil,
-		T:             time.Now(),
-		isTransaction: true,
-		Logging:       logging}
-	return a
+func (s *BinaryProtocol) Save() {
+	s.Lock.Lock()
+	oldW := s.W
+	s.W = bytes.NewBuffer(nil)
+	s.WriteChan <- oldW.Bytes()
+	s.W.Reset()
+	s.Lock.Unlock()
 }
 
-func (s *BinaryProtocol) Done() {
-	s.W.Flush()
+func (s *BinaryProtocol) Flush() error {
+	b := <-s.WriteChan
+	t := time.Now()
+	n, e := s.RW.Write(b)
+	if e != nil {
+		return e
+	}
+	if n < len(b) {
+		log.Println("INCOMPLETE WRITE OF", n, "/", len(b))
+	}
+	took := time.Since(t)
+	if len(b) > 1000 {
+		log.Println("LONG WRITE", len(b))
+	}
+	if took > time.Millisecond {
+		log.Println("Write took", took)
+	}
+	return nil
 }

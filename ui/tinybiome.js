@@ -25,7 +25,14 @@ DataView.prototype.getUTF8String = function(offset, length) {
 		dv = new DataView(m.data)
 		off = 0
 		while (off < dv.byteLength) {
-			off = readMessage(dv, off)
+			olf = off
+			try {
+				off = readMessage(dv, off)
+			}
+			catch (e) {
+				console.log(e)
+			}
+			// console.log(off-olf)
 		}
 	}
 
@@ -60,7 +67,7 @@ function readMessage(dv, off) {
 		off = off + 21
 		break;
 	case 2:
-		p = new pellet(dv.getInt32(off+1, true, true), dv.getInt32(off+5, true, true), dv.getInt32(off+9, true, true))
+		p = new pellet(dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
 		off = off + 13
 		break
 	case 3:
@@ -78,19 +85,27 @@ function readMessage(dv, off) {
 	case 4:
 		id = dv.getInt32(off+1, true)
 		len = dv.getInt32(off+5, true)
-		name = dv.getUTF8String(off+9,len)
+		if (len<100000 && len > -1) {
+			name = dv.getUTF8String(off+9,len)
+			console.log("CREATING PLAYER", id, "NAME(",len,")",name)
+			p = (new player(currentRoom, id))
+			p.name = name ? name : "";
+		} else {
+			console.log("INCORRECT LEN", len)
+		}
 		off = off + 9 + len
-		console.log("CREATING PLAYER", id, "NAME(",len,")",name)
-		p = (new player(currentRoom, id))
-		p.name = name ? name : "";
 		break
 	case 5:
 		id = dv.getInt32(off+1, true)
 		len = dv.getInt32(off+5, true)
-		name = dv.getUTF8String(off+9,len)
+		if (len<100000 && len > -1) {
+			name = dv.getUTF8String(off+9,len)
+			console.log("RENAMING PLAYER", id)
+			currentRoom.players[id].name=name
+		} else {
+			console.log("INCORRECT LEN", len)
+		}
 		off = off + 9 + len
-		console.log("RENAMING PLAYER", id)
-		currentRoom.players[id].name=name
 		break
 	case 6:
 		id = dv.getInt32(off+1, true)
@@ -135,17 +150,21 @@ function readMessage(dv, off) {
 		break;
 	case 11:
 		amt = dv.getInt32(off+1, true)
-		console.log("MULTI PELLET", amt)
-		o = off + 5
-		for(var i=0;i<amt;i++) {
-			x = dv.getInt32(o, true, true)
-			y = dv.getInt32(o+4, true, true)
-			style = dv.getInt32(o+8, true, true)
-			if (Math.random()<.0001) {
-				console.log("CREATING PELLET", x, y, style)
+		if (amt<1000000) {
+			console.log("MULTI PELLET", amt)
+			o = off + 5
+			for(var i=0;i<amt;i++) {
+				x = dv.getInt32(o, true)
+				y = dv.getInt32(o+4, true)
+				style = dv.getInt32(o+8, true)
+				if (Math.random()<.0001) {
+					console.log("CREATING PELLET", x, y, style)
+				}
+				p = new pellet(x, y, style)
+				o += 12
 			}
-			p = new pellet(x, y, style)
-			o += 12
+		} else {
+			console.log("ERROR SIZE", amt)
 		}
 		
 		off = off + 5 + amt * 12
@@ -340,7 +359,7 @@ function render() {
 			width = width/haveRatio*ratio
 		}
 		if (haveRatio>ratio) {
-			height = height/haveRatio*ratio
+			height = height*haveRatio/ratio
 		}
 		midPointX = (size[2]+size[0])/2
 		midPointY = (size[3]+size[1])/2

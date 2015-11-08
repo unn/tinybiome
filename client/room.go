@@ -31,26 +31,6 @@ type Room struct {
 	ChangeLock sync.RWMutex
 }
 
-func (r *Room) run(d time.Duration) {
-	t := time.Now()
-	r.ChangeLock.Lock()
-	r.createPellets(d)
-	r.checkCollisions()
-	r.addDecay()
-	r.updatePositions(d)
-	r.sendUpdates(d)
-	for _, player := range r.Players {
-		if player != nil {
-			player.SendBuffer()
-		}
-	}
-	r.ChangeLock.Unlock()
-	took := time.Since(t)
-	if took > time.Millisecond*10 {
-		log.Println("TICK TOOK", took)
-	}
-}
-
 func NewRoom() *Room {
 	r := &Room{
 		ticker:         time.NewTicker(time.Millisecond * TickLen),
@@ -69,6 +49,26 @@ func NewRoom() *Room {
 		}
 	}()
 	return r
+}
+
+func (r *Room) run(d time.Duration) {
+	t := time.Now()
+	r.ChangeLock.Lock()
+	r.createPellets(d)
+	r.checkCollisions()
+	r.addDecay()
+	r.updatePositions(d)
+	r.sendUpdates(d)
+	for _, player := range r.Players {
+		if player != nil {
+			player.SendBuffer()
+		}
+	}
+	r.ChangeLock.Unlock()
+	took := time.Since(t)
+	if took > time.Millisecond*10 {
+		log.Println("TICK TOOK", took)
+	}
 }
 func (r *Room) updatePositions(d time.Duration) {
 	for _, actor := range r.Actors[:r.HighestID] {
@@ -200,7 +200,7 @@ type Player struct {
 	EditLock  sync.RWMutex
 	Name      string
 	Connected bool
-	WriteChan chan struct{}
+	WriteChan chan []byte
 }
 
 func (p *Player) Sync() {
@@ -210,26 +210,25 @@ func (p *Player) Sync() {
 	p.ID = r.getPlayerId(p)
 
 	start := time.Now()
-	t := p.Net.Transaction(false, 1024*1024*2)
 	log.Println("SYNCING ROOM")
-	t.WriteRoom(r)
+	p.Net.WriteRoom(r)
 
 	log.Println("SYNCING PLAYERS")
 	for _, oPlayer := range r.Players {
 		if oPlayer == nil {
 			continue
 		}
-		t.WriteNewPlayer(oPlayer)
+		p.Net.WriteNewPlayer(oPlayer)
 	}
 	log.Println("SYNCING ACTORS")
 	for _, oActor := range r.Actors[:r.HighestID] {
 		if oActor == nil {
 			continue
 		}
-		t.WriteNewActor(oActor)
+		p.Net.WriteNewActor(oActor)
 	}
 	log.Println("SYNCING PELLETS")
-	t.WritePelletsIncoming(r.Pellets[:r.PelletCount])
+	p.Net.WritePelletsIncoming(r.Pellets[:r.PelletCount])
 	took := time.Since(start)
 
 	log.Println("SYNCING OTHER PLAYERS")
@@ -243,21 +242,19 @@ func (p *Player) Sync() {
 		oPlayer.Net.WriteNewPlayer(p)
 	}
 
+	p.Net.WriteOwns(p)
 	log.Println(p, "INITIAL SYNC COMPLETE IN", took)
+	p.Net.Save()
 
-	t.WriteOwns(p)
-
-	p.WriteChan = make(chan struct{}, 0)
 	r.ChangeLock.Unlock()
 	log.Println(p, "SENDING")
-	t.Done()
 	go p.SendUpdates()
 	log.Println(p, "STARTING LOOP")
 	p.ReceiveUpdates()
 	p.Remove()
 }
 func (p *Player) SendBuffer() {
-	p.WriteChan <- struct{}{}
+	p.Net.Save()
 }
 func (p *Player) ReceiveUpdates() {
 	for {
@@ -274,13 +271,12 @@ func (p *Player) SendUpdates() {
 		log.Println("TIMED OUT?")
 	}
 	t := time.AfterFunc(time.Second, f)
-	for range p.WriteChan {
+	for {
 		t.Reset(time.Second)
-		t := time.Now()
-		p.Net.Done()
-		took := time.Since(t)
-		if took > time.Millisecond {
-			log.Println("Write took", took)
+		e := p.Net.Flush()
+		if e != nil {
+			log.Println("ERROR SENDING", e)
+			break
 		}
 	}
 }
@@ -356,7 +352,6 @@ func (p *Player) Remove() {
 
 	log.Println("Unlock 4")
 	log.Println("CLOSING CHAN")
-	close(p.WriteChan)
 	r.ChangeLock.Unlock()
 }
 

@@ -22,8 +22,9 @@ func NewServer() *Server {
 }
 
 var allowedHosts = map[string]struct{}{
-	"http://www.tinybio.me": struct{}{},
-	"http://localhost:8080": struct{}{},
+	"http://www.tinybio.me":   struct{}{},
+	"http://localhost:8080":   struct{}{},
+	"http://96.50.20.37:8080": struct{}{},
 }
 
 func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
@@ -56,6 +57,7 @@ func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
 
 func (s *Server) Accept(ws *websocket.Conn) {
 	if _, found := allowedHosts[ws.RemoteAddr().String()]; !found {
+		log.Println("REJECTED BECAUSE", ws.RemoteAddr().String())
 		return
 	}
 
