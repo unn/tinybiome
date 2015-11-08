@@ -29,18 +29,26 @@ type Room struct {
 
 	ticker     *time.Ticker
 	ChangeLock sync.RWMutex
-	Changes    *sync.Cond
 }
 
 func (r *Room) run(d time.Duration) {
+	t := time.Now()
 	r.ChangeLock.Lock()
 	r.createPellets(d)
 	r.checkCollisions()
 	r.addDecay()
 	r.updatePositions(d)
 	r.sendUpdates(d)
+	for _, player := range r.Players {
+		if player != nil {
+			player.SendBuffer()
+		}
+	}
 	r.ChangeLock.Unlock()
-	r.Changes.Broadcast()
+	took := time.Since(t)
+	if took > time.Millisecond*10 {
+		log.Println("TICK TOOK", took)
+	}
 }
 
 func NewRoom() *Room {
@@ -50,7 +58,6 @@ func NewRoom() *Room {
 		MergeTime:      10,
 		SizeMultiplier: .55,
 	}
-	r.Changes = sync.NewCond(&sync.RWMutex{})
 	log.Println(r)
 
 	go func() {
@@ -193,6 +200,7 @@ type Player struct {
 	EditLock  sync.RWMutex
 	Name      string
 	Connected bool
+	WriteChan chan struct{}
 }
 
 func (p *Player) Sync() {
@@ -239,6 +247,7 @@ func (p *Player) Sync() {
 
 	t.WriteOwns(p)
 
+	p.WriteChan = make(chan struct{}, 0)
 	r.ChangeLock.Unlock()
 	log.Println(p, "SENDING")
 	t.Done()
@@ -247,27 +256,31 @@ func (p *Player) Sync() {
 	p.ReceiveUpdates()
 	p.Remove()
 }
-
+func (p *Player) SendBuffer() {
+	p.WriteChan <- struct{}{}
+}
 func (p *Player) ReceiveUpdates() {
 	for {
 		reason := p.Net.GetMessage(p)
 		if reason != nil {
 			log.Println("REMOVING BECAUSE", reason)
-			p.Connected = false
 			break
 		}
 	}
 }
 
 func (p *Player) SendUpdates() {
-	for {
-		p.room.Changes.L.Lock()
-		p.room.Changes.Wait()
-		p.room.Changes.L.Unlock()
-		if p.Connected {
-			p.Net.Done()
-		} else {
-			break
+	f := func() {
+		log.Println("TIMED OUT?")
+	}
+	t := time.AfterFunc(time.Second, f)
+	for range p.WriteChan {
+		t.Reset(time.Second)
+		t := time.Now()
+		p.Net.Done()
+		took := time.Since(t)
+		if took > time.Millisecond {
+			log.Println("Write took", took)
 		}
 	}
 }
@@ -325,7 +338,6 @@ func (p *Player) Remove() {
 	r := p.room
 	log.Println("Lock 4")
 	r.ChangeLock.Lock()
-
 	for _, actor := range r.Actors {
 		if actor == nil {
 			continue
@@ -343,6 +355,8 @@ func (p *Player) Remove() {
 	}
 
 	log.Println("Unlock 4")
+	log.Println("CLOSING CHAN")
+	close(p.WriteChan)
 	r.ChangeLock.Unlock()
 }
 
