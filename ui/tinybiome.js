@@ -147,7 +147,7 @@ function readMessage(dv, off) {
 		mass = dv.getFloat32(off+5, true)
 		off = off + 9
 		p = actors[id]
-		p.mass = mass
+		p.setmass( mass )
 		break;
 	case 11:
 		amt = dv.getInt32(off+1, true)

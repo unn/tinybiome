@@ -12,8 +12,8 @@ import (
 const MaxEnts = 256 * 256
 const MaxPlayers = 1024
 const MaxOwns = 16
-const MaxPellets = 10000
-const TickLen = 25
+const MaxPellets = 12000
+const TickLen = 45
 
 type Room struct {
 	Width           int64
@@ -37,8 +37,8 @@ func NewRoom() *Room {
 		ticker:          time.NewTicker(time.Millisecond * TickLen),
 		StartMass:       50,
 		MergeTime:       10,
-		SizeMultiplier:  .65,
-		SpeedMultiplier: .3,
+		SizeMultiplier:  .7,
+		SpeedMultiplier: .4,
 	}
 	log.Println(r)
 

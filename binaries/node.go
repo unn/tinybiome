@@ -10,7 +10,7 @@ import (
 func init() {
 	runtime.SetBlockProfileRate(1)
 	room := client.NewRoom()
-	room.SetDimensions(2000, 2000)
+	room.SetDimensions(3000, 3000)
 	cli := client.NewServer()
 	cli.AddRoom(room)
 	log.Println("WEBSOCKETS STARTING")

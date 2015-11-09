@@ -2,8 +2,8 @@ var currentRoom;
 var myplayer;
 var hidingBbox = true;
 
-renderTileSize = 64
-tilePadding = 10
+renderTileSize = 128
+tilePadding = 5
 
 function player(room, id) {
 	this.room = room
@@ -113,7 +113,7 @@ renderTile.prototype.render = function(ctx) {
 		this.rerender()
 	}
 
-	if (renderTileSize*camera.xscale > 100 || renderTileSize*camera.yscale > 100) {
+	if (renderTileSize*camera.xscale > 150 || renderTileSize*camera.yscale > 150) {
 		for(i in this.renderables) {
 			r = this.renderables[i]
 			r.render(ctx)
@@ -378,6 +378,7 @@ function actor(id, owner, x, y) {
 	this.ys = y
 
 	this.mass = room.startmass
+	this.newmass = this.mass
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
 	renderable[this.id] = this
@@ -425,9 +426,12 @@ actor.prototype.postRender = function() {
 		ctx.stroke();
 	}
 }
-
+actor.prototype.setmass = function(m) {
+	this.newmass = m
+}
 actor.prototype.radius = function() {return Math.pow(this.mass/Math.PI, currentRoom.sizemultiplier)}
 actor.prototype.render = function(ctx) {
+	this.mass = (this.newmass+this.mass*4)/5
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
@@ -487,7 +491,7 @@ actor.prototype.step = function(seconds) {
 		this.clientStep(seconds)
 	}
 
-	allowed = 10000 / (room.speedmultiplier * (this.mass + 50))
+	allowed = 500 / (room.speedmultiplier * Math.pow(this.mass + 50, .5))
 	distance = allowed * seconds * this.speed
 	mdx = Math.cos(this.direction) * distance
 	mdy = Math.sin(this.direction) * distance

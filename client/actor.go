@@ -121,10 +121,16 @@ func (a *Actor) CheckCollisions() {
 			depth := allowedDist - dist
 			if a.MustCollide(b) {
 				tot := a.Mass + b.Mass
-				a.XSpeed = ((a.XSpeed - dx/dist*depth/2*b.Mass/tot) + a.XSpeed) / 2
-				a.YSpeed = ((a.YSpeed - dy/dist*depth/2*b.Mass/tot) + a.YSpeed) / 2
-				b.XSpeed = ((b.XSpeed + dx/dist*depth/2*a.Mass/tot) + b.XSpeed) / 2
-				b.YSpeed = ((b.YSpeed + dy/dist*depth/2*a.Mass/tot) + b.YSpeed) / 2
+
+				a.X -= dx / dist * depth * b.Mass / tot
+				a.Y -= dy / dist * depth * b.Mass / tot
+				b.X += dx / dist * depth * a.Mass / tot
+				b.Y += dy / dist * depth * a.Mass / tot
+
+				a.XSpeed = ((a.XSpeed - math.Min(dx/dist*depth/2*b.Mass/tot, 6)) + a.XSpeed) / 2
+				a.YSpeed = ((a.YSpeed - math.Min(dy/dist*depth/2*b.Mass/tot, 6)) + a.YSpeed) / 2
+				b.XSpeed = ((b.XSpeed + math.Min(dx/dist*depth/2*a.Mass/tot, 6)) + b.XSpeed) / 2
+				b.YSpeed = ((b.YSpeed + math.Min(dy/dist*depth/2*a.Mass/tot, 6)) + b.YSpeed) / 2
 			}
 			if (dist < a.Radius() || dist < b.Radius()) && a.CanEat(b) {
 				log.Println(a, "EATS", b)
@@ -148,7 +154,7 @@ func (a *Actor) CheckCollisions() {
 var friction = .1
 
 func (a *Actor) Tick(d time.Duration) {
-	allowed := 10000 / (a.Player.room.SpeedMultiplier * (a.Mass + 50))
+	allowed := 500 / (a.Player.room.SpeedMultiplier * math.Pow(a.Mass+50, .5))
 	distance := allowed * d.Seconds() * a.Speed
 
 	dx := math.Cos(a.Direction) * distance
@@ -223,7 +229,7 @@ func (a *Actor) String() string {
 	return fmt.Sprintf("%d (m:%f, o:%s)", a.ID, a.Mass, a.Player)
 }
 
-func (a *Actor) Split() {
+func (a *Actor) OldSplit() {
 	if a.Mass < 40 {
 		return
 	}
@@ -251,8 +257,41 @@ func (a *Actor) Split() {
 	b.Direction = a.Direction
 	b.Speed = a.Speed
 
-	b.XSpeed = XSpeed * distance
-	b.YSpeed = YSpeed * distance
+	d := math.Sqrt(distance)
+	b.XSpeed = XSpeed * d
+	b.YSpeed = YSpeed * d
+}
+
+func (a *Actor) Split() {
+	if a.Mass < 40 {
+		return
+	}
+	emptySlots := 0
+	for _, n := range a.Player.Owns {
+		if n == nil {
+			emptySlots += 1
+		}
+	}
+	if emptySlots < 1 {
+		return
+	}
+
+	a.Mass *= .5
+	a.MergeTime = a.MergeTime.Add(a.Player.room.MergeTimeFromMass(a.Mass))
+	a.RecalcRadius()
+
+	distance := math.Sqrt(a.Radius()*2) * 1
+	XSpeed := math.Cos(a.Direction)
+	YSpeed := math.Sin(a.Direction)
+
+	b := a.Player.NewActor(a.X+XSpeed*a.Radius(), a.Y+YSpeed*a.Radius(), a.Mass)
+
+	b.Direction = a.Direction
+	b.Speed = a.Speed
+
+	d := math.Sqrt(distance)
+	b.XSpeed = XSpeed * d
+	b.YSpeed = YSpeed * d
 }
 
 func (a *Actor) Remove() {

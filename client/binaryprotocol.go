@@ -54,7 +54,7 @@ func NewBinaryProtocol(ws io.ReadWriteCloser) Protocol {
 		R:             bufio.NewReaderSize(ws, 1024*4),
 		T:             time.Now(),
 		isTransaction: false,
-		WriteChan:     make(chan []byte, 100),
+		WriteChan:     make(chan []byte, 1000),
 		Logging:       false})
 }
 
