@@ -441,7 +441,6 @@ actor.prototype.setmass = function(m) {
 }
 actor.prototype.radius = function() {return Math.pow(this.mass/Math.PI, currentRoom.sizemultiplier)}
 actor.prototype.render = function(ctx) {
-	this.mass = (this.newmass+this.mass*4)/5
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
@@ -492,6 +491,7 @@ actor.prototype.clientStep = function(seconds) {
 
 }
 actor.prototype.step = function(seconds) {
+	this.mass = (this.newmass+this.mass*4)/5
 
 	this.x = (this.xs+this.x)/2
 	this.y = (this.ys+this.y)/2

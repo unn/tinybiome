@@ -76,6 +76,9 @@ func (a *Actor) Decay(d time.Duration) {
 	if a.DecayLevel > 1 {
 		a.DecayLevel = 1
 	}
+	if a.DecayLevel > (a.Mass-150)/300 {
+		a.DecayLevel = (a.Mass - 150) / 300
+	}
 
 	if a.DecayLevel > 0 {
 		a.Mass -= a.DecayLevel
@@ -272,7 +275,7 @@ func (a *Actor) Split() {
 	a.MergeTime = a.MergeTime.Add(a.Player.room.MergeTimeFromMass(a.Mass))
 	a.RecalcRadius()
 
-	distance := math.Sqrt(a.Radius()*2) * 1
+	distance := math.Sqrt(a.Radius()*3) * 1
 	XSpeed := math.Cos(a.Direction)
 	YSpeed := math.Sin(a.Direction)
 
