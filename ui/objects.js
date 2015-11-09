@@ -10,7 +10,17 @@ function player(room, id) {
 	this.id = id
 	this.room.players[id] = this
 	this.owns = {}
+	this.name = ""
 	renderable["player"+this.id] = this
+
+}
+player.prototype.isBot = function() {
+	var a = this.name.toLowerCase();
+	var prefix = "bot: ";
+	if (a=="bot" || a.slice(0, prefix.length) == prefix) {
+		return true
+	}
+	return false
 }
 player.prototype.remove = function() {
 	delete this.room.players[this.id]
@@ -30,6 +40,13 @@ player.prototype.render = function(ctx) {
 		n = this.name ? this.name : "Microbe"
 		gfx.renderGroup(ctx, bbox, n, mass, myActors)
 	}
+}
+player.prototype.moveTo = function(dx,dy) {
+	for(aid in this.owns) {
+		a = this.owns[aid]
+		a.moveTo(dx,dy)
+	}
+
 }
 player.prototype.bbox = function() {
 	x = this.room.width
@@ -449,46 +466,11 @@ actor.prototype.render = function(ctx) {
 	n = n ? n : "Microbe"
 	gfx.renderPlayer(ctx,this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 }
-actor.prototype.clientStep = function(seconds) {
-	onCanvasX = (this.x - camera.x)*camera.xscale
-	onCanvasY = (this.y - camera.y)*camera.yscale
-
-	mdx = mousex - onCanvasX
-	mdy = mousey - onCanvasY
-
+actor.prototype.moveTo = function(mdx,mdy) {
 	this.direction = Math.atan2(mdy,mdx)
-	this.speed = Math.sqrt(mdx*mdx+mdy*mdy) / 40
+	this.speed = Math.sqrt(mdx*mdx+mdy*mdy)
 	if (this.speed<.2) this.speed=0
 	if (this.speed>1) this.speed=1
-
-	for (i in myplayer.owns) {
-		b = myplayer.owns[i]
-		if (this == b) {
-			continue
-		}
-		dx = b.x - this.x
-		dy = b.y - this.y
-		dist = Math.sqrt(dx*dx + dy*dy)
-		if (dist == 0) {
-			dist = .01
-		}
-		allowedDist = this.radius() + b.radius()
-		depth = allowedDist - dist
-		if (depth > 0) {
-			if (this.mergetime > (new Date()) || b.mergetime > (new Date())) {
-				dx = dx / dist * depth
-				dy = dy / dist * depth
-				this.x -= dx
-				this.y -= dy
-			}
-		}
-	}
-
-	now = (new Date())
-	if (now-this.lastupdate>50) {
-		writeMove(this.id,this.direction,this.speed)
-	}
-
 }
 actor.prototype.step = function(seconds) {
 	this.mass = (this.newmass+this.mass*4)/5
@@ -497,9 +479,6 @@ actor.prototype.step = function(seconds) {
 	this.y = (this.ys+this.y)/2
 
 	room = currentRoom
-	if (this.owner==myplayer.id) {
-		this.clientStep(seconds)
-	}
 
 	allowed = 500 / (room.speedmultiplier * Math.pow(this.mass + 50, .5))
 	distance = allowed * seconds * this.speed

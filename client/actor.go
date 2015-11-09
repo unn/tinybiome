@@ -208,6 +208,13 @@ func (a *Actor) CanEat(b *Actor) bool {
 	return false
 }
 
+func (a *Actor) MoveTo(dx, dy float64) {
+	this.direction = Math.atan2(mdy,mdx)
+	this.speed = Math.sqrt(mdx*mdx+mdy*mdy)
+	if (this.speed<.2) this.speed=0
+	if (this.speed>1) this.speed=1
+}
+
 func (a *Actor) Consume(b *Actor) {
 	log.Println(a, "CONSUMES", b)
 	if a.Player == b.Player {

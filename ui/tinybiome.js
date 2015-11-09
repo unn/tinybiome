@@ -185,8 +185,16 @@ function readMessage(dv, off) {
 		
 		off = off + 5 + amt * 12
 		break
+	case 12:
+		camera.serverx = dv.getFloat32(off+1, true)
+		camera.servery = dv.getFloat32(off+5, true)
+		camera.serverwidth = dv.getFloat32(off+9, true)
+		camera.serverheight = dv.getFloat32(off+13, true)
+		off = off + 17
+		break;
 	default:
 		console.log("ERROR READING", t)
+		break;
 	}
 	return off
 }
@@ -267,7 +275,8 @@ window.onresize = function() {
     console.log("New Cam",camera)
 }
 
-var camera = {x:0,y:0,width:canvas.width,height:canvas.height,xscale:1,yscale:1};
+var camera = {x:0,y:0,width:canvas.width,height:canvas.height,xscale:1,yscale:1,
+	serverx:0,servery:0,serverwidth:canvas.width,serverheight:canvas.height};
 camera.bbox = function() {
 	return [camera.x,camera.y,camera.x+canvas.width,camera.y+camera.height]
 }
@@ -361,31 +370,35 @@ function render() {
 	ctx.save()
 
 	if (myplayer) {
-		size = myplayer.bbox()
-		size[0] -= camPad
-		size[1] -= camPad
-		size[2] += camPad
-		size[3] += camPad
+		// size = myplayer.bbox()
+		// size[0] -= camPad
+		// size[1] -= camPad
+		// size[2] += camPad
+		// size[3] += camPad
 
-		width = size[2]-size[0]
-		height = size[3]-size[1]
-		ratio = canvas.width/canvas.height
-		haveRatio = width/height
-		if (haveRatio<ratio) {
-			width = width/haveRatio*ratio
-		}
-		if (haveRatio>ratio) {
-			height = height*haveRatio/ratio
-		}
-		midPointX = (size[2]+size[0])/2
-		midPointY = (size[3]+size[1])/2
+		// width = size[2]-size[0]
+		// height = size[3]-size[1]
+		// ratio = canvas.width/canvas.height
+		// haveRatio = width/height
+		// if (haveRatio<ratio) {
+		// 	width = width/haveRatio*ratio
+		// }
+		// if (haveRatio>ratio) {
+		// 	height = height*haveRatio/ratio
+		// }
+		// midPointX = (size[2]+size[0])/2
+		// midPointY = (size[3]+size[1])/2
 
-		camera.x = (midPointX -width/2 + camera.x*3) / 4;
-		camera.y = (midPointY -height/2 + camera.y*3) / 4;
+		// camera.x = (midPointX -width/2 + camera.x*3) / 4;
+		// camera.y = (midPointY -height/2 + camera.y*3) / 4;
 
-		camera.width = (width+camera.width)/2
-		camera.height = (height+camera.height)/2
+		// camera.width = (width+camera.width)/2
+		// camera.height = (height+camera.height)/2
 
+		camera.x = (camera.x+camera.serverx)/2
+		camera.y = (camera.y+camera.servery)/2
+		camera.width = (camera.width+camera.serverwidth)/2
+		camera.height = (camera.height+camera.serverheight)/2
 		camera.xscale = canvas.width/camera.width
 		camera.yscale = canvas.height/camera.height
 		ctx.scale(camera.xscale,camera.yscale)
@@ -448,7 +461,30 @@ function draw_leaderboard(ctx, room) {
 }
 
 lastStep = (new Date())
+var lmx, lmy = 0,0;
 function step() {
+
+	mx = 2*((mousex-canvas.width/2)-.5)
+	my = 2*((mousey-canvas.height/2)-.5)
+	if (myplayer) {
+		myplayer.moveTo(mx,my)
+		if (myplayer.isBot()) {
+			bb = myplayer.bbox()
+			bbx = (bb[0]+bb[2])/2
+			bby = (bb[1]+bb[3])/2
+			onCanvasX = camera.x+mousex*camera.xscale
+			onCanvasY = camera.y+mousey*camera.yscale
+			writeMove(onCanvasX,onCanvasY)
+		} else {
+
+			if (mx!=lmx || my!=lmy) {
+				writeMove(mx,my)
+				lmx = mx
+				lmy = my
+			}
+		}
+	}
+
 	var actor;
 	now = (new Date())
 	diff = (now - lastStep) / 1000

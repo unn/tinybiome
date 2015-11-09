@@ -94,19 +94,20 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		parts := make([]byte, 12)
 		s.R.Read(parts)
 		pid := *(*int32)(unsafe.Pointer(&parts[0]))
-		d := *(*float32)(unsafe.Pointer(&parts[4]))
+		dx := *(*float32)(unsafe.Pointer(&parts[4]))
+		dy := *(*float32)(unsafe.Pointer(&parts[8]))
+
 		if math.IsNaN(float64(d)) {
 			d = 0
 		}
-
-		speed := *(*float32)(unsafe.Pointer(&parts[8]))
 		if math.IsNaN(float64(speed)) {
 			speed = 0
 		}
+
 		if s.Logging {
-			log.Println(p, "SENT DIRECTION", pid, d, speed)
+			log.Println(p, "SENT DIRECTION", pid, dx, dy)
 		}
-		p.UpdateDirection(pid, d, speed)
+		p.UpdateDirection(pid, dx, dy)
 	case 2:
 		if s.Logging {
 			log.Println(p, "SENT SPLIT")

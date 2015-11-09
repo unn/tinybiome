@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -187,6 +188,7 @@ func (r *Room) getActor(id int64) *Actor {
 
 func (r *Room) Accept(p Protocol) {
 	player := &Player{Net: p, room: r, Connected: true}
+	player.Camera = &Camera{r.Width/2 - 200, r.Height/2 - 200, 400, 400}
 	player.Sync()
 }
 
@@ -196,6 +198,13 @@ func (r *Room) MergeTimeFromMass(mass float64) time.Duration {
 	log.Println("MERGE TIME FOR", mass, "=", s, "SECONDS =", d)
 
 	return d
+}
+
+type Camera struct {
+	X      float64
+	Y      float64
+	Width  float64
+	Height float64
 }
 
 type Player struct {
@@ -208,6 +217,7 @@ type Player struct {
 	Connected bool
 	WriteChan chan []byte
 	ClanName  string
+	Camera    *Camera
 }
 
 func (p *Player) Sync() {
@@ -250,6 +260,7 @@ func (p *Player) Sync() {
 	}
 
 	p.Net.WriteOwns(p)
+	p.Net.WriteCamera(p.Camera)
 	log.Println(p, "INITIAL SYNC COMPLETE IN", took)
 	p.Net.Save()
 
@@ -288,26 +299,21 @@ func (p *Player) SendUpdates() {
 	}
 }
 
-func (p *Player) UpdateDirection(actor int32, d, s float32) {
+func (p *Player) UpdateDirection(actor int32, dx, dy float32) {
 
 	r := p.room
 	p.room.ChangeLock.RLock()
-	a := r.getActor(int64(actor))
-	if a != nil {
-		if a.Player == p {
-			a.Direction = float64(d)
-			a.Speed = float64(s)
-			if a.Speed > 1 {
-				a.Speed = 1
+	center := p.BBox().Center()
+	bot := p.IsBot()
+	for _, a := range p.Owns {
+		if a != nil {
+			if bot {
+				a.MoveTo(dx, dy)
+			} else {
+				a.SetTarget(dx, dy)
 			}
-			if a.Speed < 0 {
-				a.Speed = 0
-			}
-		} else {
-			log.Println(a, "APPARENTLY NOT OWNED BY", p)
 		}
 	}
-
 	p.room.ChangeLock.RUnlock()
 }
 func (p *Player) Split() {
@@ -386,6 +392,11 @@ func (p *Player) NewActor(x, y, mass float64) *Actor {
 	}
 
 	return actor
+}
+
+func (p *Player) IsBot() bool {
+	n := strings.ToLower(p.Name)
+	return strings.HasPrefix(n, "bot: ") || n == "bot"
 }
 
 func (p *Player) String() string {
