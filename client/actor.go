@@ -93,10 +93,18 @@ func (a *Actor) Radius() float64 {
 
 func (a *Actor) CheckCollisions() {
 	r := a.Player.room
+	rad := int64(a.Radius() * a.Radius())
 	nb := qtree.NewBounds(a.X-a.Radius(), a.Y-a.Radius(), a.Radius()*2, a.Radius()*2)
 	pels := r.PelletQuadTree.QueryRange(nb)
+	ix := int64(a.X)
+	iy := int64(a.Y)
 	for _, n := range pels {
-		a.ConsumePellet(n.Val.(*Pellet))
+		p := n.Val.(*Pellet)
+		dx := p.X - ix
+		dy := p.Y - iy
+		if dx*dx+dy*dy < rad {
+			a.ConsumePellet(p)
+		}
 	}
 
 	consumes := []*Actor{}
@@ -170,6 +178,9 @@ func (a *Actor) CanMerge() bool {
 }
 
 func (a *Actor) MustCollide(b *Actor) bool {
+	if a.Player.ClanName == b.Player.ClanName && a.Player.ClanName != "" {
+		return true
+	}
 	if a.Player == b.Player {
 		if a.CanMerge() && b.CanMerge() {
 			return false

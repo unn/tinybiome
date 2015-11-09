@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -206,6 +207,7 @@ type Player struct {
 	Name      string
 	Connected bool
 	WriteChan chan []byte
+	ClanName  string
 }
 
 func (p *Player) Sync() {
@@ -390,11 +392,19 @@ func (p *Player) String() string {
 	return fmt.Sprintf("#%d (%s)", p.ID, p.Name)
 }
 
+var clanRegex = regexp.MustCompile(`^\[(.*)\]`)
+
 func (p *Player) Rename(n string) {
 	if len(n) > 100 {
 		n = n[:100]
 	}
 	p.Name = n
+
+	names := clanRegex.FindStringSubmatch(n)
+	if names != nil {
+		p.ClanName = names[0]
+		log.Println(p, "JOINED CLAN", p.ClanName)
+	}
 
 	for _, oPlayer := range p.room.Players {
 		if oPlayer == nil {
