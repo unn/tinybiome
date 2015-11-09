@@ -15,6 +15,7 @@ DataView.prototype.getUTF8String = function(offset, length) {
 
 	ws = new WebSocket("ws://"+document.location.hostname+":5000");
 	ws.binaryType = "arraybuffer";
+	ws.synced = false;
 	ws.onerror = function() {
 		ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
 	}
@@ -26,21 +27,42 @@ DataView.prototype.getUTF8String = function(offset, length) {
 		off = 0
 		while (off < dv.byteLength) {
 			olf = off
-			try {
+			if (ws.synced) {
 				off = readMessage(dv, off)
-			}
-			catch (e) {
-				console.log(e)
-				break
+			} else {
+				off = handleSync(dv, off-1)
+				ws.synced = true
 			}
 			// console.log(off-olf)
 		}
 	}
 
+messageHandlers = [
+	handleNewRoom, handleNewActor, handleNewPellet, 
+	handleRemovePellet, handleNewPlayer, handleRenamePlayer,
+	handleDestroyPlayer, handleOwnPlayer, handleRemoveActor,
+	handleMoveActor, handleSetMass, handleMultiPellet, 
+	handlePlayerActor, handleSync]
+var messageMap = []
+function handleSync(dv, off) {
+	l = dv.getUint8(off+1)
+	messageMap = []
+	for(var i=0; i<l; i++) {
+		messageMap[dv.getUint8(off+2+i)] = i
+	}
+	return off+l+2
+}
 function readMessage(dv, off) {
 	t = dv.getUint8(off)
-	switch (t) {
-	case 0: // JOIN
+	h = messageHandlers[messageMap[t]]
+	if (!h) {
+		console.log("UNKNOWN TYPE", t, "MAPPED TO", messageMap[t])
+		return off+1000000
+	}
+	v = h(dv, off)
+	return v
+}
+function handleNewRoom(dv, off) {
 		var newroom;
 		console.log("NEW ROOM INCOMING")
 		width = dv.getInt32(off+1, true)
@@ -54,10 +76,10 @@ function readMessage(dv, off) {
 		newroom.sizemultiplier = dv.getFloat32(off+17, true)
 		newroom.speedmultiplier = dv.getFloat32(off+21, true)
 		
-		off = off + 25
 		console.log("NEW ROOM",{width:width,height:height,sm:newroom.sizemultiplier})
-		break;
-	case 1: // CREATE ACTOR
+		return off + 25
+}
+function handleNewActor(dv, off) {
 		id = dv.getInt32(off+1, true)
 		x = dv.getFloat32(off+5, true)
 		y = dv.getFloat32(off+9, true)
@@ -65,16 +87,15 @@ function readMessage(dv, off) {
 		console.log("CREATING ACTOR",id,"AT",x,y)
 		p = new actor(id, x, y)
 		p.mass = mass
-		off = off + 17
-		break;
-	case 2:
+		return off + 17
+}
+function handleNewPellet(dv, off) {
 		p = new pellet(dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
-		off = off + 13
-		break
-	case 3:
+		return off + 13
+}
+function handleRemovePellet(dv, off) {
 		dx = dv.getInt32(off+1, true)
 		dy = dv.getInt32(off+5, true)
-		off = off + 9
 		p = currentRoom.findTile(dx,dy).find(dx,dy)
 
 		if (p) {
@@ -82,8 +103,9 @@ function readMessage(dv, off) {
 		} else {
 			console.log("COULDNT FIND", dx, dy)
 		}
-		break
-	case 4:
+		return off + 9
+}
+function handleNewPlayer(dv, off) {
 		id = dv.getInt32(off+1, true)
 		len = dv.getInt32(off+5, true)
 		if (len<100000 && len > -1) {
@@ -94,9 +116,9 @@ function readMessage(dv, off) {
 		} else {
 			console.log("INCORRECT LEN", len)
 		}
-		off = off + 9 + len
-		break
-	case 5:
+		return off + 9 + len
+}
+function handleRenamePlayer(dv, off) {
 		id = dv.getInt32(off+1, true)
 		len = dv.getInt32(off+5, true)
 		if (len<100000 && len > -1) {
@@ -106,50 +128,52 @@ function readMessage(dv, off) {
 		} else {
 			console.log("INCORRECT LEN", len)
 		}
-		off = off + 9 + len
-		break
-	case 6:
+		return off + 9 + len
+}
+function handleDestroyPlayer(dv, off) {
 		id = dv.getInt32(off+1, true)
-		off = off + 5
 		console.log("DESTROYING PLAYER", id)
 		currentRoom.players[id].remove()
-		break
 
-	case 7:
+		return off + 5
+}
+function handleOwnPlayer(dv, off) {
 		id = dv.getInt32(off+1, true)
-		off = off + 5
 		console.log("NOW OWNS", id)
 		myplayer = currentRoom.players[id]
-		break;
-	case 8:
+		return off + 5
+}
+function handleRemoveActor(dv, off) {
 		id = dv.getInt32(off+1, true)
-		off = off + 5
 		console.log("REMOVING ACTOR", id)
 		p = actors[id]
 		p.remove()
+		return off + 5
 
-		break;
-	case 9: //move actor
+}
+function handleMoveActor(dv, off) {
 		id = dv.getInt32(off+1, true)
 		x = dv.getFloat32(off+5, true)
 		y = dv.getFloat32(off+9, true)
 		d = dv.getFloat32(off+13, true)
 		s = dv.getFloat32(off+17, true)
-		off = off + 21
+
 		p = actors[id]
 		p.xs = x
 		p.ys = y
 		p.direction = d
 		p.speed = s
-		break;
-	case 10: // change mass
+
+		return off + 21
+}
+function handleSetMass(dv, off) {
 		id = dv.getInt32(off+1, true)
 		mass = dv.getFloat32(off+5, true)
-		off = off + 9
 		p = actors[id]
 		p.setmass( mass )
-		break;
-	case 11:
+		return off + 9
+}
+function handleMultiPellet(dv, off) {
 		amt = dv.getInt32(off+1, true)
 		if (amt<1000000) {
 			try {
@@ -183,20 +207,15 @@ function readMessage(dv, off) {
 			console.log("ERROR SIZE", amt)
 		}
 		
-		off = off + 5 + amt * 12
-		break
-	case 12: // player actor
+		return off + 5 + amt * 12
+}
+function handlePlayerActor(dv, off) {
 		aid = dv.getInt32(off+1, true)
 		pid = dv.getInt32(off+5, true)
 		console.log("ACTOR",aid,"IS PLAYERACTOR")
-		off = off + 9
-
+		
 		a = new playeractor(aid,pid)
-		break;
-	default:
-		console.log("ERROR READING", t)
-	}
-	return off
+		return off + 9
 }
 
 function writeJoin(name) {

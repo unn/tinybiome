@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 	"unsafe"
@@ -47,17 +48,22 @@ type BinaryProtocol struct {
 	Logging       bool
 	WriteChan     chan []byte
 	Disconnected  bool
+	MessageMap    []byte
 }
 
 func NewBinaryProtocol(ws *websocket.Conn) Protocol {
-	return Protocol(&BinaryProtocol{
+	p := &BinaryProtocol{
 		RW:            ws,
 		W:             bytes.NewBuffer(nil),
 		R:             bufio.NewReaderSize(ws, 1024*4),
 		T:             time.Now(),
 		isTransaction: false,
 		WriteChan:     make(chan []byte, 1000),
-		Logging:       false})
+		Logging:       false,
+	}
+	a := Protocol(p)
+	p.WriteNewMessageMap()
+	return a
 }
 
 var invalidProto = errors.New("Invalid Protocol")
@@ -115,6 +121,9 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		p.Split()
 	default:
 		log.Println("READ ERROR, TYPE", act)
+		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
+		s.RW.Close()
+		return invalidProto
 	}
 	return nil
 }
@@ -147,7 +156,8 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 	if s.Logging {
 		log.Println("SENDING WriteRoom", r)
 	}
-	s.W.WriteByte(0)
+	log.Println("WRITEROOM INDEX", s.MessageMap[0])
+	s.W.WriteByte(s.MessageMap[0])
 	WriteInt32(s.W, r.Width)
 	WriteInt32(s.W, r.Height)
 	WriteInt32(s.W, r.StartMass)
@@ -160,7 +170,7 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteNewActor", actor)
 	}
-	s.W.WriteByte(1)
+	s.W.WriteByte(s.MessageMap[1])
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.X)
 	WriteFloat32(s.W, actor.Y)
@@ -174,7 +184,7 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 	if s.Logging {
 		log.Println("SENDING WriteNewPellet", pellet)
 	}
-	s.W.WriteByte(2)
+	s.W.WriteByte(s.MessageMap[2])
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
 	WriteInt32(s.W, pellet.Type)
@@ -184,7 +194,7 @@ func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 	if s.Logging {
 		log.Println("SENDING WriteDestroyPellet", pellet)
 	}
-	s.W.WriteByte(3)
+	s.W.WriteByte(s.MessageMap[3])
 	WriteInt32(s.W, pellet.X)
 	WriteInt32(s.W, pellet.Y)
 	// str := `{"type":"delpel","x":%d,"y":%d}`
@@ -196,7 +206,7 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteNewPlayer", player)
 	}
-	s.W.WriteByte(4)
+	s.W.WriteByte(s.MessageMap[4])
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
 	l := len(b)
@@ -211,7 +221,7 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteNamePlayer", player)
 	}
-	s.W.WriteByte(5)
+	s.W.WriteByte(s.MessageMap[5])
 	WriteInt32(s.W, player.ID)
 	b := []byte(player.Name)
 	l := len(b)
@@ -226,7 +236,7 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteDestroyPlayer", player)
 	}
-	s.W.WriteByte(6)
+	s.W.WriteByte(s.MessageMap[6])
 	WriteInt32(s.W, player.ID)
 	// str := `{"type":"delplayer","id":%d}`
 	// dat := fmt.Sprintf(str, player.ID)
@@ -237,7 +247,7 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 	if s.Logging {
 		log.Println("SENDING WriteOwns", player)
 	}
-	s.W.WriteByte(7)
+	s.W.WriteByte(s.MessageMap[7])
 	WriteInt32(s.W, player.ID)
 	// ownsPlayer := `{"type":"own","id":%d}`
 	// dat := fmt.Sprintf(ownsPlayer, player.ID)
@@ -248,7 +258,7 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteDestroyActor", actor)
 	}
-	s.W.WriteByte(8)
+	s.W.WriteByte(s.MessageMap[8])
 	WriteInt32(s.W, actor.ID)
 	// delPlayer := `{"type":"del","id":%d}`
 	// dat := fmt.Sprintf(delPlayer, actor.ID)
@@ -259,7 +269,7 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteMoveActor", actor)
 	}
-	s.W.WriteByte(9)
+	s.W.WriteByte(s.MessageMap[9])
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.X)
 	WriteFloat32(s.W, actor.Y)
@@ -274,7 +284,7 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 	if s.Logging {
 		log.Println("SENDING WriteSetMassActor", actor)
 	}
-	s.W.WriteByte(10)
+	s.W.WriteByte(s.MessageMap[10])
 	WriteInt32(s.W, actor.ID)
 	WriteFloat32(s.W, actor.Mass)
 	// delPlayer := `{"type":"mass","id":%d,"mass":%f}`
@@ -287,7 +297,7 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 		log.Println("SENDING WritePelletsIncoming", len(pellets))
 	}
 
-	s.W.WriteByte(11)
+	s.W.WriteByte(s.MessageMap[11])
 	WriteInt32(s.W, int64(len(pellets)))
 	for _, pel := range pellets {
 		WriteInt32(s.W, pel.X)
@@ -302,13 +312,30 @@ func (s *BinaryProtocol) WritePlayerActor(pa *PlayerActor) {
 		log.Println("SENDING WritePlayerActor", pa)
 	}
 
-	s.W.WriteByte(12)
+	s.W.WriteByte(s.MessageMap[12])
 	WriteInt32(s.W, pa.Actor.ID)
 	WriteInt32(s.W, pa.Player.ID)
 }
 
+func (s *BinaryProtocol) WriteNewMessageMap() {
+	if s.MessageMap != nil {
+		s.W.WriteByte(s.MessageMap[13])
+	}
+	newMessages := rand.Perm(255)
+	log.Println("SENDING SYNC MAP SIZE", len(newMessages), newMessages)
+	s.MessageMap = make([]byte, len(newMessages))
+	s.W.WriteByte(byte(len(newMessages)))
+	for n, om := range newMessages {
+		s.MessageMap[n] = byte(om)
+		s.W.WriteByte(byte(om))
+	}
+}
+
 func (s *BinaryProtocol) Save() {
 	s.Lock.Lock()
+	if rand.Intn(1000) == 0 {
+		s.WriteNewMessageMap()
+	}
 	oldW := s.W
 	s.W = bytes.NewBuffer(nil)
 	if len(s.WriteChan) > 10 {
