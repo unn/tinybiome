@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"golang.org/x/net/websocket"
 	"io"
 	"log"
 	"math"
@@ -35,7 +36,7 @@ type Protocol interface {
 }
 
 type BinaryProtocol struct {
-	RW            io.ReadWriteCloser
+	RW            *websocket.Conn
 	W             *bytes.Buffer
 	R             *bufio.Reader
 	isTransaction bool
@@ -47,7 +48,7 @@ type BinaryProtocol struct {
 	Disconnected  bool
 }
 
-func NewBinaryProtocol(ws io.ReadWriteCloser) Protocol {
+func NewBinaryProtocol(ws *websocket.Conn) Protocol {
 	return Protocol(&BinaryProtocol{
 		RW:            ws,
 		W:             bytes.NewBuffer(nil),
@@ -305,13 +306,22 @@ func (s *BinaryProtocol) Save() {
 	}
 	if len(s.WriteChan) > 50 {
 		s.Disconnected = true
+		start := time.Now()
+		s.Lock.Unlock()
+		log.Println("KILLING", s.RW)
+		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
 		s.RW.Close()
+		log.Println("DONE CLOSING", s.RW)
+		took := time.Since(start)
+		if took > time.Millisecond {
+			log.Println("CLOSING CONNECTION TOOK", took)
+		}
 
 	} else {
 		s.WriteChan <- oldW.Bytes()
+		s.W.Reset()
+		s.Lock.Unlock()
 	}
-	s.W.Reset()
-	s.Lock.Unlock()
 }
 
 func (s *BinaryProtocol) Flush() error {
@@ -325,7 +335,7 @@ func (s *BinaryProtocol) Flush() error {
 		log.Println("INCOMPLETE WRITE OF", n, "/", len(b))
 	}
 	took := time.Since(t)
-	if len(b) > 1000 {
+	if len(b) > 5000 {
 		log.Println("LONG WRITE", len(b))
 	}
 	if took > time.Millisecond {

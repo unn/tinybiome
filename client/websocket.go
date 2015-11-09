@@ -60,7 +60,6 @@ func (s *Server) Accept(ws *websocket.Conn) {
 		log.Println("REJECTED BECAUSE", ws.RemoteAddr().String())
 		return
 	}
-
 	ws.PayloadType = websocket.BinaryFrame
 	room := s.Room
 	room.Accept(NewBinaryProtocol(ws))

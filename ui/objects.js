@@ -65,6 +65,7 @@ function renderTile(room,x,y) {
 	this.y = y
 	this.id = renderTile.id(x,y)
 	renderable[this.id] = this
+	this.count = 0
 	room.tiles[this.id] = this
 	this.canRender = false
 	this.renderables = {}
@@ -73,6 +74,7 @@ function renderTile(room,x,y) {
 	this.freeadd = true
 }
 renderTile.prototype.add = function(particle) {
+	this.count += 1
 	if (particle.id in this.renderables) {
 		console.log("Duplicate Pellet", particle)
 		return
@@ -95,8 +97,12 @@ renderTile.prototype.add = function(particle) {
 
 }
 renderTile.prototype.remove = function(particle) {
+	this.count -= 1
+	if (this.count<0) this.count=0
 	if (!this.renderables[particle.id]) {
 		console.log("NOT FOUND PELLET", particle.id)
+	} else {
+
 	}
 	delete this.renderables[particle.id]
 	this.dirty = true
@@ -109,17 +115,21 @@ renderTile.prototype.render = function(ctx) {
 			this.room.addParticle(r.x,r.y,r.color)	
 		}
 	}
-	if (this.dirty) {
-		this.rerender()
-	}
 
-	if (renderTileSize*camera.xscale > 150 || renderTileSize*camera.yscale > 150) {
+	density = this.count / (renderTileSize*renderTileSize)
+	if (Math.random()<.0001) {
+		console.log(density)
+	}
+	if (density < .001 || renderTileSize*camera.xscale > 150 || renderTileSize*camera.yscale > 150) {
 		for(i in this.renderables) {
 			r = this.renderables[i]
 			r.render(ctx)
 		}
 	} else {
 
+		if (this.dirty) {
+			this.rerender()
+		}
 		myArea = this.bbox()
 		screenArea = camera.bbox()
 		myArea[0] = Math.max(myArea[0], screenArea[0])

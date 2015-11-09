@@ -8,7 +8,91 @@ cellImg.loaded = false;
 cellImg.pattern = false;
 cellImg.src = 'imgs/cells.jpg';
 
-mPlier = 5
+mPlier = 4
+
+var textCaches = {};
+var shouldCacheText = true
+var textPad = 0;
+function textCache(s, height, font) {
+	this.to = 10000
+	this.remove = this.removeAny.bind(this)
+	this.timer = setTimeout(this.remove, this.to)
+	this.text = s
+	this.font = font
+	this.height = height
+	this.rendered = false
+
+	this.id = textCache.getid(s,font)
+	textCaches[this.id] = this
+	this.rerender()
+	this.renders = 0
+}
+textCache.prototype.render = function(ctx,x,y) {
+	this.renders += 1
+	if (this.renders>20) {
+		if (!this.rendered) {
+			this.ctx.textAlign = "left";
+			this.ctx.textBaseline = "top";
+			this.ctx.font = this.height*2+"px sans serif"
+			this.ctx.fillStyle = "white";
+			this.ctx.strokeStyle = "black";
+			this.ctx.lineWidth = this.height/16;
+
+		 	this.ctx.fillText(this.text, textPad, textPad);
+		 	this.ctx.strokeText(this.text, textPad, textPad);
+		 	this.rendered = true
+		}
+		clearTimeout(this.timer)
+		this.timer = setTimeout(this.remove, this.to)
+		ctx.drawImage(this.canvas,x-textPad,y-textPad,this.width,this.height)
+	} else {
+		ctx.textAlign = "left";
+		ctx.textBaseline = "top";
+		ctx.font = this.height+"px sans serif"
+		ctx.fillStyle = "white";
+		ctx.strokeStyle = "black";
+		ctx.lineWidth = this.height/32;
+	 	ctx.fillText(this.text, x, y);
+	 	ctx.strokeText(this.text, x, y);
+	}
+}
+textCache.prototype.rerender = function() {
+	var m_canvas = document.createElement('canvas');
+	this.canvas = m_canvas
+	var ctx = m_canvas.getContext('2d');
+	this.ctx = ctx
+	ctx.font = this.font
+	ctx.fillStyle = "white";
+	ctx.strokeStyle = "black";
+	ctx.lineWidth = .3;
+	var s = ctx.measureText(this.text)
+	this.width = s.width
+
+	this.canvas.width = this.width*2+textPad*2
+	this.canvas.height = this.height*2+textPad*2
+	console.log("RERENDER",this.text,this.width,this.height,"WITH",this.font)
+	// ctx.scale(10,10)
+
+
+
+
+}
+textCache.prototype.removeAny = function() {
+	console.log("FREEING",this.id)
+	delete this.canvas
+	delete textCaches[this.id]
+}
+textCache.getid = function(s,font) {
+	return "STRING:"+s+",FONT:"+font
+}
+
+function getTextCanvas(s, height, font) {
+	var id = textCache.getid(s,font);
+	if (!(id in textCaches)) {
+		new textCache(s, height, font)
+	}
+	return textCaches[id]
+}
 
 var tileSize = 100;
 
@@ -61,14 +145,17 @@ gfx.renderGroup = function(ctx, bbox, name, mass, players) {
 	textX = x+w/2
 	textY = y
 
-	ctx.lineWidth = 1;
-	ctx.textAlign = "center";
-	ctx.fillStyle = "white";
-	ctx.strokeStyle = "black";
-	ctx.font = "28px sans serif";
-	ctx.textBaseline = "bottom";
- 	ctx.fillText(name, textX, textY);
- 	ctx.strokeText(name, textX, textY);
+	if (28*camera.yscale>20) {
+		t = getTextCanvas(name, 28, "28px sans serif")
+		textX = textX - t.width / 2
+		textY = textY - t.height
+		t.render(ctx, textX, textY)
+	} else {
+		t = getTextCanvas(name, 100, "100px sans serif")
+		textX = textX - t.width / 2
+		textY = textY - t.height
+		t.render(ctx, textX, textY)
+	}
 
  	ctx.lineWidth = .3;
  	ctx.strokeStyle = players[0].color
@@ -112,21 +199,19 @@ gfx.renderPlayer = function(ctx, x, y, color, name, mass, radius) {
 
 	ctx.restore();
 
-	ctx.lineWidth = radius*.1;
+	ctx.lineWidth = .5+radius*.01;
 	ctx.strokeStyle = color;
 	ctx.beginPath();
 	ctx.arc(x, y, radius, 0, 2 * Math.PI);
 	ctx.stroke();
-	ctx.lineWidth = 1;
 
-	ctx.lineWidth = .3;
-	ctx.textAlign = "center";
-	ctx.fillStyle = "white";
-	ctx.strokeStyle = "black";
-	ctx.font = "12px sans serif";
-	ctx.textBaseline = "top";
- 	ctx.fillText(mass, x, y);
- 	ctx.strokeText(mass, x, y);
+	if (12*camera.yscale>7) {
+
+		t = getTextCanvas(mass, 12, "12px sans serif")
+		textX = x - t.width / 2
+		textY = y
+		t.render(ctx, textX, textY)
+	}
 
  	ctx.lineWidth = 2;
 }
@@ -174,20 +259,20 @@ gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
 		leaders.length = 8
 	}
 
+
 	l = "Top "+leaders.length+"/"+total+":"
-	ctx.fillText(l, x+width,0)
-	ctx.strokeText(l, x+width,0)
 
-
+	t = getTextCanvas(l, pxHeight, pxHeight+"px sans serif")
+	t.render(ctx, x+width-t.width,0)
 
 	for(var i=0; i<leaders.length; i+=1) {
 		n = leaders[i][0]
-		ctx.fillText(n, x+width - 100,i*pxHeight+pxHeight)
-		ctx.strokeText(n, x+width - 100,i*pxHeight+pxHeight)
+		t = getTextCanvas(n, pxHeight, pxHeight+"px sans serif")
+		t.render(ctx, x+width-t.width - 200,i*pxHeight+pxHeight)
 
 		m = leaders[i][1]
-		ctx.fillText(m, x+width,i*pxHeight+pxHeight)
-		ctx.strokeText(m, x+width,i*pxHeight+pxHeight)
+		t = getTextCanvas(m, pxHeight, pxHeight+"px sans serif")
+		t.render(ctx, x+width-t.width,i*pxHeight+pxHeight)
 	}
 	
 }

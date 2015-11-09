@@ -190,10 +190,6 @@ function readMessage(dv, off) {
 	}
 	return off
 }
-mab = new DataView(new ArrayBuffer(13))
-mab.setUint8(0,1,true)
-sab = new DataView(new ArrayBuffer(1))
-sab.setUint8(0,2,true)
 
 function writeJoin(name) {
 	asString = str2ab(name)
@@ -207,12 +203,16 @@ function writeJoin(name) {
 	ws.send(ab)
 }
 function writeMove(id,d,s) {
+	mab = new DataView(new ArrayBuffer(13))
+	mab.setUint8(0,1,true)
 	mab.setInt32(1,id,true)
 	mab.setFloat32(5,d,true)
 	mab.setFloat32(9,s,true)
 	ws.send(mab)
 }
 function writeSplit() {
+	sab = new DataView(new ArrayBuffer(1))
+	sab.setUint8(0,2,true)
 	ws.send(sab)
 }
 
