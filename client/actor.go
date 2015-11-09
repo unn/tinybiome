@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"github.com/mleveck/go-quad-tree"
 	"log"
 	"math"
 	"time"
@@ -9,27 +10,28 @@ import (
 
 // types: 0 vitamind, 1 mineral
 type Pellet struct {
-	X    int64
-	Y    int64
-	room *Room
-	ID   int64
-	Mass int64
-	Type int64
+	X      int64
+	Y      int64
+	room   *Room
+	ID     int64
+	Mass   int64
+	Type   int64
+	QPoint *qtree.Point
 }
 
 func (p *Pellet) Create() {
+	p.QPoint = qtree.NewPoint(float64(p.X), float64(p.Y), p)
 	p.Mass = 3
-	if p.room.PelletCount < MaxPellets {
-		for _, b := range p.room.Players {
-			if b == nil {
-				continue
-			}
-			b.Net.WriteNewPellet(p)
+	for _, b := range p.room.Players {
+		if b == nil {
+			continue
 		}
-		p.ID = p.room.PelletCount
-		p.room.Pellets[p.ID] = p
-		p.room.PelletCount += 1
+		b.Net.WriteNewPellet(p)
 	}
+	p.ID = p.room.PelletCount
+	p.room.Pellets[p.ID] = p
+	p.room.PelletCount += 1
+	p.room.PelletQuadTree.Insert(p.QPoint)
 }
 func (p *Pellet) Remove() {
 	for _, b := range p.room.Players {
@@ -42,6 +44,7 @@ func (p *Pellet) Remove() {
 	r.PelletCount -= 1
 	r.Pellets[p.ID] = r.Pellets[r.PelletCount]
 	r.Pellets[p.ID].ID = p.ID
+	p.room.PelletQuadTree.Remove(p.QPoint)
 }
 
 type Actor struct {
@@ -86,22 +89,11 @@ func (a *Actor) Radius() float64 {
 }
 
 func (a *Actor) CheckCollisions() {
-	pellets := []*Pellet{}
 	r := a.Player.room
-	for _, p := range r.Pellets[:r.PelletCount] {
-		dx := float64(p.X) - a.X
-		dy := float64(p.Y) - a.Y
-		dist := dx*dx + dy*dy
-		allowedDist := 3 + a.Radius()
-		if dist < allowedDist*allowedDist {
-			pellets = append(pellets, p)
-		}
-	}
-
-	if len(pellets) > 0 {
-		for i := 0; i < len(pellets); i += 1 {
-			a.ConsumePellet(pellets[i])
-		}
+	nb := qtree.NewBounds(a.X-a.Radius(), a.Y-a.Radius(), a.Radius()*2, a.Radius()*2)
+	pels := r.PelletQuadTree.QueryRange(nb)
+	for _, n := range pels {
+		a.ConsumePellet(n.Val.(*Pellet))
 	}
 
 	consumes := []*Actor{}

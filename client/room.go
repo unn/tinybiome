@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"github.com/mleveck/go-quad-tree"
 	"log"
 	"math"
 	"math/rand"
@@ -24,6 +25,7 @@ type Room struct {
 	Players         [MaxPlayers]*Player
 	HighestID       int64
 	Pellets         [MaxPellets]*Pellet
+	PelletQuadTree  *qtree.Qtree
 	PelletCount     int64
 	SizeMultiplier  float64
 	SpeedMultiplier float64
@@ -142,6 +144,7 @@ func (r *Room) String() string {
 func (r *Room) SetDimensions(x, y int64) {
 	r.Width = int64(x)
 	r.Height = int64(y)
+	r.PelletQuadTree = qtree.NewQtree(-1, -1, float64(x)+1, float64(y)+1, 7)
 }
 
 func (r *Room) getId(a *Actor) int64 {
