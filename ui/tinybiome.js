@@ -31,6 +31,7 @@ DataView.prototype.getUTF8String = function(offset, length) {
 			}
 			catch (e) {
 				console.log(e)
+				break
 			}
 			// console.log(off-olf)
 		}
@@ -61,11 +62,10 @@ function readMessage(dv, off) {
 		x = dv.getFloat32(off+5, true)
 		y = dv.getFloat32(off+9, true)
 		mass = dv.getFloat32(off+13, true)
-		owner = dv.getInt32(off+17, true)
-		console.log("CREATING ACTOR",id,"BY",owner,"AT",x,y)
-		p = new actor(id, owner, x, y)
+		console.log("CREATING ACTOR",id,"AT",x,y)
+		p = new actor(id, x, y)
 		p.mass = mass
-		off = off + 21
+		off = off + 17
 		break;
 	case 2:
 		p = new pellet(dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
@@ -185,6 +185,14 @@ function readMessage(dv, off) {
 		
 		off = off + 5 + amt * 12
 		break
+	case 12: // player actor
+		aid = dv.getInt32(off+1, true)
+		pid = dv.getInt32(off+5, true)
+		console.log("ACTOR",aid,"IS PLAYERACTOR")
+		off = off + 9
+
+		a = new playeractor(aid,pid)
+		break;
 	default:
 		console.log("ERROR READING", t)
 	}
@@ -452,10 +460,6 @@ function step() {
 	var actor;
 	now = (new Date())
 	diff = (now - lastStep) / 1000
-	for (id in actors) {
-		actor = actors[id]
-		actor.step(diff)
-	}
 	if (currentRoom) {
 		currentRoom.step(diff)
 	}

@@ -30,6 +30,10 @@ function textCache(s, height, font) {
 textCache.prototype.render = function(ctx,x,y) {
 	this.renders += 1
 	if (this.renders>20) {
+		if (this.renders>500) {
+			this.rendererd = false
+			this.renders = 20
+		}
 		if (!this.rendered) {
 			this.ctx.textAlign = "left";
 			this.ctx.textBaseline = "top";
@@ -70,7 +74,7 @@ textCache.prototype.rerender = function() {
 
 	this.canvas.width = this.width*2+textPad*2
 	this.canvas.height = this.height*2+textPad*2
-	console.log("RERENDER",this.text,this.width,this.height,"WITH",this.font)
+	// console.log("RERENDER",this.text,this.width,this.height,"WITH",this.font)
 	// ctx.scale(10,10)
 
 
@@ -78,7 +82,7 @@ textCache.prototype.rerender = function() {
 
 }
 textCache.prototype.removeAny = function() {
-	console.log("FREEING",this.id)
+	// console.log("FREEING",this.id)
 	delete this.canvas
 	delete textCaches[this.id]
 }
@@ -145,17 +149,21 @@ gfx.renderGroup = function(ctx, bbox, name, mass, players) {
 	textX = x+w/2
 	textY = y
 
-	if (28*camera.yscale>20) {
-		t = getTextCanvas(name, 28, "28px sans serif")
-		textX = textX - t.width / 2
-		textY = textY - t.height
-		t.render(ctx, textX, textY)
-	} else {
-		t = getTextCanvas(name, 100, "100px sans serif")
-		textX = textX - t.width / 2
-		textY = textY - t.height
-		t.render(ctx, textX, textY)
+	size = 100
+	if (28*camera.yscale<150) {
+		size = 75
 	}
+	if (28*camera.yscale<70) {
+		size = 50
+	}
+	if (28*camera.yscale<20) {
+		size = 25
+	}
+
+	t = getTextCanvas(name, size, "28px sans serif")
+	textX = textX - t.width / 2
+	textY = textY - t.height
+	t.render(ctx, textX, textY)
 
  	ctx.lineWidth = .3;
  	ctx.strokeStyle = players[0].color

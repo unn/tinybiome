@@ -117,9 +117,6 @@ renderTile.prototype.render = function(ctx) {
 	}
 
 	density = this.count / (renderTileSize*renderTileSize)
-	if (Math.random()<.0001) {
-		console.log(density)
-	}
 	if (density < .001 || renderTileSize*camera.xscale > 150 || renderTileSize*camera.yscale > 150) {
 		for(i in this.renderables) {
 			r = this.renderables[i]
@@ -250,6 +247,12 @@ function room(width, height) {
 	this.particleCount = 0;
 }
 room.prototype.step = function(seconds) {
+	var actor;
+	for (id in steppers) {
+		actor = steppers[id]
+		actor.step(seconds)
+	}
+
 	for(var i=0; i<this.particleCount;i++) {
 		p = this.particles[i]
 		p.step(seconds)
@@ -374,10 +377,11 @@ pellet.prototype.bbox = function() {
 }
 
 actors = {}
+steppers = {}
 renderable = {}
 activeRenders = {}
 
-function actor(id, owner, x, y) {
+function actor(id, x, y) {
 	this.id = id
 	this.x = x
 	this.y = y
@@ -392,15 +396,10 @@ function actor(id, owner, x, y) {
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
 	renderable[this.id] = this
+	steppers[this.id] = this
 	actors[this.id] = this
-	this.owner = owner
-	currentRoom.players[this.owner].owns[this.id] = this
-	this.lastupdate = (new Date())
-	if (myplayer) {
-		if (this.owner == myplayer.id) {
-			document.getElementById("login").style.display="none";
-		}
-	}
+
+	this.owner = null
 }
 
 actor.prototype.contains = function(actor) {
@@ -441,53 +440,13 @@ actor.prototype.setmass = function(m) {
 }
 actor.prototype.radius = function() {return Math.pow(this.mass/Math.PI, currentRoom.sizemultiplier)}
 actor.prototype.render = function(ctx) {
+	if (this.owner) if (this.owner.render) return this.owner.render(ctx)
 	radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	this.color = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
-	n = currentRoom.players[this.owner].name
-	n = n ? n : "Microbe"
+	this.color = "#000000";
+	n = "Something..?"
 	gfx.renderPlayer(ctx,this.x,this.y,this.color,n, Math.floor(this.mass),radius)
-}
-actor.prototype.clientStep = function(seconds) {
-	onCanvasX = (this.x - camera.x)*camera.xscale
-	onCanvasY = (this.y - camera.y)*camera.yscale
-
-	mdx = mousex - onCanvasX
-	mdy = mousey - onCanvasY
-
-	this.direction = Math.atan2(mdy,mdx)
-	this.speed = Math.sqrt(mdx*mdx+mdy*mdy) / 40
-	if (this.speed<.2) this.speed=0
-	if (this.speed>1) this.speed=1
-
-	for (i in myplayer.owns) {
-		b = myplayer.owns[i]
-		if (this == b) {
-			continue
-		}
-		dx = b.x - this.x
-		dy = b.y - this.y
-		dist = Math.sqrt(dx*dx + dy*dy)
-		if (dist == 0) {
-			dist = .01
-		}
-		allowedDist = this.radius() + b.radius()
-		depth = allowedDist - dist
-		if (depth > 0) {
-			if (this.mergetime > (new Date()) || b.mergetime > (new Date())) {
-				dx = dx / dist * depth
-				dy = dy / dist * depth
-				this.x -= dx
-				this.y -= dy
-			}
-		}
-	}
-
-	now = (new Date())
-	if (now-this.lastupdate>50) {
-		writeMove(this.id,this.direction,this.speed)
-	}
 
 }
 actor.prototype.step = function(seconds) {
@@ -497,9 +456,6 @@ actor.prototype.step = function(seconds) {
 	this.y = (this.ys+this.y)/2
 
 	room = currentRoom
-	if (this.owner==myplayer.id) {
-		this.clientStep(seconds)
-	}
 
 	allowed = 500 / (room.speedmultiplier * Math.pow(this.mass + 50, .5))
 	distance = allowed * seconds * this.speed
@@ -522,14 +478,86 @@ actor.prototype.step = function(seconds) {
 
 	this.x = median(this.x, 0, room.width);
 	this.y = median(this.y, 0, room.height);
+	if (this.owner) if (this.owner.step) this.owner.step(seconds)
 }
 actor.prototype.remove = function() {
 	delete renderable[this.id]
+	delete steppers[this.id]
 	delete actors[this.id]
-	delete currentRoom.players[this.owner].owns[this.id]
+	if (this.owner) if (this.owner.remove) this.owner.remove()
+}
+
+function playeractor(aid, pid) {
+	this.actor = actors[aid]
+	this.actor.owner = this
+	this.owner = pid
+	currentRoom.players[pid].owns[aid] = this.actor
+	this.id = "pa"+aid+","+pid
+	if (myplayer) {
+		if (pid == myplayer.id) {
+			document.getElementById("login").style.display="none";
+		}
+	}
+	this.lastupdate = (new Date())
+}
+playeractor.prototype.remove = function() {
+	delete currentRoom.players[this.owner].owns[this.actor.id]
 	if (this.owner == myplayer.id) {
 		if (Object.keys(myplayer.owns).length==0) {
 			document.getElementById("login").style.display="block";
 		}
 	}
+}
+playeractor.prototype.step = function(seconds) {
+	if (this.owner==myplayer.id) {
+		var actor = this.actor;
+		onCanvasX = (actor.x - camera.x)*camera.xscale
+		onCanvasY = (actor.y - camera.y)*camera.yscale
+
+		mdx = mousex - onCanvasX
+		mdy = mousey - onCanvasY
+
+		actor.direction = Math.atan2(mdy,mdx)
+		actor.speed = Math.sqrt(mdx*mdx+mdy*mdy) / 40
+		if (actor.speed<.2) actor.speed=0
+		if (actor.speed>1) actor.speed=1
+
+		for (i in myplayer.owns) {
+			b = myplayer.owns[i]
+			if (this == b) {
+				continue
+			}
+			dx = b.x - actor.x
+			dy = b.y - actor.y
+			dist = Math.sqrt(dx*dx + dy*dy)
+			if (dist == 0) {
+				dist = .01
+			}
+			allowedDist = actor.radius() + b.radius()
+			depth = allowedDist - dist
+			if (depth > 0) {
+				if (actor.mergetime > (new Date()) || b.mergetime > (new Date())) {
+					dx = dx / dist * depth
+					dy = dy / dist * depth
+					actor.x -= dx
+					actor.y -= dy
+				}
+			}
+		}
+
+		now = (new Date())
+		if (now-this.lastupdate>3) {
+			writeMove(actor.id,actor.direction,actor.speed)
+			this.lastupdate = now
+		}
+	}
+}
+playeractor.prototype.render = function(ctx) {
+	radius = this.actor.radius()
+	// a = pi * r^2
+	// sqrt(a/pi) = r
+	this.actor.color = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
+	n = currentRoom.players[this.owner].name
+	n = n ? n : "Microbe"
+	gfx.renderPlayer(ctx,this.actor.x,this.actor.y,this.actor.color,n, Math.floor(this.actor.mass),radius)
 }

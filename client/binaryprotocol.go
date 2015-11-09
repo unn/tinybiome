@@ -26,6 +26,7 @@ type ProtocolDown interface {
 	WriteNewPellet(*Pellet)
 	WriteDestroyPellet(*Pellet)
 	WritePelletsIncoming([]*Pellet)
+	WritePlayerActor(*PlayerActor)
 	Flush() error
 	Save()
 }
@@ -164,7 +165,6 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 	WriteFloat32(s.W, actor.X)
 	WriteFloat32(s.W, actor.Y)
 	WriteFloat32(s.W, actor.Mass)
-	WriteInt32(s.W, actor.Player.ID)
 	// newPlayer := `{"type":"new","x":%f,"y":%f,"id":%d,"mass":%f,"owner":%d}`
 	// dat := fmt.Sprintf(newPlayer, actor.X, actor.Y, actor.ID, actor.Mass, actor.Player.ID)
 	// _ = dat
@@ -295,6 +295,16 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 		WriteInt32(s.W, pel.Type)
 	}
 
+}
+
+func (s *BinaryProtocol) WritePlayerActor(pa *PlayerActor) {
+	if s.Logging {
+		log.Println("SENDING WritePlayerActor", pa)
+	}
+
+	s.W.WriteByte(12)
+	WriteInt32(s.W, pa.Actor.ID)
+	WriteInt32(s.W, pa.Player.ID)
 }
 
 func (s *BinaryProtocol) Save() {
