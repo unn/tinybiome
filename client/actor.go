@@ -381,6 +381,96 @@ func (pa *PlayerActor) Write(p ProtocolDown) {
 	p.WritePlayerActor(pa)
 }
 
+type Bacteria struct {
+	Actor   *Actor
+	Room    *Room
+	TargetX float64
+	TargetY float64
+}
+
+func NewBacteria(r *Room) *Bacteria {
+	v := &Bacteria{}
+	v.Room = r
+	v.Actor = r.NewActor(
+		float64(rand.Int63n(r.Width)),
+		float64(rand.Int63n(r.Height)),
+		350)
+	v.Actor.Owner = v
+	v.Actor.Direction = rand.Float64() * math.Pi * 2
+	v.PickSpot()
+	r.AddTicker(v)
+	for _, player := range r.Players {
+		if player == nil {
+			continue
+		}
+		v.Actor.Write(player.Net)
+		player.Net.WriteBacteria(v)
+	}
+	v.Room.BacteriaCount += 1
+	return v
+}
+func (v *Bacteria) PickSpot() {
+	v.TargetX = v.Actor.X + rand.Float64()*500 - 250
+	v.TargetY = v.Actor.Y + rand.Float64()*500 - 250
+}
+func (v *Bacteria) Write(p ProtocolDown) {
+	v.Actor.Write(p)
+	p.WriteBacteria(v)
+}
+func (v *Bacteria) ActorCollision(a *Actor) {
+	if asPA, isPA := a.Owner.(*PlayerActor); isPA {
+		if v.Actor.Mass < asPA.Actor.Mass {
+			v.Actor.Mass += 1
+			asPA.Actor.Mass -= 1
+		} else {
+			v.Actor.Mass -= 1
+			asPA.Actor.Mass += 1
+		}
+		v.Actor.RecalcRadius()
+		asPA.Actor.RecalcRadius()
+
+		if v.Actor.Mass < 25 {
+			v.Remove()
+		}
+	}
+}
+func (v *Bacteria) ShouldCollide(a *Actor) bool {
+	if _, isBacteria := a.Owner.(*Bacteria); isBacteria {
+		return true
+	}
+	return false
+}
+func (v *Bacteria) Tick(d time.Duration) {
+	if rand.Intn(100) == 0 {
+		v.PickSpot()
+	}
+
+	dx := v.TargetX - v.Actor.X
+	dy := v.TargetY - v.Actor.Y
+	v.Actor.Direction = math.Atan2(dy, dx)
+
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	if dist > 1 {
+		v.Actor.Speed += rand.Float64()*dist/1000*(1-v.Actor.Speed) - .03
+		if v.Actor.Speed < 0 {
+			v.Actor.Speed = 0
+		}
+		if v.Actor.Speed > .4 {
+			v.Actor.Speed = .4
+		}
+	} else {
+		v.Actor.Speed *= .5
+	}
+
+	v.Actor.Tick(d)
+}
+func (v *Bacteria) Remove() {
+	v.Actor.Remove()
+	v.Room.BacteriaCount -= 1
+	v.Room.RemoveTicker(v)
+}
+
 type Virus struct {
 	Actor   *Actor
 	Room    *Room
@@ -394,7 +484,7 @@ func NewVirus(r *Room) *Virus {
 	v.Actor = r.NewActor(
 		float64(rand.Int63n(r.Width)),
 		float64(rand.Int63n(r.Height)),
-		150)
+		rand.Float64()*250+150)
 	v.Actor.Owner = v
 	v.Actor.Direction = rand.Float64() * math.Pi * 2
 	v.PickSpot()
@@ -424,7 +514,8 @@ func (v *Virus) ActorCollision(a *Actor) {
 				asPA.Split()
 			}
 			v.Remove()
-			asPA.Actor.Mass += v.Actor.Mass * .8
+			asPA.Actor.Mass += v.Actor.Mass * .1
+			asPA.Actor.RecalcRadius()
 		}
 	}
 }
@@ -450,8 +541,8 @@ func (v *Virus) Tick(d time.Duration) {
 		if v.Actor.Speed < 0 {
 			v.Actor.Speed = 0
 		}
-		if v.Actor.Speed > 1 {
-			v.Actor.Speed = 1
+		if v.Actor.Speed > .4 {
+			v.Actor.Speed = .4
 		}
 	} else {
 		v.Actor.Speed *= .5

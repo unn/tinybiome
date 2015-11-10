@@ -18,7 +18,8 @@ const MaxPellets = 12000
 const MaxTickers = 12000
 const TickLen = 25
 
-const MaxViruses = 100
+const MaxViruses = 60
+const MaxBacteria = 30
 const TileSize = int64(100)
 
 type Ticker interface {
@@ -51,7 +52,8 @@ type Room struct {
 	SizeMultiplier  float64
 	SpeedMultiplier float64
 
-	VirusCount int64
+	VirusCount    int64
+	BacteriaCount int64
 
 	ticker     *time.Ticker
 	ChangeLock sync.RWMutex
@@ -117,6 +119,9 @@ func (r *Room) createThings(d time.Duration) {
 
 	if r.VirusCount < MaxViruses {
 		NewVirus(r)
+	}
+	if r.BacteriaCount < MaxBacteria {
+		NewBacteria(r)
 	}
 }
 

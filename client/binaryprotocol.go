@@ -29,6 +29,7 @@ type ProtocolDown interface {
 	WritePelletsIncoming([]*Pellet)
 	WritePlayerActor(*PlayerActor)
 	WriteVirus(*Virus)
+	WriteBacteria(*Bacteria)
 	Flush() error
 	Save()
 }
@@ -326,6 +327,16 @@ func (s *BinaryProtocol) WriteVirus(v *Virus) {
 
 	s.W.WriteByte(s.MessageMap[12])
 	s.W.WriteByte(1)
+	WriteInt32(s.W, v.Actor.ID)
+}
+
+func (s *BinaryProtocol) WriteBacteria(v *Bacteria) {
+	if s.Logging {
+		log.Println("SENDING WriteBacteria", v)
+	}
+
+	s.W.WriteByte(s.MessageMap[12])
+	s.W.WriteByte(2)
 	WriteInt32(s.W, v.Actor.ID)
 }
 

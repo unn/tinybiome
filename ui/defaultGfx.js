@@ -11,25 +11,24 @@ cellImg.src = 'imgs/cells.jpg';
 mPlier = 4
 
 var textCaches = {};
-var shouldCacheText = true
+var shouldCacheText = false
 var textPad = 0;
-function textCache(s, height, font) {
+function textCache(s, height) {
 	this.to = 10000
 	this.remove = this.removeAny.bind(this)
 	this.timer = setTimeout(this.remove, this.to)
 	this.text = s
-	this.font = font
 	this.height = height
+	this.font = this.height+"px sans serif"
 	this.rendered = false
-
-	this.id = textCache.getid(s,font)
+	this.id = textCache.getid(s,height)
 	textCaches[this.id] = this
-	this.rerender()
 	this.renders = 0
+	this.rerender()
 }
 textCache.prototype.render = function(ctx,x,y) {
 	this.renders += 1
-	if (this.renders>20) {
+	if (this.renders>20 && shouldCacheText) {
 		if (this.renders>500) {
 			this.rendererd = false
 			this.renders = 20
@@ -52,7 +51,7 @@ textCache.prototype.render = function(ctx,x,y) {
 	} else {
 		ctx.textAlign = "left";
 		ctx.textBaseline = "top";
-		ctx.font = this.height+"px sans serif"
+		ctx.font = this.font
 		ctx.fillStyle = "white";
 		ctx.strokeStyle = "black";
 		ctx.lineWidth = this.height/32;
@@ -74,26 +73,23 @@ textCache.prototype.rerender = function() {
 
 	this.canvas.width = this.width*2+textPad*2
 	this.canvas.height = this.height*2+textPad*2
+	if (!shouldCacheText) delete this.canvas
 	// console.log("RERENDER",this.text,this.width,this.height,"WITH",this.font)
 	// ctx.scale(10,10)
-
-
-
-
 }
 textCache.prototype.removeAny = function() {
 	// console.log("FREEING",this.id)
-	delete this.canvas
+	if (shouldCacheText) delete this.canvas
 	delete textCaches[this.id]
 }
-textCache.getid = function(s,font) {
-	return "STRING:"+s+",FONT:"+font
+textCache.getid = function(s,height) {
+	return "STRING:"+s+",FONT:"+height
 }
 
-function getTextCanvas(s, height, font) {
-	var id = textCache.getid(s,font);
+function getTextCanvas(s, height) {
+	var id = textCache.getid(s, height);
 	if (!(id in textCaches)) {
-		new textCache(s, height, font)
+		new textCache(s, height)
 	}
 	return textCaches[id]
 }
@@ -149,18 +145,18 @@ gfx.renderGroup = function(ctx, bbox, name, mass, players) {
 	textX = x+w/2
 	textY = y
 
-	size = 100
+	size = 25
 	if (28*camera.yscale<150) {
-		size = 75
+		size = 35
 	}
 	if (28*camera.yscale<70) {
-		size = 50
+		size = 45
 	}
 	if (28*camera.yscale<20) {
-		size = 25
+		size = 55
 	}
 
-	t = getTextCanvas(name, size, "28px sans serif")
+	t = getTextCanvas(name, size)
 	textX = textX - t.width / 2
 	textY = textY - t.height
 	t.render(ctx, textX, textY)
@@ -170,7 +166,32 @@ gfx.renderGroup = function(ctx, bbox, name, mass, players) {
  	ctx.strokeRect(x,y,w,h)
 }
 
-gfx.renderVirus = function(ctx, x, y, mass, radius) {
+gfx.renderBacteria = function(ctx, x, y, color, mass, radius) {
+	ctx.save();
+	ctx.beginPath();
+	bubbles = 6
+	ca = Math.PI*2/(bubbles)
+	for(var i=0; i<=bubbles; i++) {
+		a = (x+y)/20+i*ca
+		if (i==0) {
+			ctx.moveTo(x+radius*.7*Math.cos(a), y+radius*.7*Math.sin(a))
+		} else {
+			mx = x+radius*Math.cos(a-ca/2)
+			my = y+radius*Math.sin(a-ca/2)
+			ex = x+radius*.7*Math.cos(a)
+			ey = y+radius*.7*Math.sin(a)
+			ctx.quadraticCurveTo(mx,my,ex,ey)
+		}
+
+	}
+	ctx.clip();
+
+	gfx.renderCell(ctx, x, y, color, radius)
+
+	ctx.restore();
+}
+
+gfx.renderVirus = function(ctx, x, y, color, mass, radius) {
 	ctx.save();
 	ctx.beginPath();
 	d = 1
@@ -183,16 +204,17 @@ gfx.renderVirus = function(ctx, x, y, mass, radius) {
 		} else {
 			ctx.lineTo(x+radius*d*Math.cos(a), y+radius*d*Math.sin(a))
 		}
-		if (d==1) d=.5
+		if (d==1) d=.65
 		else d=1
 	}
 	ctx.clip();
 
-	gfx.renderCell(ctx, x, y, "red", radius)
+	gfx.renderCell(ctx, x, y, color, radius)
 
 	ctx.restore();
 
 }
+
 gfx.renderActor = function(ctx, x, y, color, mass, radius) {
 	ctx.save();
 	ctx.beginPath();
@@ -204,15 +226,15 @@ gfx.renderActor = function(ctx, x, y, color, mass, radius) {
 	ctx.restore();
 
 
-	if (12*camera.yscale>7) {
+	// if (12*camera.yscale>7) {
 
-		t = getTextCanvas(mass, 12, "12px sans serif")
-		textX = x - t.width / 2
-		textY = y
-		t.render(ctx, textX, textY)
-	}
+	// 	t = getTextCanvas(mass, 12, "12px sans serif")
+	// 	textX = x - t.width / 2
+	// 	textY = y
+	// 	t.render(ctx, textX, textY)
+	// }
 
- 	ctx.lineWidth = 2;
+ // 	ctx.lineWidth = 2;
 }
 
 gfx.renderCell = function(ctx, x, y, color, radius) {
@@ -251,17 +273,26 @@ gfx.renderCell = function(ctx, x, y, color, radius) {
 	ctx.stroke();
 }
 
+var frame = 0;
 gfx.renderVitamin = function(ctx, x, y, color, radius) {
 	ctx.beginPath();
 	ctx.fillStyle = color;
 	r = radius
-	ctx.moveTo(x,y-r)
-	ctx.lineTo(x-r*.8,y-r*.55)
-	ctx.lineTo(x-r*.8,y+r*.55)
-	ctx.lineTo(x,y+r)
-	ctx.lineTo(x+r*.8,y+r*.55)
-	ctx.lineTo(x+r*.8,y-r*.55)
-	ctx.lineTo(x,y-r)
+
+	parts = 12
+	if (camera.xscale*5<10) {
+		parts = 9
+	}
+	ca = Math.PI*2/(parts)
+	for(var i=0; i<=parts; i++) {
+		a = Math.PI*2*frame/1000+i*ca
+		if (i==0) {
+			ctx.moveTo(x+radius*Math.cos(a), y+radius*Math.sin(a))
+		} else {
+			ctx.lineTo(x+radius*Math.cos(a), y+radius*Math.sin(a))
+		}
+	}
+
 	ctx.fill();
 }
 
@@ -278,6 +309,10 @@ gfx.renderMineral = function(ctx, x, y, color, radius) {
 }
 
 gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
+	frame += 1;
+	if (frame>1000) {
+		frame = 0
+	}
 	pxHeight = 28
 	ctx.lineWidth = 1;
 	ctx.textAlign = "right";
@@ -297,16 +332,16 @@ gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
 
 	l = "Top "+leaders.length+"/"+total+":"
 
-	t = getTextCanvas(l, pxHeight, pxHeight+"px sans serif")
+	t = getTextCanvas(l, pxHeight, pxHeight)
 	t.render(ctx, x+width-t.width,0)
 
 	for(var i=0; i<leaders.length; i+=1) {
 		n = leaders[i][0]
-		t = getTextCanvas(n, pxHeight, pxHeight+"px sans serif")
+		t = getTextCanvas(n, pxHeight, pxHeight)
 		t.render(ctx, x+width-t.width - 200,i*pxHeight+pxHeight)
 
 		m = leaders[i][1]
-		t = getTextCanvas(m, pxHeight, pxHeight+"px sans serif")
+		t = getTextCanvas(m, pxHeight, pxHeight)
 		t.render(ctx, x+width-t.width,i*pxHeight+pxHeight)
 	}
 	

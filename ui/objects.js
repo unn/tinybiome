@@ -5,6 +5,18 @@ var hidingBbox = true;
 renderTileSize = 128
 tilePadding = 5
 
+var darkGreen = "#303C00";
+var lightGreen = "#B4CC48";
+var red = "#840000";
+var green = "#788418";
+var orange = "#CC480C";
+var lightBlue = "#9CC0CC";
+var fadedRed = "#B46C6C";
+var sand = "#F0E49C";
+var deepBlue = "#3C6C78";
+var brightOrange = "#FCA800";
+
+
 function player(room, id) {
 	this.room = room
 	this.id = id
@@ -31,6 +43,8 @@ player.prototype.render = function(ctx) {
 		gfx.renderGroup(ctx, bbox, n, mass, myActors)
 	}
 }
+var randomActorId = null;
+var randomActorTime = (new Date());
 player.prototype.bbox = function() {
 	x = this.room.width
 	y = this.room.height
@@ -48,7 +62,17 @@ player.prototype.bbox = function() {
 		found = true
 	}
 	if (!found) {
-		return [xr,yr,x,y]
+		now = (new Date());
+		if (now-randomActorTime>5000 || !randomActorId || !actors[randomActorId]) {
+			randomActorTime = now
+			randomActorId = pickRandomProperty(actors)
+		}
+		a = actors[randomActorId]
+		if (!a) {
+			return [x/2-300,y/2-300,x/2+300,y/2+300]
+		}
+
+		return a.bbox()
 	}
 
 	return [x-4,y-4,xr+4,yr+4]
@@ -190,7 +214,7 @@ renderTile.prototype.find = function(x,y) {
 	return this.renderables[id]
 }
 renderTile.id = function(x,y) {
-	return "tile("+x+","+y+")"
+	return "a_t("+x+","+y+")"
 }
 
 function pickRandomProperty(obj) {
@@ -343,7 +367,7 @@ function pellet(x,y,style) {
 		console.log("WTF", this.id,mytile)
 	}
 	mytile.add(this)
-	this._radius = 1.9
+	this._radius = 4
 	if (this.style==0) {
 		this.color = rgb(Math.random()*100,Math.random()*100,255)
 	}
@@ -395,7 +419,7 @@ function actor(id, x, y) {
 	this.newmass = this.mass
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
-	renderable[this.id] = this
+	renderable["b_a"+this.id] = this
 	steppers[this.id] = this
 	actors[this.id] = this
 
@@ -481,7 +505,7 @@ actor.prototype.step = function(seconds) {
 	if (this.owner) if (this.owner.step) this.owner.step(seconds)
 }
 actor.prototype.remove = function() {
-	delete renderable[this.id]
+	delete renderable["b_a"+this.id]
 	delete steppers[this.id]
 	delete actors[this.id]
 	if (this.owner) if (this.owner.remove) this.owner.remove()
@@ -518,32 +542,32 @@ playeractor.prototype.step = function(seconds) {
 		mdy = mousey - onCanvasY
 
 		actor.direction = Math.atan2(mdy,mdx)
-		actor.speed = Math.sqrt(mdx*mdx+mdy*mdy) / 40
-		if (actor.speed<.2) actor.speed=0
+		actor.speed = (Math.sqrt(mdx*mdx+mdy*mdy)-20) / 100
+		if (actor.speed<0) actor.speed=0
 		if (actor.speed>1) actor.speed=1
 
-		for (i in myplayer.owns) {
-			b = myplayer.owns[i]
-			if (this == b) {
-				continue
-			}
-			dx = b.x - actor.x
-			dy = b.y - actor.y
-			dist = Math.sqrt(dx*dx + dy*dy)
-			if (dist == 0) {
-				dist = .01
-			}
-			allowedDist = actor.radius() + b.radius()
-			depth = allowedDist - dist
-			if (depth > 0) {
-				if (actor.mergetime > (new Date()) || b.mergetime > (new Date())) {
-					dx = dx / dist * depth
-					dy = dy / dist * depth
-					actor.x -= dx
-					actor.y -= dy
-				}
-			}
-		}
+		// for (i in myplayer.owns) {
+		// 	b = myplayer.owns[i]
+		// 	if (this == b) {
+		// 		continue
+		// 	}
+		// 	dx = b.x - actor.x
+		// 	dy = b.y - actor.y
+		// 	dist = Math.sqrt(dx*dx + dy*dy)
+		// 	if (dist == 0) {
+		// 		dist = .01
+		// 	}
+		// 	allowedDist = actor.radius() + b.radius()
+		// 	depth = allowedDist - dist
+		// 	if (depth > 0) {
+		// 		if (actor.mergetime > (new Date()) || b.mergetime > (new Date())) {
+		// 			dx = dx / dist * depth
+		// 			dy = dy / dist * depth
+		// 			actor.x -= dx
+		// 			actor.y -= dy
+		// 		}
+		// 	}
+		// }
 
 		now = (new Date())
 		if (now-this.lastupdate>3) {
@@ -565,7 +589,17 @@ playeractor.prototype.render = function(ctx) {
 function virus(aid) {
 	this.actor = actors[aid]
 	this.actor.owner = this
+	this.actor.color = red
 }
 virus.prototype.render = function(ctx) {
-	gfx.renderVirus(ctx, this.actor.x, this.actor.y, this.actor.mass, this.actor.radius())
+	gfx.renderVirus(ctx, this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+}
+
+function bacteria(aid) {
+	this.actor = actors[aid]
+	this.actor.owner = this
+	this.actor.color = lightBlue
+}
+bacteria.prototype.render = function(ctx) {
+	gfx.renderBacteria(ctx, this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 }

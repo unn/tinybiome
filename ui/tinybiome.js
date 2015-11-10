@@ -3,7 +3,7 @@ var myplayer;
 var tileSize = 50;
 var hidingBbox = true;
 var debugMode = false;
-var camPad = 200
+var camPad = 100
 
 DataView.prototype.getUTF8String = function(offset, length) {
     var utf16View = [];
@@ -224,6 +224,13 @@ function handleDescribeActor(dv, off) {
 			
 			a = new virus(aid)
 			return off + 6
+		case 2:
+			aid = dv.getInt32(off+2, true)
+			console.log("ACTOR",aid,"IS BACTERIA")
+			
+			a = new bacteria(aid)
+			return off + 6
+
 		}
 }
 
@@ -348,8 +355,8 @@ document.onkeyup = function(e) {
 function handleScroll(e) {
 	console.log(e)
 	camPad += e.deltaY/4
-	if (camPad>200) {
-		camPad = 200
+	if (camPad>100) {
+		camPad = 100
 	}
 	if (camPad < 10) {
 		camPad = 10
