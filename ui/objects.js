@@ -151,7 +151,7 @@ renderTile.prototype.render = function(ctx) {
 	}
 
 	density = this.count / (renderTileSize*renderTileSize)
-	if (density * renderQuality < .001  ) {
+	if (density < .001 * renderQuality  ) {
 		for(i in this.renderables) {
 			r = this.renderables[i]
 			r.render(ctx)

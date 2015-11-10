@@ -507,7 +507,9 @@ function render() {
 
 function draw_leaderboard(ctx, room) {
 	var playersWithScore = []
+	total = 0
 	for(k in room.players) {
+		total += 1
 		p = room.players[k]
 		s = 0
 		for(i in p.owns) {
@@ -520,7 +522,7 @@ function draw_leaderboard(ctx, room) {
 		}
 	}
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
-	gfx.renderLeaderBoard(ctx, playersWithScore, canvas.width-400, 0, 400, 800)
+	gfx.renderLeaderBoard(ctx, playersWithScore, canvas.width-400, 0, 400, 800, total)
 }
 
 lastStep = (new Date())

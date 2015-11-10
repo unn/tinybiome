@@ -349,7 +349,7 @@ gfx.renderMineral = function(ctx, x, y, color, radius) {
 	ctx.fill();
 }
 
-gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
+gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height, connected) {
 	frame += 1;
 	if (frame>1000) {
 		frame = 0
@@ -370,20 +370,24 @@ gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height) {
 		leaders.length = 8
 	}
 
+	l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality
 
-	l = "Top "+leaders.length+"/"+total+":"
-
-	t = getTextCanvas(l, pxHeight, pxHeight)
+	nPxHeight = 14;
+	t = getTextCanvas(l, nPxHeight, nPxHeight)
 	t.render(ctx, x+width-t.width,0)
+
+	l = "Top "+leaders.length+":"
+	t = getTextCanvas(l, pxHeight, pxHeight)
+	t.render(ctx, x+width-t.width,nPxHeight)
 
 	for(var i=0; i<leaders.length; i+=1) {
 		n = leaders[i][0]
 		t = getTextCanvas(n, pxHeight, pxHeight)
-		t.render(ctx, x+width-t.width - 200,i*pxHeight+pxHeight)
+		t.render(ctx, x+width-t.width - 200,i*pxHeight+nPxHeight+pxHeight)
 
 		m = leaders[i][1]
 		t = getTextCanvas(m, pxHeight, pxHeight)
-		t.render(ctx, x+width-t.width,i*pxHeight+pxHeight)
+		t.render(ctx, x+width-t.width,i*pxHeight+pxHeight+nPxHeight)
 	}
 	
 }
