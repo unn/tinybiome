@@ -72,6 +72,21 @@ var invalidProto = errors.New("Invalid Protocol")
 var hackAttempt = errors.New("Hack Attempt")
 var Disconnected = errors.New("Disconnected")
 
+func guaranteeRead(r io.Reader, p []byte) error {
+	n := 0
+	for n < len(p) {
+		o, e := r.Read(p[n:])
+		if e != nil {
+			log.Println("ERR", e)
+		}
+		if o != len(p) {
+			log.Println("ERR, READ", o, "/", len(p))
+		}
+		n += o
+	}
+	return nil
+}
+
 // runs in a goroutine
 func (s *BinaryProtocol) GetMessage(p *Player) error {
 	if s.Disconnected {
@@ -84,7 +99,8 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 	switch act {
 	case 0:
 		size := make([]byte, 4)
-		s.R.Read(size)
+		guaranteeRead(s.R, size)
+
 		strSize := *(*int32)(unsafe.Pointer(&size[0]))
 		if s.Logging {
 			log.Println(p, "SENT JOIN")
@@ -96,12 +112,14 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 			return invalidProto
 		}
 		nameBytes := make([]byte, strSize)
-		s.R.Read(nameBytes)
+		guaranteeRead(s.R, nameBytes)
+
 		name := string(nameBytes)
 		p.Join(name)
 	case 1:
 		parts := make([]byte, 12)
-		s.R.Read(parts)
+		guaranteeRead(s.R, parts)
+
 		pid := *(*int32)(unsafe.Pointer(&parts[0]))
 		d := *(*float32)(unsafe.Pointer(&parts[4]))
 		if math.IsNaN(float64(d)) {

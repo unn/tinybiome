@@ -84,7 +84,7 @@ func NewActor(r *Room) *Actor {
 	return a
 }
 func (a *Actor) RecalcRadius() {
-	a.radius = math.Pow(a.Mass/math.Pi, a.room.SizeMultiplier)
+	a.radius = math.Pow(a.Mass, a.room.SizeMultiplier)
 }
 func (a *Actor) Radius() float64 {
 	return a.radius
@@ -433,6 +433,11 @@ func (v *Bacteria) ActorCollision(a *Actor) {
 			v.Remove()
 		}
 	}
+	if _, isV := a.Owner.(*Virus); isV {
+		a.Mass += v.Actor.Mass
+		a.RecalcRadius()
+		v.Remove()
+	}
 }
 func (v *Bacteria) ShouldCollide(a *Actor) bool {
 	if _, isBacteria := a.Owner.(*Bacteria); isBacteria {
@@ -526,6 +531,11 @@ func (v *Virus) ShouldCollide(a *Actor) bool {
 	return false
 }
 func (v *Virus) Tick(d time.Duration) {
+	if v.Actor.Mass > 500 {
+		v.Actor.Mass -= 1
+		v.Actor.RecalcRadius()
+	}
+
 	if rand.Intn(100) == 0 {
 		v.PickSpot()
 	}

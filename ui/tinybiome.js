@@ -3,7 +3,8 @@ var myplayer;
 var tileSize = 50;
 var hidingBbox = true;
 var debugMode = false;
-var camPad = 100
+var maxCamPad = 150;
+var camPad = maxCamPad;
 
 DataView.prototype.getUTF8String = function(offset, length) {
     var utf16View = [];
@@ -287,6 +288,7 @@ function rgb(r, g, b){
 var canvas = document.getElementById("playarea");
 function ohno(x) {
 	var errs = document.getElementById("err");
+	document.getElementById("mainfloat").style.display="block";
 	errs.innerHTML = x;
 }
 var popup;
@@ -301,7 +303,7 @@ window.onload = function() {
 }
 
 window.onresize = function() {
-    popup = document.getElementById("login");
+    popup = document.getElementById("mainfloat");
     popup.style.left = ""+String(window.innerWidth/2 - popup.offsetWidth/2)+"px";
     popup.style.top = ""+String(window.innerHeight/2 - popup.offsetHeight/2)+"px";
     console.log("Left",window.innerWidth/2 - popup.innerWidth/2);
@@ -355,8 +357,8 @@ document.onkeyup = function(e) {
 function handleScroll(e) {
 	console.log(e)
 	camPad += e.deltaY/4
-	if (camPad>100) {
-		camPad = 100
+	if (camPad>maxCamPad) {
+		camPad = maxCamPad
 	}
 	if (camPad < 10) {
 		camPad = 10
@@ -380,8 +382,34 @@ function load_graphics_file(name) {
 }
 
 var renderCycles = 0
-var graphicsCounts
+var graphicsCounts;
+var fps = 30;
+
+
+var renderQuality = 2;
+var lastFps = (new Date());
+var newFps = 0;
 function render() {
+	window.requestAnimationFrame(render)
+	newFps += 1
+	now = (new Date())
+	if (now-lastFps>1000) {
+		lastFps = now
+		fps = newFps
+		newFps = 0
+
+		if (fps>50) {
+			if (renderQuality < 3) {
+				renderQuality += 1
+			}
+		}
+		if (fps<30 + renderQuality*5) {
+			if (renderQuality > 0) {
+				renderQuality -= 1
+			}
+		}
+	}
+
 	renderCycles -= 1
 	if (renderCycles <= 0) {
 		if (graphicsCounts) {
@@ -391,6 +419,7 @@ function render() {
 			graphicsCounts.particleSkips /= 100
 			graphicsCounts.renderTime /= 100
 			graphicsCounts.particleTime /= 100
+			graphicsCounts.fps = fps
 			if (debugMode) {
 				console.log(JSON.stringify(graphicsCounts))
 			}
@@ -399,6 +428,12 @@ function render() {
 			particleSkips: 0, renderTime:0,
 			particleTime: 0}
 		renderCycles = 100
+	}
+
+	if (renderQuality<2) {
+		if ((renderCycles%2)==1) {
+			return
+		}
 	}
 	gfx.renderArea(ctx,canvas.width,canvas.height)
 	ctx.save()
@@ -468,8 +503,6 @@ function render() {
 	if (currentRoom) {
 		draw_leaderboard(ctx,currentRoom)
 	}
-
-	window.requestAnimationFrame(render)
 }
 
 function draw_leaderboard(ctx, room) {

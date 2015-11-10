@@ -69,22 +69,21 @@ player.prototype.bbox = function() {
 		}
 		a = actors[randomActorId]
 		if (!a) {
-			return [x/2-300,y/2-300,x/2+300,y/2+300]
+			return [x/2-400,y/2-400,x/2+400,y/2+400]
 		}
 
-		return a.bbox()
+		bb = a.bbox()
+		bb[0] -= 200
+		bb[1] -= 200
+		bb[2] += 200
+		bb[3] += 200
+		return bb
 	}
 
 	return [x-4,y-4,xr+4,yr+4]
 }
 
 function renderTile(room,x,y) {
-	var m_canvas = document.createElement('canvas');
-	m_canvas.width = renderTileSize + tilePadding*2;
-	m_canvas.height = renderTileSize + tilePadding*2;
-	var m_context = m_canvas.getContext('2d');
-	this.canvas = m_canvas
-	this.ctx = m_context
 	this.x = x
 	this.y = y
 	this.id = renderTile.id(x,y)
@@ -96,6 +95,7 @@ function renderTile(room,x,y) {
 	this.dirty = false
 	this.room = room
 	this.freeadd = true
+	this.clear = this.clearAny.bind(this)
 }
 renderTile.prototype.add = function(particle) {
 	this.count += 1
@@ -131,7 +131,17 @@ renderTile.prototype.remove = function(particle) {
 	delete this.renderables[particle.id]
 	this.dirty = true
 }
+renderTile.prototype.clearAny = function() {
+	if (!this.canvas) {
+		delete this.canvas
+		console.log("FREEING",this.id)
+	}
+	this.dirty = true
+}
 renderTile.prototype.render = function(ctx) {
+	clearTimeout(this.to)
+	this.to = setTimeout(this.clear, 100)
+
 	if (Math.random()*1000<Object.keys(this.renderables).length) {
 		r = pickRandomProperty(this.renderables)
 		if (r) {
@@ -141,7 +151,7 @@ renderTile.prototype.render = function(ctx) {
 	}
 
 	density = this.count / (renderTileSize*renderTileSize)
-	if (density < .001 || renderTileSize*camera.xscale > 150 || renderTileSize*camera.yscale > 150) {
+	if (density * renderQuality < .001  ) {
 		for(i in this.renderables) {
 			r = this.renderables[i]
 			r.render(ctx)
@@ -179,6 +189,18 @@ renderTile.prototype.render = function(ctx) {
 	 }
 }
 renderTile.prototype.rerender = function() {
+	if (!(this.canvas)) {
+		console.log("CREATING RENDERTILE", this.id)
+		var m_canvas = document.createElement('canvas');
+
+		this.to = setTimeout(this.clear, 100)
+		m_canvas.width = renderTileSize + tilePadding*2;
+		m_canvas.height = renderTileSize + tilePadding*2;
+		var m_context = m_canvas.getContext('2d');
+		this.canvas = m_canvas
+		this.ctx = m_context
+	}
+
 	this.ctx.clearRect(0, 0, renderTileSize+tilePadding*2, renderTileSize+tilePadding*2);
 	this.ctx.save()
 	this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
@@ -424,6 +446,7 @@ function actor(id, x, y) {
 	actors[this.id] = this
 
 	this.owner = null
+	this.inview = false
 }
 
 actor.prototype.contains = function(actor) {
@@ -462,8 +485,9 @@ actor.prototype.postRender = function() {
 actor.prototype.setmass = function(m) {
 	this.newmass = m
 }
-actor.prototype.radius = function() {return Math.pow(this.mass/Math.PI, currentRoom.sizemultiplier)}
+actor.prototype.radius = function() {return Math.pow(this.mass, currentRoom.sizemultiplier)}
 actor.prototype.render = function(ctx) {
+	this.inview = true
 	if (this.owner) if (this.owner.render) return this.owner.render(ctx)
 	radius = this.radius()
 	// a = pi * r^2
@@ -476,8 +500,6 @@ actor.prototype.render = function(ctx) {
 actor.prototype.step = function(seconds) {
 	this.mass = (this.newmass+this.mass*4)/5
 
-	this.x = (this.xs+this.x)/2
-	this.y = (this.ys+this.y)/2
 
 	room = currentRoom
 
@@ -485,23 +507,31 @@ actor.prototype.step = function(seconds) {
 	distance = allowed * seconds * this.speed
 	mdx = Math.cos(this.direction) * distance
 	mdy = Math.sin(this.direction) * distance
-	particleChance = 1-1/((10 * seconds)*this.speed*this.radius())
-	if (Math.random()<particleChance) {
-		a = this.direction + Math.random()*Math.PI-Math.PI/2
-		dx = Math.cos(a)*this.radius()
-		dy = Math.sin(a)*this.radius()
-		p = room.addParticle(this.x-dx,this.y-dy,this.color)
-		p.xspeed = -mdx
-		p.yspeed = -mdy
+
+
+	if (this.inview) {
+		particleChance = 1-1/((10 * seconds)*this.speed*this.radius())
+		if (Math.random()<particleChance*renderQuality/4) {
+			a = this.direction + Math.random()*Math.PI-Math.PI/2
+			dx = Math.cos(a)*this.radius()
+			dy = Math.sin(a)*this.radius()
+			p = room.addParticle(this.x-dx,this.y-dy,this.color)
+			p.xspeed = -mdx
+			p.yspeed = -mdy
+		}
 	}
 
 
 	this.x += mdx
 	this.y += mdy
 
+	this.x = (this.xs+this.x*2)/3
+	this.y = (this.ys+this.y*2)/3
 
 	this.x = median(this.x, 0, room.width);
 	this.y = median(this.y, 0, room.height);
+
+	this.inview = false
 	if (this.owner) if (this.owner.step) this.owner.step(seconds)
 }
 actor.prototype.remove = function() {
@@ -519,7 +549,7 @@ function playeractor(aid, pid) {
 	this.id = "pa"+aid+","+pid
 	if (myplayer) {
 		if (pid == myplayer.id) {
-			document.getElementById("login").style.display="none";
+			document.getElementById("mainfloat").style.display="none";
 		}
 	}
 	this.lastupdate = (new Date())
@@ -528,7 +558,7 @@ playeractor.prototype.remove = function() {
 	delete currentRoom.players[this.owner].owns[this.actor.id]
 	if (this.owner == myplayer.id) {
 		if (Object.keys(myplayer.owns).length==0) {
-			document.getElementById("login").style.display="block";
+			document.getElementById("mainfloat").style.display="block";
 		}
 	}
 }

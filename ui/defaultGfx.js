@@ -124,16 +124,26 @@ gfx.renderBackground = function(ctx, x, y, width, height) {
 }
 
 gfx.renderParticle = function(ctx, x, y, life, color) {
+	if (renderQuality<1) {
+		return
+	}
 	ctx.fillStyle = color;
 	ctx.beginPath();
 	r = life/50
 	ctx.moveTo(x,y-r)
-	ctx.lineTo(x-r*.8,y-r*.55)
-	ctx.lineTo(x-r*.8,y+r*.55)
-	ctx.lineTo(x,y+r)
-	ctx.lineTo(x+r*.8,y+r*.55)
-	ctx.lineTo(x+r*.8,y-r*.55)
-	ctx.lineTo(x,y-r)
+	if (renderQuality<2) {
+		ctx.lineTo(x-r,y)
+		ctx.lineTo(x,y+r)
+		ctx.lineTo(x+r,y)
+		ctx.lineTo(x,y-r)
+	} else {
+		ctx.lineTo(x-r*.8,y-r*.55)
+		ctx.lineTo(x-r*.8,y+r*.55)
+		ctx.lineTo(x,y+r)
+		ctx.lineTo(x+r*.8,y+r*.55)
+		ctx.lineTo(x+r*.8,y-r*.55)
+		ctx.lineTo(x,y-r)
+	}
 	ctx.fill();
 }
 
@@ -145,21 +155,28 @@ gfx.renderGroup = function(ctx, bbox, name, mass, players) {
 	textX = x+w/2
 	textY = y
 
-	size = 25
+	size = 15
 	if (28*camera.yscale<150) {
-		size = 35
+		size = 20
 	}
 	if (28*camera.yscale<70) {
-		size = 45
+		size = 25
 	}
 	if (28*camera.yscale<20) {
-		size = 55
+		size = 30
 	}
 
+
 	t = getTextCanvas(name, size)
-	textX = textX - t.width / 2
-	textY = textY - t.height
-	t.render(ctx, textX, textY)
+	if (y+h/2<camera.y+camera.height/3*2) {
+		textX = textX - t.width / 2
+		textY = textY - t.height
+		t.render(ctx, textX, textY)
+	} else {
+		textX = textX - t.width / 2
+		textY = y + h
+		t.render(ctx, textX, textY)
+	}
 
  	ctx.lineWidth = .3;
  	ctx.strokeStyle = players[0].color
@@ -176,11 +193,18 @@ gfx.renderBacteria = function(ctx, x, y, color, mass, radius) {
 		if (i==0) {
 			ctx.moveTo(x+radius*.7*Math.cos(a), y+radius*.7*Math.sin(a))
 		} else {
-			mx = x+radius*Math.cos(a-ca/2)
-			my = y+radius*Math.sin(a-ca/2)
 			ex = x+radius*.7*Math.cos(a)
 			ey = y+radius*.7*Math.sin(a)
-			ctx.quadraticCurveTo(mx,my,ex,ey)
+			if (renderQuality>1) {
+				mx = x+radius*Math.cos(a-ca/2)
+				my = y+radius*Math.sin(a-ca/2)
+				ctx.quadraticCurveTo(mx,my,ex,ey)
+			} else {
+				mx = x+radius*.8*Math.cos(a-ca/2)
+				my = y+radius*.8*Math.sin(a-ca/2)
+				ctx.lineTo(mx,my)
+				ctx.lineTo(ex,ey)
+			}
 		}
 
 	}
@@ -195,7 +219,10 @@ gfx.renderVirus = function(ctx, x, y, color, mass, radius) {
 	ctx.save();
 	ctx.beginPath();
 	d = 1
-	spikes = 6
+	spikes = 8
+	if (renderQuality<2) {
+		spikes = 6
+	}
 	ca = Math.PI*2/(spikes*2)
 	for(var i=0; i<=spikes*2; i++) {
 		a = (x+y)/20+i*ca
@@ -223,6 +250,8 @@ gfx.renderActor = function(ctx, x, y, color, mass, radius) {
 
 	gfx.renderCell(ctx, x, y, color, radius)
 
+
+
 	ctx.restore();
 
 
@@ -238,33 +267,39 @@ gfx.renderActor = function(ctx, x, y, color, mass, radius) {
 }
 
 gfx.renderCell = function(ctx, x, y, color, radius) {
-	if (cellImg.loaded) {
-		if (!cellImg.pattern) {
-			cellImg.pattern = ctx.createPattern(cellImg, 'repeat');
+	if (renderQuality>0) {
+		if (cellImg.loaded) {
+			if (!cellImg.pattern) {
+				cellImg.pattern = ctx.createPattern(cellImg, 'repeat');
+			}
+			ctx.fillStyle = cellImg.pattern;
+			pX = x-radius
+			pY = y-radius
+			sX = radius*2
+			sY = radius*2
+			pX = Math.floor(pX/cellImgWidth)*cellImgWidth
+			pY = Math.floor(pY/cellImgHeight)*cellImgHeight
+			sX = Math.floor((pX+sX)/cellImgWidth)*cellImgWidth
+			sY = Math.floor((pY+sY)/cellImgHeight)*cellImgHeight
+			ctx.save()
+			ctx.translate(x-radius,y-radius);
+			ctx.scale(.3,.3)
+			ctx.fillRect(0,0,(radius*2/.3),(radius*2/.3));
+			// ctx.translate(-(x-radius),-(y-radius));
+			ctx.restore()
 		}
-		ctx.fillStyle = cellImg.pattern;
-		pX = x-radius
-		pY = y-radius
-		sX = radius*2
-		sY = radius*2
-		pX = Math.floor(pX/cellImgWidth)*cellImgWidth
-		pY = Math.floor(pY/cellImgHeight)*cellImgHeight
-		sX = Math.floor((pX+sX)/cellImgWidth)*cellImgWidth
-		sY = Math.floor((pY+sY)/cellImgHeight)*cellImgHeight
-		ctx.save()
-		ctx.translate(x-radius,y-radius);
-		ctx.scale(.3,.3)
-		ctx.fillRect(0,0,(radius*2/.3),(radius*2/.3));
-		// ctx.translate(-(x-radius),-(y-radius));
-		ctx.restore()
-	}
 
-	ctx.globalCompositeOperation = "multiply";
-	ctx.fillStyle = color;
-	ctx.beginPath();
-	ctx.fillRect(x-radius,y-radius,radius*2,radius*2)
-	ctx.fill();
-	ctx.globalCompositeOperation = "source-over";
+
+		ctx.globalCompositeOperation = "multiply";
+		ctx.fillStyle = color;
+		ctx.fillRect(x-radius,y-radius,radius*2,radius*2)
+		ctx.fill();
+		ctx.globalCompositeOperation = "source-over";
+	} else {
+		ctx.fillStyle = color;
+		ctx.fillRect(x-radius,y-radius,radius*2,radius*2)
+		ctx.fill();
+	}
 
 	ctx.lineWidth = .5+radius*.01;
 	ctx.strokeStyle = color;
@@ -279,9 +314,15 @@ gfx.renderVitamin = function(ctx, x, y, color, radius) {
 	ctx.fillStyle = color;
 	r = radius
 
-	parts = 12
-	if (camera.xscale*5<10) {
-		parts = 9
+	parts = 8
+	if (renderQuality<3) {
+		parts = 6
+	}
+	if (renderQuality<2) {
+		parts = 4
+	}
+	if (renderQuality<1) {
+		parts = 3
 	}
 	ca = Math.PI*2/(parts)
 	for(var i=0; i<=parts; i++) {
