@@ -61,7 +61,7 @@ func (p *Pellet) Remove() {
 }
 
 type Actor struct {
-	Owner     Owner
+	Owner     interface{}
 	room      *Room
 	ID        int64
 	X         float64
@@ -78,9 +78,9 @@ type Actor struct {
 
 func NewActor(r *Room) *Actor {
 	a := &Actor{room: r}
-	r.AddTicker(a)
 	id := r.getId(a)
 	a.ID = id
+	log.Println("NEW ACTOR", a)
 	return a
 }
 func (a *Actor) RecalcRadius() {
@@ -91,87 +91,91 @@ func (a *Actor) Radius() float64 {
 }
 
 func (a *Actor) CheckCollisions() {
-	r := a.Radius()
-	rad := int64(a.Radius() * a.Radius())
-	t := time.Now()
+	if pc, is := a.Owner.(PelletCollider); is {
+		r := a.Radius()
+		rad := int64(a.Radius() * a.Radius())
+		t := time.Now()
 
-	ix := int64(int64(a.X-r) / TileSize)
-	iy := int64(int64(a.Y-r) / TileSize)
-	ax := int64(a.X)
-	ay := int64(a.Y)
-	ex := int64(int64(a.X+r) / TileSize)
-	ey := int64(int64(a.Y+r) / TileSize)
+		ix := int64(int64(a.X-r) / TileSize)
+		iy := int64(int64(a.Y-r) / TileSize)
+		ax := int64(a.X)
+		ay := int64(a.Y)
+		ex := int64(int64(a.X+r) / TileSize)
+		ey := int64(int64(a.Y+r) / TileSize)
 
-	if ix < 0 {
-		ix = 0
-	}
-	if iy < 0 {
-		iy = 0
-	}
-	if ex > a.room.Width/TileSize-1 {
-		ex = a.room.Width/TileSize - 1
-	}
-	if ey > a.room.Height/TileSize-1 {
-		ey = a.room.Height/TileSize - 1
-	}
+		if ix < 0 {
+			ix = 0
+		}
+		if iy < 0 {
+			iy = 0
+		}
+		if ex > a.room.Width/TileSize-1 {
+			ex = a.room.Width/TileSize - 1
+		}
+		if ey > a.room.Height/TileSize-1 {
+			ey = a.room.Height/TileSize - 1
+		}
 
-	for ix := ix; ix <= ex; ix += 1 {
-		for iy := iy; iy <= ey; iy += 1 {
+		for ix := ix; ix <= ex; ix += 1 {
+			for iy := iy; iy <= ey; iy += 1 {
 
-			tile := a.room.PelletTiles[ix][iy]
-			pels := tile.Pellets[:tile.PelletCount]
+				tile := a.room.PelletTiles[ix][iy]
+				pels := tile.Pellets[:tile.PelletCount]
 
-			for _, p := range pels {
-				dx := p.X - ax
-				dy := p.Y - ay
-				if dx*dx+dy*dy < rad {
-					a.Owner.PelletCollision(p)
+				for _, p := range pels {
+					dx := p.X - ax
+					dy := p.Y - ay
+					if dx*dx+dy*dy < rad {
+						pc.PelletCollision(p)
+					}
 				}
 			}
 		}
-	}
-	took := time.Since(t)
-	if took > 1*time.Millisecond {
-		log.Println("QR TOOK", took)
-	}
-
-	consumes := []*Actor{}
-	for _, b := range a.room.Actors[:a.room.HighestID] {
-		if b == a || b == nil {
-			continue
+		took := time.Since(t)
+		if took > 1*time.Millisecond {
+			log.Println("QR TOOK", took)
 		}
-		dx := b.X - a.X
-		dy := b.Y - a.Y
-		dist := dx*dx + dy*dy
-		if dist == 0 {
-			dist = .01
-		}
-		allowedDist := a.Radius() + b.Radius()
-		if dist < allowedDist*allowedDist {
-			dist = math.Sqrt(dist)
-			depth := allowedDist - dist
-			if a.Owner.ShouldCollide(b) {
-				tot := a.Mass + b.Mass
+	}
 
-				a.X -= dx / dist * depth * b.Mass / tot
-				a.Y -= dy / dist * depth * b.Mass / tot
-				b.X += dx / dist * depth * a.Mass / tot
-				b.Y += dy / dist * depth * a.Mass / tot
-
-				a.XSpeed = ((a.XSpeed - math.Min(dx/dist*depth/2*b.Mass/tot, 6)) + a.XSpeed) / 2
-				a.YSpeed = ((a.YSpeed - math.Min(dy/dist*depth/2*b.Mass/tot, 6)) + a.YSpeed) / 2
-				b.XSpeed = ((b.XSpeed + math.Min(dx/dist*depth/2*a.Mass/tot, 6)) + b.XSpeed) / 2
-				b.YSpeed = ((b.YSpeed + math.Min(dy/dist*depth/2*a.Mass/tot, 6)) + b.YSpeed) / 2
+	if ac, is := a.Owner.(ActorCollider); is {
+		consumes := []*Actor{}
+		for _, b := range a.room.Actors[:a.room.HighestID] {
+			if b == a || b == nil {
+				continue
 			}
-			if dist < a.Radius() || dist < b.Radius() {
-				consumes = append(consumes, b)
+			dx := b.X - a.X
+			dy := b.Y - a.Y
+			dist := dx*dx + dy*dy
+			if dist == 0 {
+				dist = .01
+			}
+			allowedDist := a.Radius() + b.Radius()
+			if dist < allowedDist*allowedDist {
+				dist = math.Sqrt(dist)
+				depth := allowedDist - dist
+				if ac.ShouldCollide(b) {
+					tot := a.Mass + b.Mass
+
+					a.X -= dx / dist * depth * b.Mass / tot
+					a.Y -= dy / dist * depth * b.Mass / tot
+					b.X += dx / dist * depth * a.Mass / tot
+					b.Y += dy / dist * depth * a.Mass / tot
+
+					a.XSpeed = ((a.XSpeed - math.Min(dx/dist*depth/2*b.Mass/tot, 6)) + a.XSpeed) / 2
+					a.YSpeed = ((a.YSpeed - math.Min(dy/dist*depth/2*b.Mass/tot, 6)) + a.YSpeed) / 2
+					b.XSpeed = ((b.XSpeed + math.Min(dx/dist*depth/2*a.Mass/tot, 6)) + b.XSpeed) / 2
+					b.YSpeed = ((b.YSpeed + math.Min(dy/dist*depth/2*a.Mass/tot, 6)) + b.YSpeed) / 2
+				}
+				if dist < a.Radius() || dist < b.Radius() {
+					consumes = append(consumes, b)
+				}
 			}
 		}
-	}
 
-	if len(consumes) > 0 {
-		for i := 0; i < len(consumes); i += 1 {
-			a.Owner.ActorCollision(consumes[i])
+		if len(consumes) > 0 {
+			for i := 0; i < len(consumes); i += 1 {
+				ac.ActorCollision(consumes[i])
+			}
 		}
 	}
 	a.moved = true
@@ -199,6 +203,10 @@ func (a *Actor) Tick(d time.Duration) {
 	a.Y += dy
 }
 
+func (a *Actor) Write(p ProtocolDown) {
+	p.WriteNewActor(a)
+}
+
 func (a *Actor) String() string {
 	return fmt.Sprintf("%d (m:%f)", a.ID, a.Mass)
 }
@@ -212,11 +220,13 @@ func (a *Actor) Remove() {
 		}
 		player.Net.WriteDestroyActor(a)
 	}
-	r.RemoveTicker(a)
 }
 
-type Owner interface {
+type PelletCollider interface {
 	PelletCollision(*Pellet)
+}
+
+type ActorCollider interface {
 	ActorCollision(*Actor)
 	ShouldCollide(*Actor) bool
 }
@@ -226,6 +236,11 @@ type PlayerActor struct {
 	Player     *Player
 	MergeTime  time.Time
 	DecayLevel float64
+}
+
+func (a *PlayerActor) Tick(d time.Duration) {
+	a.Decay(d)
+	a.Actor.Tick(d)
 }
 
 func (a *PlayerActor) Remove() {
@@ -361,45 +376,91 @@ func (a *PlayerActor) CanMerge() bool {
 	return a.MergeTime.Before(time.Now())
 }
 
-type RandomWalker struct {
-	Actor *Actor
-	Room  *Room
+func (pa *PlayerActor) Write(p ProtocolDown) {
+	pa.Actor.Write(p)
+	p.WritePlayerActor(pa)
 }
 
-func NewRandomWalker(r *Room) *RandomWalker {
-	rw := &RandomWalker{}
-	rw.Room = r
-	rw.Actor = r.NewActor(
+type Virus struct {
+	Actor   *Actor
+	Room    *Room
+	TargetX float64
+	TargetY float64
+}
+
+func NewVirus(r *Room) *Virus {
+	v := &Virus{}
+	v.Room = r
+	v.Actor = r.NewActor(
 		float64(rand.Int63n(r.Width)),
 		float64(rand.Int63n(r.Height)),
 		150)
-	rw.Actor.Owner = rw
-	r.AddTicker(rw)
-	rw.Room.VirusCount += 1
-	return rw
+	v.Actor.Owner = v
+	v.Actor.Direction = rand.Float64() * math.Pi * 2
+	v.PickSpot()
+	r.AddTicker(v)
+	for _, player := range r.Players {
+		if player == nil {
+			continue
+		}
+		v.Actor.Write(player.Net)
+		player.Net.WriteVirus(v)
+	}
+	v.Room.VirusCount += 1
+	return v
 }
-func (rw *RandomWalker) PelletCollision(*Pellet) {
-
+func (v *Virus) PickSpot() {
+	v.TargetX = v.Actor.X + rand.Float64()*500 - 250
+	v.TargetY = v.Actor.Y + rand.Float64()*500 - 250
 }
-func (rw *RandomWalker) ActorCollision(a *Actor) {
-	if a.Mass > rw.Actor.Mass {
+func (v *Virus) Write(p ProtocolDown) {
+	v.Actor.Write(p)
+	p.WriteVirus(v)
+}
+func (v *Virus) ActorCollision(a *Actor) {
+	if a.Mass > v.Actor.Mass {
 		if asPA, isPA := a.Owner.(*PlayerActor); isPA {
-			for range [3]byte{} {
+			for range [6]byte{} {
 				asPA.Split()
 			}
-			rw.Remove()
-			asPA.Actor.Mass += rw.Actor.Mass * .8
+			v.Remove()
+			asPA.Actor.Mass += v.Actor.Mass * .8
 		}
 	}
 }
-func (rw *RandomWalker) ShouldCollide(*Actor) bool {
+func (v *Virus) ShouldCollide(a *Actor) bool {
+	if _, isVirus := a.Owner.(*Virus); isVirus {
+		return true
+	}
 	return false
 }
-func (rw *RandomWalker) Tick(d time.Duration) {
+func (v *Virus) Tick(d time.Duration) {
+	if rand.Intn(100) == 0 {
+		v.PickSpot()
+	}
 
+	dx := v.TargetX - v.Actor.X
+	dy := v.TargetY - v.Actor.Y
+	v.Actor.Direction = math.Atan2(dy, dx)
+
+	dist := math.Sqrt(dx*dx + dy*dy)
+
+	if dist > 1 {
+		v.Actor.Speed += rand.Float64()*dist/1000*(1-v.Actor.Speed) - .03
+		if v.Actor.Speed < 0 {
+			v.Actor.Speed = 0
+		}
+		if v.Actor.Speed > 1 {
+			v.Actor.Speed = 1
+		}
+	} else {
+		v.Actor.Speed *= .5
+	}
+
+	v.Actor.Tick(d)
 }
-func (rw *RandomWalker) Remove() {
-	rw.Actor.Remove()
-	rw.Room.VirusCount -= 1
-	rw.Room.RemoveTicker(rw)
+func (v *Virus) Remove() {
+	v.Actor.Remove()
+	v.Room.VirusCount -= 1
+	v.Room.RemoveTicker(v)
 }

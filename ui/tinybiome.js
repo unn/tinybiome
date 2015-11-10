@@ -15,7 +15,6 @@ DataView.prototype.getUTF8String = function(offset, length) {
 
 	ws = new WebSocket("ws://"+document.location.hostname+":5000");
 	ws.binaryType = "arraybuffer";
-	ws.synced = false;
 	ws.onerror = function() {
 		ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
 	}
@@ -42,7 +41,7 @@ messageHandlers = [
 	handleRemovePellet, handleNewPlayer, handleRenamePlayer,
 	handleDestroyPlayer, handleOwnPlayer, handleRemoveActor,
 	handleMoveActor, handleSetMass, handleMultiPellet, 
-	handlePlayerActor, handleSync]
+	handleDescribeActor, handleSync]
 var messageMap = []
 function handleSync(dv, off) {
 	l = dv.getUint8(off+1)
@@ -209,13 +208,23 @@ function handleMultiPellet(dv, off) {
 		
 		return off + 5 + amt * 12
 }
-function handlePlayerActor(dv, off) {
-		aid = dv.getInt32(off+1, true)
-		pid = dv.getInt32(off+5, true)
-		console.log("ACTOR",aid,"IS PLAYERACTOR")
-		
-		a = new playeractor(aid,pid)
-		return off + 9
+function handleDescribeActor(dv, off) {
+		t = dv.getUint8(off+1)
+		switch (t) {
+		case 0:
+			aid = dv.getInt32(off+2, true)
+			pid = dv.getInt32(off+6, true)
+			console.log("ACTOR",aid,"IS PLAYERACTOR")
+			
+			a = new playeractor(aid,pid)
+			return off + 10
+		case 1:
+			aid = dv.getInt32(off+2, true)
+			console.log("ACTOR",aid,"IS VIRUS")
+			
+			a = new virus(aid)
+			return off + 6
+		}
 }
 
 function writeJoin(name) {

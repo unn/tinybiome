@@ -170,13 +170,52 @@ gfx.renderGroup = function(ctx, bbox, name, mass, players) {
  	ctx.strokeRect(x,y,w,h)
 }
 
-gfx.renderPlayer = function(ctx, x, y, color, name, mass, radius) {
+gfx.renderVirus = function(ctx, x, y, mass, radius) {
+	ctx.save();
+	ctx.beginPath();
+	d = 1
+	spikes = 6
+	ca = Math.PI*2/(spikes*2)
+	for(var i=0; i<=spikes*2; i++) {
+		a = (x+y)/20+i*ca
+		if (i==0) {
+			ctx.moveTo(x+radius*d*Math.cos(a), y+radius*d*Math.sin(a))
+		} else {
+			ctx.lineTo(x+radius*d*Math.cos(a), y+radius*d*Math.sin(a))
+		}
+		if (d==1) d=.5
+		else d=1
+	}
+	ctx.clip();
+
+	gfx.renderCell(ctx, x, y, "red", radius)
+
+	ctx.restore();
+
+}
+gfx.renderActor = function(ctx, x, y, color, mass, radius) {
 	ctx.save();
 	ctx.beginPath();
 	ctx.arc(x, y, radius, 0, 2 * Math.PI);
 	ctx.clip();
 
+	gfx.renderCell(ctx, x, y, color, radius)
 
+	ctx.restore();
+
+
+	if (12*camera.yscale>7) {
+
+		t = getTextCanvas(mass, 12, "12px sans serif")
+		textX = x - t.width / 2
+		textY = y
+		t.render(ctx, textX, textY)
+	}
+
+ 	ctx.lineWidth = 2;
+}
+
+gfx.renderCell = function(ctx, x, y, color, radius) {
 	if (cellImg.loaded) {
 		if (!cellImg.pattern) {
 			cellImg.pattern = ctx.createPattern(cellImg, 'repeat');
@@ -205,23 +244,11 @@ gfx.renderPlayer = function(ctx, x, y, color, name, mass, radius) {
 	ctx.fill();
 	ctx.globalCompositeOperation = "source-over";
 
-	ctx.restore();
-
 	ctx.lineWidth = .5+radius*.01;
 	ctx.strokeStyle = color;
 	ctx.beginPath();
 	ctx.arc(x, y, radius, 0, 2 * Math.PI);
 	ctx.stroke();
-
-	if (12*camera.yscale>7) {
-
-		t = getTextCanvas(mass, 12, "12px sans serif")
-		textX = x - t.width / 2
-		textY = y
-		t.render(ctx, textX, textY)
-	}
-
- 	ctx.lineWidth = 2;
 }
 
 gfx.renderVitamin = function(ctx, x, y, color, radius) {

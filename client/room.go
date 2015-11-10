@@ -23,6 +23,8 @@ const TileSize = int64(100)
 
 type Ticker interface {
 	Tick(time.Duration)
+	Write(ProtocolDown)
+	Remove()
 }
 
 type Tile struct {
@@ -114,7 +116,7 @@ func (r *Room) createThings(d time.Duration) {
 	}
 
 	if r.VirusCount < MaxViruses {
-		NewRandomWalker(r)
+		NewVirus(r)
 	}
 }
 
@@ -235,13 +237,6 @@ func (r *Room) NewActor(x, y, mass float64) *Actor {
 	actor.Mass = mass
 	actor.RecalcRadius()
 	log.Println("NEW ACTOR", actor)
-
-	for _, oPlayer := range r.Players {
-		if oPlayer == nil {
-			continue
-		}
-		oPlayer.Net.WriteNewActor(actor)
-	}
 	return actor
 }
 func (r *Room) AddTicker(t Ticker) {
@@ -265,7 +260,7 @@ type Player struct {
 	ID        int64
 	Net       Protocol
 	room      *Room
-	Owns      [MaxOwns]*PlayerActor
+	Owns      [MaxOwns]Ticker
 	EditLock  sync.RWMutex
 	Name      string
 	Connected bool
@@ -276,7 +271,7 @@ type Player struct {
 func (p *Player) Tick(d time.Duration) {
 	for _, actor := range p.Owns {
 		if actor != nil {
-			actor.Decay(d)
+			actor.Tick(d)
 		}
 	}
 }
@@ -284,29 +279,19 @@ func (p *Player) Sync() {
 	r := p.room
 
 	r.ChangeLock.Lock()
+	r.AddTicker(p)
 	p.ID = r.getPlayerId(p)
 
 	start := time.Now()
 	log.Println("SYNCING ROOM")
 	p.Net.WriteRoom(r)
-	log.Println("SYNCING ACTORS")
-	for _, oActor := range r.Actors[:r.HighestID] {
-		if oActor == nil {
-			continue
-		}
-		p.Net.WriteNewActor(oActor)
-	}
-	log.Println("SYNCING PLAYERS")
-	for _, oPlayer := range r.Players {
+	log.Println("SYNCING TICKERS")
+	for _, oPlayer := range r.Tickers {
 		if oPlayer == nil {
 			continue
 		}
-		p.Net.WriteNewPlayer(oPlayer)
-		for _, actor := range oPlayer.Owns {
-			if actor != nil {
-				p.Net.WritePlayerActor(actor)
-			}
-		}
+		oPlayer.Write(p.Net)
+
 	}
 	log.Println("SYNCING PELLETS")
 	p.Net.WritePelletsIncoming(r.Pellets[:r.PelletCount])
@@ -327,13 +312,20 @@ func (p *Player) Sync() {
 	log.Println(p, "INITIAL SYNC COMPLETE IN", took)
 	p.Net.Save()
 
-	r.AddTicker(p)
 	r.ChangeLock.Unlock()
 	log.Println(p, "SENDING")
 	go p.SendUpdates()
 	log.Println(p, "STARTING LOOP")
 	p.ReceiveUpdates()
 	p.Remove()
+}
+func (p *Player) Write(pn ProtocolDown) {
+	pn.WriteNewPlayer(p)
+	for _, actor := range p.Owns {
+		if actor != nil {
+			actor.Write(pn)
+		}
+	}
 }
 func (p *Player) SendBuffer() {
 	p.Net.Save()
@@ -389,7 +381,7 @@ func (p *Player) UpdateDirection(actor int32, d, s float32) {
 	p.room.ChangeLock.RUnlock()
 }
 
-type PlayerActorList []*PlayerActor
+type PlayerActorList []Ticker
 
 func (a PlayerActorList) Len() int      { return len(a) }
 func (a PlayerActorList) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -400,18 +392,20 @@ func (a PlayerActorList) Less(i, j int) bool {
 	if a[j] == nil {
 		return true
 	}
-	return a[i].Actor.Mass > a[j].Actor.Mass
+	aA := a[i].(*PlayerActor)
+	aB := a[j].(*PlayerActor)
+	return aA.Actor.Mass > aB.Actor.Mass
 }
 
 func (p *Player) Split() {
 	p.room.ChangeLock.Lock()
-	n := make([]*PlayerActor, len(p.Owns[:]))
+	n := make([]Ticker, len(p.Owns[:]))
 	copy(n, p.Owns[:])
 	sorted := PlayerActorList(n)
 	sort.Sort(sorted)
 	for _, a := range sorted {
 		if a != nil {
-			a.Split()
+			a.(*PlayerActor).Split()
 		}
 	}
 	p.room.ChangeLock.Unlock()
@@ -471,7 +465,7 @@ func (p *Player) NewActor(x, y, mass float64) *Actor {
 		if oPlayer == nil {
 			continue
 		}
-		oPlayer.Net.WritePlayerActor(actor)
+		actor.Write(oPlayer.Net)
 	}
 
 	for n, a := range p.Owns {

@@ -446,7 +446,7 @@ actor.prototype.render = function(ctx) {
 	// sqrt(a/pi) = r
 	this.color = "#000000";
 	n = "Something..?"
-	gfx.renderPlayer(ctx,this.x,this.y,this.color,n, Math.floor(this.mass),radius)
+	gfx.renderActor(ctx,this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 
 }
 actor.prototype.step = function(seconds) {
@@ -556,8 +556,16 @@ playeractor.prototype.render = function(ctx) {
 	radius = this.actor.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	this.actor.color = this.owner==myplayer.id ? "#33FF33" : "#FF3333";
+	this.actor.color = this.owner==myplayer.id ? "#33FF33" : "#3333FF";
 	n = currentRoom.players[this.owner].name
 	n = n ? n : "Microbe"
-	gfx.renderPlayer(ctx,this.actor.x,this.actor.y,this.actor.color,n, Math.floor(this.actor.mass),radius)
+	gfx.renderActor(ctx,this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
+}
+
+function virus(aid) {
+	this.actor = actors[aid]
+	this.actor.owner = this
+}
+virus.prototype.render = function(ctx) {
+	gfx.renderVirus(ctx, this.actor.x, this.actor.y, this.actor.mass, this.actor.radius())
 }

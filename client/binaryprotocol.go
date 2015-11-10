@@ -28,6 +28,7 @@ type ProtocolDown interface {
 	WriteDestroyPellet(*Pellet)
 	WritePelletsIncoming([]*Pellet)
 	WritePlayerActor(*PlayerActor)
+	WriteVirus(*Virus)
 	Flush() error
 	Save()
 }
@@ -313,8 +314,19 @@ func (s *BinaryProtocol) WritePlayerActor(pa *PlayerActor) {
 	}
 
 	s.W.WriteByte(s.MessageMap[12])
+	s.W.WriteByte(0)
 	WriteInt32(s.W, pa.Actor.ID)
 	WriteInt32(s.W, pa.Player.ID)
+}
+
+func (s *BinaryProtocol) WriteVirus(v *Virus) {
+	if s.Logging {
+		log.Println("SENDING WriteVirus", v)
+	}
+
+	s.W.WriteByte(s.MessageMap[12])
+	s.W.WriteByte(1)
+	WriteInt32(s.W, v.Actor.ID)
 }
 
 func (s *BinaryProtocol) WriteNewMessageMap() {
@@ -322,7 +334,7 @@ func (s *BinaryProtocol) WriteNewMessageMap() {
 		s.W.WriteByte(s.MessageMap[13])
 	}
 	newMessages := rand.Perm(255)
-	log.Println("SENDING SYNC MAP SIZE", len(newMessages), newMessages)
+	// log.Println("SENDING SYNC MAP SIZE", len(newMessages), newMessages)
 	s.MessageMap = make([]byte, len(newMessages))
 	s.W.WriteByte(byte(len(newMessages)))
 	for n, om := range newMessages {
