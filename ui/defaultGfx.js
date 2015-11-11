@@ -16,7 +16,6 @@ var textPad = 0;
 function textCache(s, height) {
 	this.to = 10000
 	this.remove = this.removeAny.bind(this)
-	this.timer = setTimeout(this.remove, this.to)
 	this.text = s
 	this.height = height
 	this.font = this.height+"px sans serif"
@@ -24,11 +23,14 @@ function textCache(s, height) {
 	this.id = textCache.getid(s,height)
 	textCaches[this.id] = this
 	this.renders = 0
+	this.visible = false
 	this.rerender()
 }
 textCache.prototype.render = function(ctx,x,y) {
+	this.visible = true
 	this.renders += 1
 	if (this.renders>20 && shouldCacheText) {
+		if (!this.timer) this.timer = setTimeout(this.remove, this.to)
 		if (this.renders>500) {
 			this.rendererd = false
 			this.renders = 20
@@ -45,8 +47,6 @@ textCache.prototype.render = function(ctx,x,y) {
 		 	this.ctx.strokeText(this.text, textPad, textPad);
 		 	this.rendered = true
 		}
-		clearTimeout(this.timer)
-		this.timer = setTimeout(this.remove, this.to)
 		ctx.drawImage(this.canvas,x-textPad,y-textPad,this.width,this.height)
 	} else {
 		ctx.textAlign = "left";
@@ -59,6 +59,7 @@ textCache.prototype.render = function(ctx,x,y) {
 	 	ctx.strokeText(this.text, x, y);
 	}
 }
+
 textCache.prototype.rerender = function() {
 	var m_canvas = document.createElement('canvas');
 	this.canvas = m_canvas
@@ -78,6 +79,12 @@ textCache.prototype.rerender = function() {
 	// ctx.scale(10,10)
 }
 textCache.prototype.removeAny = function() {
+	this.timer = setTimeout(this.remove, this.to)
+	if (this.visible) {
+		this.visible = false
+		return
+	}
+
 	// console.log("FREEING",this.id)
 	if (shouldCacheText) delete this.canvas
 	delete textCaches[this.id]
@@ -168,7 +175,7 @@ gfx.renderGroup = function(ctx, bbox, name, mass, players) {
 
 
 	t = getTextCanvas(name, size)
-	if (y+h/2<camera.y+camera.height/3*2) {
+	if (y+h/2>camera.y+camera.height/3*2) {
 		textX = textX - t.width / 2
 		textY = textY - t.height
 		t.render(ctx, textX, textY)

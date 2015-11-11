@@ -246,9 +246,11 @@ function writeJoin(name) {
 	}
 	ws.send(ab)
 }
+
+mab = new DataView(new ArrayBuffer(13))
+mab.setUint8(0,1,true)
 function writeMove(id,d,s) {
-	mab = new DataView(new ArrayBuffer(13))
-	mab.setUint8(0,1,true)
+
 	mab.setInt32(1,id,true)
 	mab.setFloat32(5,d,true)
 	mab.setFloat32(9,s,true)

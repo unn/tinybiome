@@ -96,6 +96,7 @@ function renderTile(room,x,y) {
 	this.room = room
 	this.freeadd = true
 	this.clear = this.clearAny.bind(this)
+	this.visible = false
 }
 renderTile.prototype.add = function(particle) {
 	this.count += 1
@@ -132,6 +133,11 @@ renderTile.prototype.remove = function(particle) {
 	this.dirty = true
 }
 renderTile.prototype.clearAny = function() {
+	this.to = setTimeout(this.clear, 100)
+	if (this.visible) {
+		this.visible = false
+		return
+	}
 	if (!this.canvas) {
 		delete this.canvas
 		console.log("FREEING",this.id)
@@ -139,8 +145,7 @@ renderTile.prototype.clearAny = function() {
 	this.dirty = true
 }
 renderTile.prototype.render = function(ctx) {
-	clearTimeout(this.to)
-	this.to = setTimeout(this.clear, 100)
+	this.visible = true
 
 	if (Math.random()*1000<Object.keys(this.renderables).length) {
 		r = pickRandomProperty(this.renderables)
@@ -154,6 +159,11 @@ renderTile.prototype.render = function(ctx) {
 	if (density < .001 * renderQuality  ) {
 		for(i in this.renderables) {
 			r = this.renderables[i]
+			bbox = r.bbox()
+			if (bbox[2] < camera.x - padding || bbox[3] < camera.y - padding
+				|| bbox[0] > camera.x + camera.width + padding
+				|| bbox[1] > camera.y + camera.height + padding)
+				continue
 			r.render(ctx)
 		}
 	} else {
@@ -418,7 +428,7 @@ pellet.prototype.remove = function() {
 	myTile.remove(this)
 }
 pellet.prototype.bbox = function() {
-	r = this._radius
+	var r = this._radius
 	return [this.x-r, this.y-r, this.x+r, this.y+r]
 }
 
