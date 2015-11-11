@@ -7,6 +7,10 @@ var maxCamPad = 150;
 var camPad = maxCamPad;
 var maxQuality = 3;
 
+
+var gfx = {};
+var gfx_loaded = {"default.js":true}
+
 DataView.prototype.getUTF8String = function(offset, length) {
     var utf16View = [];
     for (var i = 0; i < length; ++i) {
@@ -477,7 +481,7 @@ window.onload = function() {
 	servers = new server(document.location.hostname+":4000")
 	setQuality(maxQuality-1)
 	window.requestAnimationFrame(render)
-	window.onresize();
+	graphicsChanged();
 	document.getElementById("loginButton").onclick = function() {
 		console.log("JOINING")
 		n = document.getElementById("name").value;
@@ -486,7 +490,8 @@ window.onload = function() {
 }
 
 var resFactor = 1;
-window.onresize = function() {
+var ctx;
+function graphicsChanged() {
     popup = document.getElementById("mainfloat");
     popup.style.left = ""+String(window.innerWidth/2 - popup.offsetWidth/2)+"px";
     popup.style.top = ""+String(window.innerHeight/2 - popup.offsetHeight/2)+"px";
@@ -496,16 +501,19 @@ window.onresize = function() {
     canvas.style.height = window.innerHeight;
     canvas.cwidth = window.innerWidth;
     canvas.cheight = window.innerHeight;
-    ctx = canvas.getContext("2d")
+    ctx = gfx.getContext(canvas)
 
     console.log("New Cam",camera)
 }
+
+window.onresize = graphicsChanged;
+
+
 
 var camera = {x:0,y:0,width:canvas.width,height:canvas.height,xscale:1,yscale:1};
 camera.bbox = function() {
 	return [camera.x,camera.y,camera.x+camera.width,camera.y+camera.height]
 }
-var ctx = canvas.getContext("2d");
 
 var mousex = canvas.width/2;
 var mousey = canvas.height/2;
@@ -559,8 +567,6 @@ function handleScroll(e) {
 canvas.addEventListener("mousewheel", handleScroll, false);
 canvas.addEventListener("DOMMouseScroll", handleScroll, false);
 
-var gfx = {}
-var gfx_loaded = {"default.js":true}
 
 function load_graphics_file(name) {
 	if (gfx_loaded[name]) {
@@ -586,20 +592,20 @@ function setQuality(q) {
 	if (renderQuality!=q) {
 		switch (q) {
 		case 0:
-			resFactor = .4;
-			window.onresize();
+			resFactor = 1;
+			graphicsChanged();
 			break;
 		case 1:
-			resFactor = .6;
-			window.onresize();
+			resFactor = 1;
+			graphicsChanged();
 			break;
 		case 2:
-			resFactor = .8;
-			window.onresize();
+			resFactor = 1;
+			graphicsChanged();
 			break;
 		case 3:
-			resFactor = .9;
-			window.onresize();
+			resFactor = 1;
+			graphicsChanged();
 			break;
 		}
 	}
@@ -652,7 +658,7 @@ function render() {
 		}
 	}
 	gfx.renderArea(ctx,canvas.width,canvas.height)
-	ctx.save()
+	
 
 	if (currentSock && currentSock.room && currentSock.room.myplayer) {
 		size = currentSock.room.myplayer.bbox()
@@ -685,8 +691,7 @@ function render() {
 
 		camera.xscale = canvas.width/camera.width
 		camera.yscale = canvas.height/camera.height
-		ctx.scale(camera.xscale,camera.yscale)
-		ctx.translate(-camera.x,-camera.y)
+		gfx.position(ctx, -camera.x,-camera.y, camera.xscale,camera.yscale)
 	}
 
 	
@@ -702,7 +707,7 @@ function render() {
 		currentSock.room.render(ctx)
 	}
 
-	ctx.restore()
+	gfx.done(ctx)
 
 
 
@@ -715,11 +720,6 @@ function render() {
 			}
 		}
 	}
-
-	ctx.strokeStyle = "rgba(30,60,80,.4)";
-	ctx.beginPath();
-	ctx.arc(mousex, mousey, 10, 0, 2 * Math.PI);
-	ctx.stroke();
 
 	if (currentSock && currentSock.room) {
 		draw_leaderboard(ctx,currentSock.room)

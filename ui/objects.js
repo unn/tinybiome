@@ -21,8 +21,10 @@ function player(room, id) {
 	this.room.players[id] = this
 	this.owns = {}
 	this.room.renderable["player"+this.id] = this
+	this.gfx = gfx.createGroup()
 }
 player.prototype.remove = function() {
+	this.gfx.free()
 	delete this.room.players[this.id]
 	delete this.room.renderable["player"+this.id]
 }
@@ -38,7 +40,7 @@ player.prototype.render = function(ctx) {
 	if (myActors.length>0) {
 		bbox = this.bbox()
 		n = this.name ? this.name : "Microbe"
-		gfx.renderGroup(ctx, bbox, n, mass, myActors)
+		this.gfx.update(bbox, n, mass, myActors)
 	}
 }
 var randomActorId = null;
@@ -115,6 +117,8 @@ function renderTile(room,x,y) {
 	this.clear = this.clearAny.bind(this)
 	this.visible = false
 	this.myplayer = null
+
+	this.cache = gfx.createRenderTile()
 }
 renderTile.prototype.add = function(particle) {
 	this.count += 1
@@ -156,10 +160,8 @@ renderTile.prototype.clearAny = function() {
 		this.visible = false
 		return
 	}
-	if (!this.canvas) {
-		delete this.canvas
-		console.log("FREEING",this.id)
-	}
+	this.cache.free()
+	console.log("FREEING",this.id)
 	this.dirty = true
 }
 renderTile.prototype.render = function(ctx) {
@@ -197,7 +199,8 @@ renderTile.prototype.render = function(ctx) {
 		myArea[3] = Math.min(myArea[3], screenArea[3])
 
 		// ctx.imageSmoothingEnabled = false
-	  	ctx.drawImage(this.canvas, this.x-tilePadding, this.y-tilePadding);
+		this.cache.render(ctx, this.x, this.y)
+	  	
 
 	  	sArea = [myArea[0]-this.x,myArea[1]-this.y,myArea[2]-this.x,myArea[3]-this.y]
 	  	tArea = [myArea[0]+tilePadding,myArea[1]+tilePadding,myArea[2]-tilePadding,myArea[3]-tilePadding]
@@ -217,30 +220,7 @@ renderTile.prototype.render = function(ctx) {
 	 }
 }
 renderTile.prototype.rerender = function() {
-	if (!(this.canvas)) {
-		console.log("CREATING RENDERTILE", this.id)
-		var m_canvas = document.createElement('canvas');
-
-		this.to = setTimeout(this.clear, 100)
-		m_canvas.width = renderTileSize + tilePadding*2;
-		m_canvas.height = renderTileSize + tilePadding*2;
-		var m_context = m_canvas.getContext('2d');
-		this.canvas = m_canvas
-		this.ctx = m_context
-	}
-
-	this.ctx.clearRect(0, 0, renderTileSize+tilePadding*2, renderTileSize+tilePadding*2);
-	this.ctx.save()
-	this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
-
-	for (id in this.renderables) {
-		objectToRender = this.renderables[id]
-		if (!this.contains(objectToRender.x,objectToRender.y))  {
-			console.log("WTF",this,objectToRender)
-		}
-		objectToRender.render(this.ctx)
-	}
-	this.ctx.restore()
+	this.cache(this.renderables)
 	this.dirty = false
 }
 renderTile.prototype.contains = function(x,y) {
@@ -286,9 +266,10 @@ function particle(id,room,x,y,color) {
 	this.color = color
 	this.room = room
 	this.room.particles[id] = this
+	this.gfx = gfx.createParticle()
 }
 particle.prototype.render = function(ctx) {
-	gfx.renderParticle(ctx, this.x, this.y, this.life, this.color)
+	this.gfx.update(this.x, this.y, this.life, this.color)
 }
 particle.prototype.step = function(seconds) {
 	this.life -= (10*16)*seconds
@@ -301,6 +282,7 @@ particle.prototype.step = function(seconds) {
 	if (this.life<=0) this.destroy()
 }
 particle.prototype.destroy = function() {
+	this.gfx.free()
 	this.room.particleCount -= 1
 	this.room.particles[this.id] = this.room.particles[this.room.particleCount]
 	this.room.particles[this.id].id = this.id
@@ -355,7 +337,6 @@ room.prototype.addParticle = function(x,y,color) {
 }
 room.prototype.render = function(ctx) {
 	start = (new Date())
-	gfx.renderRoom(ctx,this.width,this.height)
 
 	padding = 10
 	for (id in this.renderable) {
@@ -426,9 +407,11 @@ function pellet(room, x,y,style) {
 	mytile.add(this)
 	this._radius = 4
 	if (this.style==0) {
+		this.gfx = gfx.createMineral()
 		this.color = rgb(Math.random()*100,Math.random()*100,255)
 	}
 	if (this.style==1) {
+		this.gfx = gfx.createVitamin()
 		this.color = rgb(255,Math.random()*100,Math.random()*100)
 	}
 }
@@ -436,11 +419,7 @@ pellet.prototype.radius = function() {
 	return this._radius
 }
 pellet.prototype.render = function(ctx) {
-	if (this.style==0) {
-		gfx.renderMineral(ctx, this.x, this.y, this.color, this._radius)
-	} else {
-		gfx.renderVitamin(ctx, this.x, this.y, this.color, this._radius)
-	}
+	this.gfx.update(this.x, this.y, this.color, this._radius)
 }
 pellet.prototype.remove = function() {
 	for(var i=0;i<4;i+=1) {
@@ -451,6 +430,7 @@ pellet.prototype.remove = function() {
 		console.log(myTile)
 	}
 	myTile.remove(this)
+	this.gfx.free()
 }
 pellet.prototype.bbox = function() {
 	var r = this._radius
@@ -480,6 +460,8 @@ function actor(room, id, x, y) {
 
 	this.owner = null
 	this.inview = false
+
+	this.gfx = gfx.createActor()
 }
 
 actor.prototype.contains = function(actor) {
@@ -508,11 +490,11 @@ actor.prototype.postRender = function() {
 	dx = dx / dist * (dist-10)
 	dy = dy / dist * (dist-10)
 	if (this.owner == this.room.myplayer.id) {
-		ctx.strokeStyle = "rgba(30,60,80,.4)";
-		ctx.beginPath();
-		ctx.moveTo(onCanvasX, onCanvasY);
-	    ctx.lineTo(onCanvasX+dx, onCanvasY+dy);
-		ctx.stroke();
+		// ctx.strokeStyle = "rgba(30,60,80,.4)";
+		// ctx.beginPath();
+		// ctx.moveTo(onCanvasX, onCanvasY);
+	 //    ctx.lineTo(onCanvasX+dx, onCanvasY+dy);
+		// ctx.stroke();
 	}
 }
 actor.prototype.setmass = function(m) {
@@ -527,7 +509,7 @@ actor.prototype.render = function(ctx) {
 	// sqrt(a/pi) = r
 	this.color = "#000000";
 	n = "Something..?"
-	gfx.renderActor(ctx,this.x,this.y,this.color,n, Math.floor(this.mass),radius)
+	this.gfx.update(this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 
 }
 actor.prototype.step = function(seconds) {
@@ -569,6 +551,7 @@ actor.prototype.step = function(seconds) {
 	if (this.owner) if (this.owner.step) this.owner.step(seconds)
 }
 actor.prototype.remove = function() {
+	this.gfx.free()
 	delete this.room.renderable["b_a"+this.id]
 	delete this.room.steppers[this.id]
 	delete this.room.actors[this.id]
@@ -588,6 +571,7 @@ function playeractor(room, aid, pid) {
 		}
 	}
 	this.lastupdate = (new Date())
+	this.gfx = gfx.createPlayerActor()
 }
 playeractor.prototype.remove = function() {
 	delete this.room.players[this.owner].owns[this.actor.id]
@@ -596,6 +580,7 @@ playeractor.prototype.remove = function() {
 			document.getElementById("mainfloat").style.display="block";
 		}
 	}
+	this.gfx.free()
 }
 playeractor.prototype.step = function(seconds) {
 	if (this.owner==this.room.myplayer.id) {
@@ -648,7 +633,7 @@ playeractor.prototype.render = function(ctx) {
 	this.actor.color = this.owner==this.room.myplayer.id ? "#33FF33" : "#3333FF";
 	n = this.room.players[this.owner].name
 	n = n ? n : "Microbe"
-	gfx.renderActor(ctx,this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
+	this.gfx.update(this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
 }
 
 function virus(room, aid) {
@@ -656,9 +641,13 @@ function virus(room, aid) {
 	this.actor = this.room.actors[aid]
 	this.actor.owner = this
 	this.actor.color = red
+	this.gfx = gfx.createVirus()
 }
 virus.prototype.render = function(ctx) {
-	gfx.renderVirus(ctx, this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+	this.gfx.update(this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+}
+virus.prototype.remove = function() {
+	this.gfx.free()
 }
 
 function bacteria(room, aid) {
@@ -666,7 +655,11 @@ function bacteria(room, aid) {
 	this.actor = this.room.actors[aid]
 	this.actor.owner = this
 	this.actor.color = lightBlue
+	this.gfx = gfx.createBacteria()
 }
 bacteria.prototype.render = function(ctx) {
-	gfx.renderBacteria(ctx, this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+	this.gfx.update(this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+}
+bacteria.prototype.remove = function() {
+	this.gfx.free()
 }
