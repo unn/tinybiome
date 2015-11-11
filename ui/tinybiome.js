@@ -388,7 +388,7 @@ var graphicsCounts;
 var fps = 30;
 
 
-var renderQuality = 2;
+var renderQuality = 3;
 var lastFps = (new Date());
 var newFps = 0;
 function render() {
@@ -400,16 +400,16 @@ function render() {
 		fps = newFps
 		newFps = 0
 
-		if (fps>50) {
-			if (renderQuality < 3) {
-				renderQuality += 1
-			}
-		}
-		if (fps<30 + renderQuality*5) {
-			if (renderQuality > 0) {
-				renderQuality -= 1
-			}
-		}
+		// if (fps>50) {
+		// 	if (renderQuality < 3) {
+		// 		renderQuality += 1
+		// 	}
+		// }
+		// if (fps<30 + renderQuality*5) {
+		// 	if (renderQuality > 0) {
+		// 		renderQuality -= 1
+		// 	}
+		// }
 	}
 
 	renderCycles -= 1
