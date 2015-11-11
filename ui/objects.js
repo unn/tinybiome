@@ -55,6 +55,12 @@ player.prototype.bbox = function() {
 	for (i in this.owns) {
 		b = this.owns[i]
 		bb = b.bbox()
+		if (!bb) {
+			console.log("BB ERROR",bb)
+		}
+		if (isNaN(bb[0])) {
+			console.log("BB ERROR",bb)
+		}
 		if (bb[0]<x) x = bb[0]
 		if (bb[1]<y) y = bb[1]
 		if (bb[2]>xr) xr = bb[2]
@@ -69,17 +75,29 @@ player.prototype.bbox = function() {
 		}
 		a = actors[randomActorId]
 		if (!a) {
+			if (isNaN(x)) {
+				console.log("BB ERROR", x)
+			}
 			return [x/2-400,y/2-400,x/2+400,y/2+400]
 		}
 
 		bb = a.bbox()
+		if (!bb) {
+			console.log("BB ERROR",bb)
+		}
 		bb[0] -= 200
 		bb[1] -= 200
 		bb[2] += 200
 		bb[3] += 200
+		if (isNaN(bb[0])) {
+			console.log("BB ERROR",bb, a)
+		}
 		return bb
 	}
 
+	if (isNaN(x)) {
+		console.log("BB ERROR", x, y, xr, yr)
+	}
 	return [x-4,y-4,xr+4,yr+4]
 }
 
@@ -435,7 +453,6 @@ pellet.prototype.bbox = function() {
 actors = {}
 steppers = {}
 renderable = {}
-activeRenders = {}
 
 function actor(id, x, y) {
 	this.id = id
@@ -511,7 +528,7 @@ actor.prototype.step = function(seconds) {
 	this.mass = (this.newmass+this.mass*4)/5
 
 
-	room = currentRoom
+	var room = currentRoom
 
 	allowed = 500 / (room.speedmultiplier * Math.pow(this.mass + 50, .5))
 	distance = allowed * seconds * this.speed

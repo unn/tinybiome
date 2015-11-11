@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/ethicatech/tinybiome/client"
 	"golang.org/x/net/websocket"
@@ -13,6 +14,11 @@ import (
 
 func main() {
 	port := 3000
+	p := flag.Int("port", 3000, "Which port to run the server on")
+	flag.Parse()
+	if p != nil {
+		port = *p
+	}
 	d, e := websocket.Dial("ws://tinybio.me:4000", "", "http://server.go")
 	if e != nil {
 		log.Println("MASTER SERVER DOWN", e)

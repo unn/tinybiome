@@ -46,10 +46,10 @@ func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
 
 	s.Lock.Unlock()
 
-	log.Println("New Client", ip)
+	log.Println("CLIENT ENTERS", ip)
 	s.WSH.ServeHTTP(res, req)
 
-	log.Println("CLIENT LEAVING", ip)
+	log.Println("CLIENT EXITS", ip)
 	s.Lock.Lock()
 	s.IPS[ip] -= 1
 	s.Lock.Unlock()

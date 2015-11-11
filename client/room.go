@@ -353,12 +353,7 @@ func (p *Player) ReceiveUpdates() {
 }
 
 func (p *Player) SendUpdates() {
-	f := func() {
-		log.Println("TIMED OUT?")
-	}
-	t := time.AfterFunc(time.Second, f)
 	for {
-		t.Reset(time.Second)
 		e := p.Net.Flush()
 		if e != nil {
 			log.Println("ERROR SENDING", e)
@@ -424,6 +419,7 @@ func (p *Player) Split() {
 }
 func (p *Player) Join(name string) {
 	if !p.Synced {
+		log.Println("PLAYER NOT SYNCED YET", p)
 		return
 	}
 	r := p.room

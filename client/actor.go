@@ -206,6 +206,7 @@ func (a *Actor) Tick(d time.Duration) {
 
 func (a *Actor) Write(p ProtocolDown) {
 	p.WriteNewActor(a)
+	p.WriteSetMassActor(a)
 }
 
 func (a *Actor) String() string {

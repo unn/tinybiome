@@ -36,7 +36,8 @@ function server(location) {
 			new sock(d.address);
 		}
 		if (d.meth=="rem") {
-			self.removeServer(d.address)
+			s = self.findServer(d.address)
+			self.removeServer(s)
 		}
 	}
 }
@@ -45,26 +46,35 @@ server.prototype.connectTo = function(sock) {
 	if (currentSock) {
 		currentSock.dc()
 	}
-	currentSock = this.servers[0]
-	currentSock.writeSync()
+	currentSock = sock
+	if (currentSock.connected) {
+		currentSock.writeSync()
+	}
 }
 server.prototype.addServer = function(sock) {
 	this.servers.push(sock)
 	this.ensureConnected()
 }
 server.prototype.ensureConnected = function() {
+	console.log("EC",currentSock)
 	if (!currentSock) {
 		if (this.servers.length>=1) {
-			currentSock = this.servers[0]
-			currentSock.writeSync()
+			this.connectTo(this.servers[0])
+		}
+	}
+	console.log("EC",currentSock.connected,currentSock)
+}
+server.prototype.findServer = function(location) {
+	for(var i=0;i<this.servers;i+=1) {
+		if (this.servers[i].location == location) {
+			return this.servers[i]
 		}
 	}
 }
-server.prototype.removeServer = function(location) {
+server.prototype.removeServer = function(sock) {
 	for(var i=0;i<this.servers;i+=1) {
-		if (this.servers[i].location == d.add) {
+		if (this.servers[i] == sock) {
 			this.servers.splice(i, 1);
-			this.servers[i].myremove()
 			break
 		}
 	}
@@ -115,6 +125,8 @@ function sock(location) {
 	this.myremove = this.remove.bind(this)
 	this.ws.onopen = function() {
 		self.connected = true
+		if (currentSock==self)
+			self.writeSync()
 		console.log("CONNECTED TO",location)
 		self.mytick()
 		servers.addServer(self)
@@ -135,16 +147,18 @@ sock.prototype.dc = function() {
 		currentSock=null
 	}
 	this.ws.close()
+	this.connected = false
 }
 sock.prototype.remove = function() {
+	if (currentSock==this) {
+		currentSock=null
+	}
 	console.log("REMOVING", this)
-	servers.removeServer(this.location)
-	this.connected = false
+	servers.removeServer(this)
 	document.getElementById("serverlist").removeChild(this.ele)
 	new sock(this.location)
 }
 sock.prototype.tick = function() {
-	console.log("TICK",this)
 	if (this.connected) {
 		this.writePing()
 		setTimeout(this.mytick,1000);
@@ -196,7 +210,7 @@ sock.prototype.handleNewRoom = function(dv, off) {
 		newroom.sizemultiplier = dv.getFloat32(off+17, true)
 		newroom.speedmultiplier = dv.getFloat32(off+21, true)
 		
-		console.log("NEW ROOM",{width:width,height:height,sm:newroom.sizemultiplier})
+		console.log("NEW ROOM",{width:width,height:height,sm:newroom.sizemultiplier,mass:newroom.startmass})
 		return off + 25
 }
 sock.prototype.handleNewActor = function(dv, off) {
@@ -389,6 +403,10 @@ sock.prototype.writeSplit = function() {
 	this.ws.send(sab)
 }
 sock.prototype.writeSync = function() {
+	console.log("SYNCING",this.location)
+	actors = {}
+	renderable = {}
+	steppers = {}
 	sab = new DataView(new ArrayBuffer(1))
 	sab.setUint8(0,3,true)
 	this.ws.send(sab)
@@ -487,6 +505,9 @@ document.onkeydown = function(e) {
     if (e.keyCode == '144') {
     	debugMode = true
     }
+    if (e.keyCode == '27') {
+
+    }
     if (debugMode) {
 		if (e.keyCode == '68') {
 	    	load_graphics_file("dark.js")
@@ -574,16 +595,16 @@ function render() {
 		fps = newFps
 		newFps = 0
 
-		if (fps>55) {
-			if (renderQuality < maxQuality) {
-				setQuality(renderQuality+1)
-			}
-		}
-		if (fps<30 + renderQuality*5) {
-			if (renderQuality > 0) {
-				setQuality(renderQuality-1)
-			}
-		}
+		// if (fps>55) {
+		// 	if (renderQuality < maxQuality) {
+		// 		setQuality(renderQuality+1)
+		// 	}
+		// }
+		// if (fps<30 + renderQuality*5) {
+		// 	if (renderQuality > 0) {
+		// 		setQuality(renderQuality-1)
+		// 	}
+		// }
 	}
 
 	renderCycles -= 1
@@ -616,6 +637,9 @@ function render() {
 
 	if (myplayer) {
 		size = myplayer.bbox()
+		if (Math.random()<.01) {
+			console.log("CAMERA",size)
+		}
 		size[0] -= camPad
 		size[1] -= camPad
 		size[2] += camPad
