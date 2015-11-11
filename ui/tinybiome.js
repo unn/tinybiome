@@ -1,3 +1,5 @@
+"use strict"
+
 var currentSock;
 
 var tileSize = 50;
@@ -480,6 +482,8 @@ var popup;
 window.onload = function() {
 	servers = new server(document.location.hostname+":4000")
 	setQuality(maxQuality-1)
+	renderBackground = gfx.createRenderBackground(ctx)
+	renderLeaderBoard = gfx.createLeaderBoard({stage:ctx.top})
 	window.requestAnimationFrame(render)
 	graphicsChanged();
 	document.getElementById("loginButton").onclick = function() {
@@ -611,6 +615,9 @@ function setQuality(q) {
 	}
 	renderQuality=q
 }
+// var renderArea = gfx.createRenderArea(ctx)
+var renderBackground
+var renderLeaderBoard
 function render() {
 	window.requestAnimationFrame(render)
 	newFps += 1
@@ -657,7 +664,7 @@ function render() {
 			return
 		}
 	}
-	gfx.renderArea(ctx,canvas.width,canvas.height)
+	// renderArea.update(ctx,canvas.width,canvas.height)
 	
 
 	if (currentSock && currentSock.room && currentSock.room.myplayer) {
@@ -701,7 +708,13 @@ function render() {
 	w = x + camera.width > room.width ? room.width - x : camera.width
 	h = y + camera.height > room.height ? room.height - y : camera.height 
 
-	gfx.renderBackground(ctx, x, y, w, h)
+	x = camera.x
+	y = camera.y
+	w = camera.width
+	h = camera.height 
+
+
+	renderBackground.update(x, y, w, h)
 
 	if (currentSock && currentSock.room) {
 		currentSock.room.render(ctx)
@@ -743,7 +756,7 @@ function draw_leaderboard(ctx, room) {
 		}
 	}
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
-	gfx.renderLeaderBoard(ctx, playersWithScore, canvas.width-400, 0, 400, 800, total)
+	renderLeaderBoard.update(playersWithScore, canvas.width-400, 0, 400, 800, total)
 }
 
 // utils

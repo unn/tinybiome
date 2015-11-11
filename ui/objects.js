@@ -1,18 +1,20 @@
+"use strict"
+
 var hidingBbox = true;
 
-var renderTileSize = 128;
+var renderTileSize = 250;
 var tilePadding = 5;
 
-var darkGreen = "#303C00";
-var lightGreen = "#B4CC48";
-var red = "#840000";
-var green = "#788418";
-var orange = "#CC480C";
-var lightBlue = "#9CC0CC";
-var fadedRed = "#B46C6C";
-var sand = "#F0E49C";
-var deepBlue = "#3C6C78";
-var brightOrange = "#FCA800";
+var darkGreen = 0x303C00;
+var lightGreen = 0xB4CC48;
+var red = 0x840000;
+var green = 0x788418;
+var orange = 0xCC480C;
+var lightBlue = 0x9CC0CC;
+var fadedRed = 0xB46C6C;
+var sand = 0xF0E49C;
+var deepBlue = 0x3C6C78;
+var brightOrange = 0xFCA800;
 
 
 function player(room, id) {
@@ -21,12 +23,15 @@ function player(room, id) {
 	this.room.players[id] = this
 	this.owns = {}
 	this.room.renderable["player"+this.id] = this
-	this.gfx = gfx.createGroup()
+	this.gfx = gfx.createGroup(pix)
 }
 player.prototype.remove = function() {
 	this.gfx.free()
 	delete this.room.players[this.id]
 	delete this.room.renderable["player"+this.id]
+}
+player.prototype.free = function() {
+	this.gfx.free()
 }
 player.prototype.render = function(ctx) {
 	myActors = []
@@ -85,6 +90,7 @@ player.prototype.bbox = function() {
 		if (!bb) {
 			console.log("BB ERROR",bb)
 		}
+		bb = [bb[0],bb[1],bb[2],bb[3]]
 		bb[0] -= 200
 		bb[1] -= 200
 		bb[2] += 200
@@ -114,11 +120,8 @@ function renderTile(room,x,y) {
 	this.dirty = false
 	this.room = room
 	this.freeadd = true
-	this.clear = this.clearAny.bind(this)
 	this.visible = false
-	this.myplayer = null
-
-	this.cache = gfx.createRenderTile()
+	this.gfx = gfx.createRenderTile(pix)
 }
 renderTile.prototype.add = function(particle) {
 	this.count += 1
@@ -128,44 +131,18 @@ renderTile.prototype.add = function(particle) {
 	}
 
 	this.renderables[particle.id] = particle
+	particle.render({stage:this.gfx.container})
 
-
-	if (this.freeadd && false) {
-		// TODO: figure out why this optimization doesn't work
-		this.ctx.save()
-		this.scale(camera.xscale,camera.yscale)
-		this.translate(-camera.x,-camera.y)
-		this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
-		particle.render(this.ctx)
-		this.ctx.restore()
-	} else {
-		this.dirty = true
-	}
-
+}
+renderTile.prototype.free = function() {
+	this.gfx.free()
 }
 renderTile.prototype.remove = function(particle) {
-	this.count -= 1
-	if (this.count<0) this.count=0
-	if (!this.renderables[particle.id]) {
-		console.log("NOT FOUND PELLET", particle.id)
-	} else {
-
-	}
+	this.free()
 	delete this.renderables[particle.id]
-	this.dirty = true
-}
-renderTile.prototype.clearAny = function() {
-	this.to = setTimeout(this.clear, 100)
-	if (this.visible) {
-		this.visible = false
-		return
-	}
-	this.cache.free()
-	console.log("FREEING",this.id)
-	this.dirty = true
 }
 renderTile.prototype.render = function(ctx) {
-	this.visible = true
+	this.gfx.update()
 
 	if (Math.random()*1000<Object.keys(this.renderables).length) {
 		r = pickRandomProperty(this.renderables)
@@ -175,37 +152,7 @@ renderTile.prototype.render = function(ctx) {
 		}
 	}
 
-	density = this.count / (renderTileSize*renderTileSize)
-	if (density < .001 * renderQuality  ) {
-		for(i in this.renderables) {
-			r = this.renderables[i]
-			bbox = r.bbox()
-			if (bbox[2] < camera.x - padding || bbox[3] < camera.y - padding
-				|| bbox[0] > camera.x + camera.width + padding
-				|| bbox[1] > camera.y + camera.height + padding)
-				continue
-			r.render(ctx)
-		}
-	} else {
 
-		if (this.dirty) {
-			this.rerender()
-		}
-		myArea = this.bbox()
-		screenArea = camera.bbox()
-		myArea[0] = Math.max(myArea[0], screenArea[0])
-		myArea[1] = Math.max(myArea[1], screenArea[1])
-		myArea[2] = Math.min(myArea[2], screenArea[2])
-		myArea[3] = Math.min(myArea[3], screenArea[3])
-
-		// ctx.imageSmoothingEnabled = false
-		this.cache.render(ctx, this.x, this.y)
-	  	
-
-	  	sArea = [myArea[0]-this.x,myArea[1]-this.y,myArea[2]-this.x,myArea[3]-this.y]
-	  	tArea = [myArea[0]+tilePadding,myArea[1]+tilePadding,myArea[2]-tilePadding,myArea[3]-tilePadding]
-
-	  }
   	// TODO: try optimizing drawImage to clip within camera area
 	// ctx.drawImage(this.canvas, sArea[0], sArea[1], sArea[2]-sArea[0],sArea[3]-sArea[1],
 	// 	tArea[0], tArea[1], tArea[2]-tArea[0],tArea[3]-tArea[1])
@@ -220,7 +167,16 @@ renderTile.prototype.render = function(ctx) {
 	 }
 }
 renderTile.prototype.rerender = function() {
-	this.cache(this.renderables)
+	for(i in this.renderables) {
+		r = this.renderables[i]
+		bbox = r.bbox()
+		if (bbox[2] < camera.x - padding || bbox[3] < camera.y - padding
+			|| bbox[0] > camera.x + camera.width + padding
+			|| bbox[1] > camera.y + camera.height + padding)
+			continue
+		r.render(ctx)
+	}
+
 	this.dirty = false
 }
 renderTile.prototype.contains = function(x,y) {
@@ -266,7 +222,7 @@ function particle(id,room,x,y,color) {
 	this.color = color
 	this.room = room
 	this.room.particles[id] = this
-	this.gfx = gfx.createParticle()
+	this.gfx = gfx.createParticle(pix)
 }
 particle.prototype.render = function(ctx) {
 	this.gfx.update(this.x, this.y, this.life, this.color)
@@ -353,9 +309,9 @@ room.prototype.render = function(ctx) {
 				if (isTile) {
 					graphicsCounts.tileSkips += 1
 				}
+				objectToRender.free()
 				continue
 			}
-
 		}
 		objectToRender.render(ctx)
 		if (isTile) {
@@ -404,22 +360,29 @@ function pellet(room, x,y,style) {
 	if (!mytile.contains(x,y)) {
 		console.log("WTF", this.id,mytile)
 	}
-	mytile.add(this)
 	this._radius = 4
-	if (this.style==0) {
-		this.gfx = gfx.createMineral()
-		this.color = rgb(Math.random()*100,Math.random()*100,255)
+	mytile.add(this)
+	if (!this.gfx) {
+		console.log("GFS",this.gfx)
 	}
-	if (this.style==1) {
-		this.gfx = gfx.createVitamin()
-		this.color = rgb(255,Math.random()*100,Math.random()*100)
-	}
+	this.style = style
 }
 pellet.prototype.radius = function() {
 	return this._radius
 }
 pellet.prototype.render = function(ctx) {
+	if (this.style==0) {
+		this.gfx = gfx.createMineral(ctx)
+		this.color = fromRgb(Math.random()*100,Math.random()*100,255)
+	}
+	if (this.style==1) {
+		this.gfx = gfx.createVitamin(ctx)
+		this.color = fromRgb(255,Math.random()*100,Math.random()*100)
+	}
 	this.gfx.update(this.x, this.y, this.color, this._radius)
+}
+pellet.prototype.free = function() {
+	this.gfx.free()
 }
 pellet.prototype.remove = function() {
 	for(var i=0;i<4;i+=1) {
@@ -461,7 +424,8 @@ function actor(room, id, x, y) {
 	this.owner = null
 	this.inview = false
 
-	this.gfx = gfx.createActor()
+	this.gfx = gfx.createActor(pix)
+	this.bb = []
 }
 
 actor.prototype.contains = function(actor) {
@@ -476,10 +440,13 @@ actor.prototype.contains = function(actor) {
 }
 actor.prototype.bbox = function() {
 	r = this.radius()
-	bb = [this.x-r, this.y-r, this.x+r, this.y+r]
+	this.bb[0] = this.x-r
+	this.bb[1] = this.y-r
+	this.bb[2] = this.x+r
+	this.bb[3] = this.y+r
 	// [2707.2190938111135, 3086.8755672544276, 2718.5028854820685, 3098.1593589253825] 
 	// Object {x: 2237.860989646591, y: 2852.517463089905, width: 950, height: 480}
-	return bb
+	return this.bb
 }
 actor.prototype.postRender = function() {
 	onCanvasX = (this.x - camera.x)*camera.xscale
@@ -512,6 +479,7 @@ actor.prototype.render = function(ctx) {
 	this.gfx.update(this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 
 }
+actor.prototype.free = function() {}
 actor.prototype.step = function(seconds) {
 	this.mass = (this.newmass+this.mass*4)/5
 
@@ -571,7 +539,7 @@ function playeractor(room, aid, pid) {
 		}
 	}
 	this.lastupdate = (new Date())
-	this.gfx = gfx.createPlayerActor()
+	this.gfx = gfx.createPlayerActor(pix)
 }
 playeractor.prototype.remove = function() {
 	delete this.room.players[this.owner].owns[this.actor.id]
@@ -580,6 +548,9 @@ playeractor.prototype.remove = function() {
 			document.getElementById("mainfloat").style.display="block";
 		}
 	}
+	this.gfx.free()
+}
+playeractor.prototype.free = function() {
 	this.gfx.free()
 }
 playeractor.prototype.step = function(seconds) {
@@ -630,7 +601,7 @@ playeractor.prototype.render = function(ctx) {
 	radius = this.actor.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	this.actor.color = this.owner==this.room.myplayer.id ? "#33FF33" : "#3333FF";
+	this.actor.color = this.owner==this.room.myplayer.id ? 0x33FF33 : 0x3333FF;
 	n = this.room.players[this.owner].name
 	n = n ? n : "Microbe"
 	this.gfx.update(this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
@@ -640,13 +611,16 @@ function virus(room, aid) {
 	this.room = room
 	this.actor = this.room.actors[aid]
 	this.actor.owner = this
-	this.actor.color = red
-	this.gfx = gfx.createVirus()
+	this.actor.color = 0xFF0000
+	this.gfx = gfx.createVirus(pix)
 }
 virus.prototype.render = function(ctx) {
 	this.gfx.update(this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 }
 virus.prototype.remove = function() {
+	this.gfx.free()
+}
+virus.prototype.free = function() {
 	this.gfx.free()
 }
 
@@ -655,11 +629,14 @@ function bacteria(room, aid) {
 	this.actor = this.room.actors[aid]
 	this.actor.owner = this
 	this.actor.color = lightBlue
-	this.gfx = gfx.createBacteria()
+	this.gfx = gfx.createBacteria(pix)
 }
 bacteria.prototype.render = function(ctx) {
 	this.gfx.update(this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 }
 bacteria.prototype.remove = function() {
+	this.gfx.free()
+}
+bacteria.prototype.free = function() {
 	this.gfx.free()
 }

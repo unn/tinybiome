@@ -1,3 +1,5 @@
+"use strict"
+
 var cellImg = new Image();
 cellImg.onload = function() {
 	cellImg.loaded = true
@@ -18,374 +20,25 @@ mPlier = 4
 var tileSize = 100;
 
 var pix = {
+	top: new PIXI.Container(),
 	stage: new PIXI.Container(),
 	scale: new PIXI.Container()
 }
 pix.scale.addChild(pix.stage)
+pix.top.addChild(pix.scale)
 
 gfx.getContext = function(canvas) {
-	pix.renderer = PIXI.autoDetectRenderer(canvas.width, canvas.height, {view:canvas})
+	if (!pix.renderer) {
+		pix.renderer = PIXI.autoDetectRenderer(canvas.width, canvas.height, {view:canvas})
+	} else {
+		pix.renderer.resize(canvas.width, canvas.height);
+	}
 	return pix
 }
 
-// return an object with a .free(), .cache(particles), and .render(ctx, x, y)
-gfx.renderTile = function() {
-	return {
-		free: function(){},
-		cache: function(){},
-		render: function(){}
-	}
-	// return {
-	// 	free: function() {
-	// 		if (this.canvas) {
-	// 			delete this.canvas
-	// 		}
-	// 	},
-	// 	cache: function(renderables) {
-	// 		if (!(this.canvas)) {
-	// 			console.log("CREATING RENDERTILE", this.id)
-	// 			var m_canvas = document.createElement('canvas');
-
-	// 			this.to = setTimeout(this.clear, 100)
-	// 			m_canvas.width = renderTileSize + tilePadding*2;
-	// 			m_canvas.height = renderTileSize + tilePadding*2;
-	// 			var m_context = m_canvas.getContext('webgl');
-	// 			this.canvas = m_canvas
-	// 			this.ctx = m_context
-	// 		}
-
-	// 		this.ctx.clearRect(0, 0, renderTileSize+tilePadding*2, renderTileSize+tilePadding*2);
-	// 		this.ctx.save()
-	// 		this.ctx.translate(-this.x+tilePadding,-this.y+tilePadding)
-
-	// 		for (id in this.renderables) {
-	// 			objectToRender = this.renderables[id]
-	// 			objectToRender.render(this.ctx)
-	// 		}
-	// 		this.ctx.restore()
-	// 	},
-	// 	render: function(ctx,x,y) {
-	// 		ctx.drawImage(this.canvas, x, y);
-	// 	}
-	// }
-}
-
-
-
-gfx.renderRoom = function(ctx, width, height) {
-	// ctx.strokeStyle = "black";
-	// ctx.strokeRect(0, 0, width, height);
-}
-
-gfx.renderArea = function(ctx, width, height) {
-	// ctx.clearRect(0,0,width, height);
-}
-
-gfx.renderBackground = function(ctx, x, y, width, height) {
-	// ctx.strokeStyle = "lightgray";
-	// offsetX = x % tileSize;
-	// offsetY = y % tileSize;
-	// ctx.beginPath();
-
-
-	// for (var curX=x-offsetX; curX<x+width+tileSize-offsetX; curX+=tileSize) {
-	// 	ctx.moveTo(curX,y);
-	// 	ctx.lineTo(curX,y+height);
-	// }
-	// for (var curY=Math.max(y-offsetY,0); curY<y+height+tileSize-offsetY; curY+=tileSize) {
-	// 	ctx.moveTo(x,curY);
-	// 	ctx.lineTo(x+width,curY);
-	// }
-	// ctx.stroke();
-}
-
-gfx.renderParticle = function(ctx, x, y, life, color) {
-	// if (renderQuality<1) {
-	// 	return
-	// }
-	// ctx.fillStyle = color;
-	// ctx.beginPath();
-	// r = life/50
-	// ctx.moveTo(x,y-r)
-	// if (renderQuality<2) {
-	// 	ctx.lineTo(x-r,y)
-	// 	ctx.lineTo(x,y+r)
-	// 	ctx.lineTo(x+r,y)
-	// 	ctx.lineTo(x,y-r)
-	// } else {
-	// 	ctx.lineTo(x-r*.8,y-r*.55)
-	// 	ctx.lineTo(x-r*.8,y+r*.55)
-	// 	ctx.lineTo(x,y+r)
-	// 	ctx.lineTo(x+r*.8,y+r*.55)
-	// 	ctx.lineTo(x+r*.8,y-r*.55)
-	// 	ctx.lineTo(x,y-r)
-	// }
-	// ctx.fill();
-}
-
-gfx.renderGroup = function(ctx, bbox, name, mass, players) {
-	// w = bbox[2]-bbox[0]
-	// h = bbox[3]-bbox[1]
-	// x = bbox[0]
-	// y = bbox[1]
-	// textX = x+w/2
-	// textY = y
-
-	// size = 12
-	// if (28*camera.yscale<150) {
-	// 	size = 17
-	// }
-	// if (28*camera.yscale<70) {
-	// 	size = 24
-	// }
-	// if (28*camera.yscale<20) {
-	// 	size = 30
-	// }
-
-
-	// ctx.lineWidth = 1;
-	// ctx.textAlign = "center";
-	// ctx.fillStyle = "white";
-	// ctx.strokeStyle = "black"
-	// ctx.font = fontPrefix+size+"px "+font;
-
-	// if (y+n/2>camera.y+camera.height/3*2) {
-	// 	textX = n
-	// 	textY = textY
-	// 	ctx.textBaseline = "bottom";
-	// 	ctx.fillText(name, textX, textY)
-	// 	ctx.strokeText(name, textX, textY)
-	// } else {
-	// 	textX = textX
-	// 	textY = y + h
-	// 	ctx.textBaseline = "top";
-	// 	ctx.fillText(name, textX, textY)
-	// 	ctx.strokeText(name, textX, textY)
-	// }
-
- // 	ctx.lineWidth = .3;
- // 	ctx.strokeStyle = players[0].color
- // 	ctx.strokeRect(x,y,w,h)
-}
-
-gfx.renderBacteria = function(ctx, x, y, color, mass, radius) {
-	// ctx.save();
-	// ctx.beginPath();
-	// bubbles = 6
-	// ca = Math.PI*2/(bubbles)
-	// for(var i=0; i<=bubbles; i++) {
-	// 	a = (x+y)/20+i*ca
-	// 	if (i==0) {
-	// 		ctx.moveTo(x+radius*.7*Math.cos(a), y+radius*.7*Math.sin(a))
-	// 	} else {
-	// 		ex = x+radius*.7*Math.cos(a)
-	// 		ey = y+radius*.7*Math.sin(a)
-	// 		if (renderQuality>1) {
-	// 			mx = x+radius*Math.cos(a-ca/2)
-	// 			my = y+radius*Math.sin(a-ca/2)
-	// 			ctx.quadraticCurveTo(mx,my,ex,ey)
-	// 		} else {
-	// 			mx = x+radius*.8*Math.cos(a-ca/2)
-	// 			my = y+radius*.8*Math.sin(a-ca/2)
-	// 			ctx.lineTo(mx,my)
-	// 			ctx.lineTo(ex,ey)
-	// 		}
-	// 	}
-
-	// }
-	// ctx.clip();
-
-	// gfx.renderCell(ctx, x, y, color, radius)
-
-	// ctx.restore();
-}
-
-gfx.renderVirus = function(ctx, x, y, color, mass, radius) {
-	// ctx.save();
-	// ctx.beginPath();
-	// d = 1
-	// spikes = 8
-	// if (renderQuality<2) {
-	// 	spikes = 6
-	// }
-	// ca = Math.PI*2/(spikes*2)
-	// for(var i=0; i<=spikes*2; i++) {
-	// 	a = (x+y)/20+i*ca
-	// 	if (i==0) {
-	// 		ctx.moveTo(x+radius*d*Math.cos(a), y+radius*d*Math.sin(a))
-	// 	} else {
-	// 		ctx.lineTo(x+radius*d*Math.cos(a), y+radius*d*Math.sin(a))
-	// 	}
-	// 	if (d==1) d=.65
-	// 	else d=1
-	// }
-	// ctx.clip();
-
-	// gfx.renderCell(ctx, x, y, color, radius)
-
-	// ctx.restore();
-
-}
-
-gfx.renderActor = function(ctx, x, y, color, mass, radius) {
-	// ctx.save();
-	// ctx.beginPath();
-	// ctx.arc(x, y, radius, 0, 2 * Math.PI);
-	// ctx.clip();
-
-	// gfx.renderCell(ctx, x, y, color, radius)
-
-
-
-	// ctx.restore();
-}
-
-gfx.renderCell = function(ctx, x, y, color, radius) {
-	// if (renderQuality>0) {
-	// 	if (cellImg.loaded) {
-	// 		if (!cellImg.pattern) {
-	// 			cellImg.pattern = ctx.createPattern(cellImg, 'repeat');
-	// 		}
-	// 		ctx.fillStyle = cellImg.pattern;
-	// 		pX = x-radius
-	// 		pY = y-radius
-	// 		sX = radius*2
-	// 		sY = radius*2
-	// 		pX = Math.floor(pX/cellImgWidth)*cellImgWidth
-	// 		pY = Math.floor(pY/cellImgHeight)*cellImgHeight
-	// 		sX = Math.floor((pX+sX)/cellImgWidth)*cellImgWidth
-	// 		sY = Math.floor((pY+sY)/cellImgHeight)*cellImgHeight
-	// 		ctx.save()
-	// 		ctx.translate(x-radius,y-radius);
-	// 		ctx.scale(.3,.3)
-	// 		ctx.fillRect(0,0,(radius*2/.3),(radius*2/.3));
-	// 		// ctx.translate(-(x-radius),-(y-radius));
-	// 		ctx.restore()
-	// 	}
-
-
-	// 	ctx.globalCompositeOperation = "multiply";
-	// 	ctx.fillStyle = color;
-	// 	ctx.fillRect(x-radius,y-radius,radius*2,radius*2)
-	// 	ctx.fill();
-	// 	ctx.globalCompositeOperation = "source-over";
-	// } else {
-	// 	ctx.fillStyle = color;
-	// 	ctx.fillRect(x-radius,y-radius,radius*2,radius*2)
-	// 	ctx.fill();
-	// }
-
-	// ctx.lineWidth = .5+radius*.01;
-	// ctx.strokeStyle = color;
-	// ctx.beginPath();
-	// ctx.arc(x, y, radius, 0, 2 * Math.PI);
-	// ctx.stroke();
-}
-
-var frame = 0;
-gfx.renderVitamin = function(ctx, x, y, color, radius) {
-
-	// var bunny = new PIXI.Sprite(texture);
-
-	// // center the sprites anchor point
-	// bunny.anchor.x = 0.5;
-	// bunny.anchor.y = 0.5;
-
-	// // move the sprite t the center of the screen
-	// bunny.position.x = 150;
-	// bunny.position.y = 150;
-
-
-	// ctx.stage.addChild(bunny);
-
-	// ctx.beginPath();
-	// ctx.fillStyle = color;
-	// r = radius
-
-	// parts = 8
-	// if (renderQuality<3) {
-	// 	parts = 6
-	// }
-	// if (renderQuality<2) {
-	// 	parts = 4
-	// }
-	// if (renderQuality<1) {
-	// 	parts = 3
-	// }
-	// ca = Math.PI*2/(parts)
-	// for(var i=0; i<=parts; i++) {
-	// 	a = Math.PI*2*frame/1000+i*ca
-	// 	if (i==0) {
-	// 		ctx.moveTo(x+radius*Math.cos(a), y+radius*Math.sin(a))
-	// 	} else {
-	// 		ctx.lineTo(x+radius*Math.cos(a), y+radius*Math.sin(a))
-	// 	}
-	// }
-
-	// ctx.fill();
-}
-
-gfx.renderMineral = function(ctx, x, y, color, radius) {
-	// ctx.beginPath();
-	// ctx.fillStyle = color;
-	// r = radius
-	// ctx.moveTo(x,y-r)
-	// ctx.lineTo(x-r,y)
-	// ctx.lineTo(x,y+r)
-	// ctx.lineTo(x+r,y)
-	// ctx.lineTo(x,y-r)
-	// ctx.fill();
-}
-
-gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height, connected) {
-	// frame += 1;
-	// if (frame>1000) {
-	// 	frame = 0
-	// }
-	// ctx.textAlign = "right";
-	// ctx.textBaseline = "top";
-	// ctx.fillStyle = "white";
-	// ctx.strokeStyle = "black"
-
-	// total = leaders.length
-	// if (leaders.length <= 0) {
-	// 	return
-	// }
-	// if (leaders.length > 8) {
-	// 	leaders.length = 8
-	// }
-
-	// l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+Math.floor(currentSock.latency*10)/10+"ms"
-
-	// nPxHeight = 14;
-	// ctx.lineWidth = .4;
-	// ctx.font = fontPrefix+nPxHeight+"px "+font;
-	// ctx.fillText(l, x+width,0)
-	// ctx.strokeText(l, x+width,0)
-
-	// pxHeight = 20
-	// ctx.font = fontPrefix+pxHeight+"px "+font;
-
-	// ctx.lineWidth = .7;
-	// l = "Top "+leaders.length+":"
-	// ctx.fillText(l, x+width,nPxHeight)
-	// ctx.strokeText(l, x+width,nPxHeight)
-
-	// for(var i=0; i<leaders.length; i+=1) {
-	// 	n = leaders[i][0]
-
-	// 	ctx.fillText(n, x+width - 200,i*pxHeight+nPxHeight+pxHeight)
-	// 	ctx.strokeText(n, x+width - 200,i*pxHeight+nPxHeight+pxHeight)
-
-	// 	m = leaders[i][1]
-
-	// 	ctx.fillText(m, x+width,i*pxHeight+pxHeight+nPxHeight)
-	// 	ctx.strokeText(m, x+width,i*pxHeight+pxHeight+nPxHeight)
-	// }
-	
-}
-
 gfx.position = function(ctx, x, y, xscale, yscale) {
+	// x -= 50
+	// y -= 50
 	ctx.scale.scale.x = xscale
 	ctx.scale.scale.y = yscale
 	ctx.stage.position.x = x
@@ -397,51 +50,162 @@ gfx.position = function(ctx, x, y, xscale, yscale) {
 
 gfx.done = function(ctx) {
 	// console.log("DONE")
-	ctx.renderer.render(ctx.scale)
+	ctx.renderer.render(ctx.top)
 }
 
-function fromRgb(r,g,b) {
-	return r*255*255+g*255+b
+
+
+gfx.createRenderBackground = function(pix) {
+	var g = new PIXI.Graphics();
+	pix.stage.addChild(g)
+	return {update:function(x,y,w,h) {
+		g.clear();
+		g.beginFill(0xFFFFFF,1)
+		g.drawRect(x,y,w,h)
+		g.endFill()
+	}, free:function(){}}
 }
 
-gfx.createGroup = function() { // (ctx, bbox, n, mass, myActors)
-	return {update:function(){},free:function(){}}
+gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
+	var last;
+	return {update:function(bbox,n,mass,myActors){
+		// if (last) {
+		// 	pix.stage.removeChild(last)
+		// }
+		// last = new PIXI.Container()
+
+		// var text = new PIXI.Text(n,{
+		// 	font: '24px Arial', 
+		// 	stroke: "black", 
+		// 	fill: "white", 
+		// 	strokeThickness: 1});
+
+		// last.addChild(text)
+		// last.position.x = bbox[0]
+		// last.position.y = bbox[1]
+
+		// text.anchor.x = .5;
+		// text.position.x = (bbox[2]-bbox[0])/2
+		// text.position.y = bbox[3]-bbox[1]
+		// pix.stage.addChild(last)
+
+	},free:function(){
+		pix.stage.removeChild(last)
+	}}
 }
 
-gfx.createRenderTile = function() {
-	return {update:function(){},free:function(){}}
+var frame = 0
+gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
+	var last;
+	return {update:function(leaders,x, y, width, height, connected){
+		// if (last) {
+		// 	pix.stage.removeChild(last)
+		// }
+		// last = new PIXI.Container()
+
+		// frame += 1;
+		// if (frame>1000) {
+		// 	frame = 0
+		// }
+
+		// total = leaders.length
+		// if (leaders.length <= 0) {
+		// 	return
+		// }
+		// if (leaders.length > 8) {
+		// 	leaders.length = 8
+		// }
+
+		// l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+Math.floor(currentSock.latency*10)/10+"ms"
+
+		// nPxHeight = 14;
+		// var text = new PIXI.Text(l,{
+		// 	font: '24px Arial', 
+		// 	stroke: "black", 
+		// 	fill: "white", 
+		// 	strokeThickness: 1});
+		// text.anchor.x = 1;
+		// text.position.x = x+width
+		// text.position.y = 0
+		// last.addChild(text)
+
+		// pxHeight = 20
+
+		// ctx.lineWidth = .7;
+		// l = "Top "+leaders.length+":"
+		// var text = new PIXI.Text(l,{
+		// 	font: '24px Arial', 
+		// 	stroke: "black", 
+		// 	fill: "white", 
+		// 	strokeThickness: 1});
+		// text.anchor.x = 1;
+		// text.position.x = x+width
+		// text.position.y = nPxHeight
+		// last.addChild(text)
+
+		// for(var i=0; i<leaders.length; i+=1) {
+		// 	n = leaders[i][0]
+		// 	var text = new PIXI.Text(n,{
+		// 		font: '24px Arial', 
+		// 		stroke: "black", 
+		// 		fill: "white", 
+		// 		strokeThickness: 1});
+		// 	text.anchor.x = 1;
+		// 	text.position.x = x+width - 200
+		// 	text.position.y = i*pxHeight+nPxHeight+pxHeight
+		// 	last.addChild(text)
+
+		// 	m = leaders[i][1]
+		// 	var text = new PIXI.Text(m,{
+		// 		font: '24px Arial', 
+		// 		stroke: "black", 
+		// 		fill: "white", 
+		// 		strokeThickness: 1});
+		// 	text.anchor.x = 1;
+		// 	text.position.x = x+width
+		// 	text.position.y = i*pxHeight+nPxHeight+pxHeight
+		// 	last.addChild(text)
+		// }
+
+		// last.position.x = width
+		// last.position.y = 0
+		// pix.stage.addChild(last)
+
+	},free:function(){
+		pix.stage.removeChild(last)
+	}}
 }
 
-gfx.createParticle = function() { // (this.x, this.y, this.life, this.color)
+
+gfx.createRenderTile = function(pix) {
+	var container = new PIXI.Container();
 	var rendered = false;
-	var bunny;
+	return {
+		container: container,
+		update:function(){
+			if (!rendered) {
+				rendered = true
+				pix.stage.addChild(container);
+			}
+		},
+		free:function(){
+			if (rendered) {
+				rendered = false
+				pix.stage.removeChild(container);
+			}	
+		}
+	}
+}
+
+gfx.renderArea = function() {}
+gfx.renderBackground = function() {}
+
+gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
+	var rendered = false;
+	var bunny = genericCircle();
 	return {
 		update: function(x,y,life,c) {
 			if (!rendered) {
-				bunny = new PIXI.Graphics()
-				bunny.beginFill(fromRgb(40,50,190),1);
-
-				parts = 8
-				if (renderQuality<3) {
-					parts = 6
-				}
-				if (renderQuality<2) {
-					parts = 4
-				}
-				if (renderQuality<1) {
-					parts = 3
-				}
-				ca = Math.PI*2/(parts)
-				for(var i=0; i<=parts; i++) {
-					a = Math.PI*2*frame/1000+i*ca
-					if (i==0) {
-						bunny.moveTo(Math.cos(a), Math.sin(a))
-					} else {
-						bunny.lineTo(Math.cos(a), Math.sin(a))
-					}
-				}
-
-				bunny.endFill();
 				pix.stage.addChild(bunny);
 				rendered = true
 			}
@@ -450,240 +214,257 @@ gfx.createParticle = function() { // (this.x, this.y, this.life, this.color)
 			bunny.scale.y = r
 			bunny.position.x = x
 			bunny.position.y = y
+			bunny.tint = c
 		},
 		free: function() {
-			pix.stage.removeChild(bunny)
+			if (rendered) {
+				rendered = false
+				bunny.clear()
+				pix.stage.removeChild(bunny)
+			}
 		}
 	}
 	return {update:function(){},free:function(){}}
 }
 
 
-gfx.createVitamin = function() { // (this.x, this.y, this.color, this._radius)
+gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius)
 	var rendered = false;
-	var bunny;
+	var bunny = genericCircle()
 	return {
 		update: function(x,y,c,r) {
 			if (!rendered) {
-				bunny = new PIXI.Graphics()
-				bunny.beginFill(fromRgb(40,50,255),1);
-
-				parts = 8
-				if (renderQuality<3) {
-					parts = 6
-				}
-				if (renderQuality<2) {
-					parts = 4
-				}
-				if (renderQuality<1) {
-					parts = 3
-				}
-				ca = Math.PI*2/(parts)
-				for(var i=0; i<=parts; i++) {
-					a = Math.PI*2*frame/1000+i*ca
-					if (i==0) {
-						bunny.moveTo(Math.cos(a), Math.sin(a))
-					} else {
-						bunny.lineTo(Math.cos(a), Math.sin(a))
-					}
-				}
-
-				bunny.endFill();
 				pix.stage.addChild(bunny);
 				rendered = true
 			}
+			bunny.tint = c
 			bunny.scale.x = r
 			bunny.scale.y = r
 			bunny.position.x = x
 			bunny.position.y = y
 		},
 		free: function() {
-			pix.stage.removeChild(bunny)
+			if (rendered) {
+				rendered = false
+				pix.stage.removeChild(bunny)
+			}
 		}
 	}
 	return {update:function(){},free:function(){}}
 }
 
-gfx.createMineral = function() { // (this.x, this.y, this.color, this._radius)
+gfx.createMineral = function(pix) { // (this.x, this.y, this.color, this._radius)
 	var rendered = false;
-	var bunny;
+	var bunny = genericCircle()
 	return {
 		update: function(x,y,c,r) {
 			if (!rendered) {
-				bunny = new PIXI.Graphics()
-				bunny.beginFill(fromRgb(255,50,70),1);
-
-				parts = 8
-				if (renderQuality<3) {
-					parts = 6
-				}
-				if (renderQuality<2) {
-					parts = 4
-				}
-				if (renderQuality<1) {
-					parts = 3
-				}
-				ca = Math.PI*2/(parts)
-				for(var i=0; i<=parts; i++) {
-					a = Math.PI*2*frame/1000+i*ca
-					if (i==0) {
-						bunny.moveTo(Math.cos(a), Math.sin(a))
-					} else {
-						bunny.lineTo(Math.cos(a), Math.sin(a))
-					}
-				}
-
-				bunny.endFill();
 				pix.stage.addChild(bunny);
 				rendered = true
 			}
+			bunny.tint = c
 			bunny.scale.x = r
 			bunny.scale.y = r
 			bunny.position.x = x
 			bunny.position.y = y
 		},
 		free: function() {
-			pix.stage.removeChild(bunny)
+			if (rendered) {
+				rendered = false
+				pix.stage.removeChild(bunny)
+			}
 		}
 	}
 	return {update:function(){},free:function(){}}
 }
 
-gfx.createActor = function() { // (this.x,this.y,this.color,n, Math.floor(this.mass),radius)
+gfx.createActor = function(pix) { // (this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 	return {update:function(){},free:function(){}}
 }
 
-gfx.createPlayerActor = function() { // (this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
+gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
 	var rendered = false;
-	var bunny;
+	var playerMask;
+	var tilingSprite;
 	return {
 		update: function(x,y,c,mass,r) {
 			if (!rendered) {
-				bunny = new PIXI.Graphics()
-				bunny.beginFill(fromRgb(40,250,190),1);
+				tilingSprite = new PIXI.extras.TilingSprite(texture, 5000, 5000);
+				playerMask = new PIXI.Graphics()
+				playerMask.beginFill(fromRgb(40,250,190),1);
+				playerMask.arc(0,0,1,0,Math.PI*2)
+				playerMask.endFill();
+				pix.stage.addChild(playerMask);
 
-				parts = 8
-				if (renderQuality<3) {
-					parts = 6
-				}
-				if (renderQuality<2) {
-					parts = 4
-				}
-				if (renderQuality<1) {
-					parts = 3
-				}
-				ca = Math.PI*2/(parts)
-				for(var i=0; i<=parts; i++) {
-					a = Math.PI*2*frame/1000+i*ca
-					if (i==0) {
-						bunny.moveTo(Math.cos(a), Math.sin(a))
-					} else {
-						bunny.lineTo(Math.cos(a), Math.sin(a))
-					}
-				}
-
-				bunny.endFill();
-				pix.stage.addChild(bunny);
+				tilingSprite.mask = playerMask;
+				pix.stage.addChild(tilingSprite);
 				rendered = true
 			}
-			bunny.scale.x = r
-			bunny.scale.y = r
-			bunny.position.x = x
-			bunny.position.y = y
+			playerMask.scale.x = r
+			playerMask.scale.y = r
+			playerMask.position.x = x
+			playerMask.position.y = y
+			tilingSprite.tint = c
+			tilingSprite.scale.x = .3
+			tilingSprite.scale.y = .3
+			tilingSprite.position.x = x-2500*tilingSprite.scale.x
+			tilingSprite.position.y = y-2500*tilingSprite.scale.y
+
 		},
 		free: function() {
-			pix.stage.removeChild(bunny)
+			rendered = false
+			pix.stage.removeChild(tilingSprite)
+			pix.stage.removeChild(playerMask);
 		}
 	}
 	return {update:function(){},free:function(){}}
 }
 
-gfx.createVirus = function() { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 	var rendered = false;
-	var bunny;
+	var bunny = genericCell(virusBall());
 	return {
 		update: function(x,y,c,mass, r) {
 			if (!rendered) {
-				bunny = new PIXI.Graphics()
-				bunny.beginFill(fromRgb(255,50,190),1);
-
-				parts = 8
-				if (renderQuality<3) {
-					parts = 6
-				}
-				if (renderQuality<2) {
-					parts = 4
-				}
-				if (renderQuality<1) {
-					parts = 3
-				}
-				ca = Math.PI*2/(parts)
-				for(var i=0; i<=parts; i++) {
-					a = Math.PI*2*frame/1000+i*ca
-					if (i==0) {
-						bunny.moveTo(Math.cos(a), Math.sin(a))
-					} else {
-						bunny.lineTo(Math.cos(a), Math.sin(a))
-					}
-				}
-
-				bunny.endFill();
-				pix.stage.addChild(bunny);
+				pix.stage.addChild(bunny.container);
 				rendered = true
 			}
-			bunny.scale.x = r
-			bunny.scale.y = r
-			bunny.position.x = x
-			bunny.position.y = y
+			bunny.container.scale.x = r
+			bunny.container.scale.y = r
+			// bunny.container.tint = c
+			bunny.container.position.x = x
+			bunny.container.position.y = y
+
+			bunny.container.rotation = (x+y)/200
+			bunny.back.tint = c
 		},
 		free: function() {
-			pix.stage.removeChild(bunny)
+			rendered = false
+			pix.stage.removeChild(bunny.container)
 		}
 	}
 	return {update:function(){},free:function(){}}
 }
 
-gfx.createBacteria = function() { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+gfx.createBacteria = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 	var rendered = false;
-	var bunny;
+	var bunny = genericCell(bubbleCircle());
 	return {
 		update: function(x,y,c,mass, r) {
 			if (!rendered) {
-				bunny = new PIXI.Graphics()
-				bunny.beginFill(fromRgb(140,150,255),1);
-
-				parts = 8
-				if (renderQuality<3) {
-					parts = 6
-				}
-				if (renderQuality<2) {
-					parts = 4
-				}
-				if (renderQuality<1) {
-					parts = 3
-				}
-				ca = Math.PI*2/(parts)
-				for(var i=0; i<=parts; i++) {
-					a = Math.PI*2*frame/1000+i*ca
-					if (i==0) {
-						bunny.moveTo(Math.cos(a), Math.sin(a))
-					} else {
-						bunny.lineTo(Math.cos(a), Math.sin(a))
-					}
-				}
-
-				bunny.endFill();
-				pix.stage.addChild(bunny);
+				pix.stage.addChild(bunny.container);
 				rendered = true
 			}
-			bunny.scale.x = r
-			bunny.scale.y = r
-			bunny.position.x = x
-			bunny.position.y = y
+			bunny.container.scale.x = r
+			bunny.container.scale.y = r
+			// bunny.container.tint = c
+			bunny.container.position.x = x
+			bunny.container.position.y = y
+
+			bunny.container.rotation = (x+y)/200
+
+			bunny.back.tint = c
 		},
 		free: function() {
-			pix.stage.removeChild(bunny)
+			rendered = false
+			pix.stage.removeChild(bunny.container)
 		}
 	}
-	return {update:function(){},free:function(){}}
+}
+
+var genericCircle = (function() {
+	var playerMask = new PIXI.Graphics()
+	playerMask.beginFill(0xFFFFFF,1);
+	// playerMask.arc(0,0,1,0,Math.PI*2)
+
+	parts = 12
+	a = Math.PI*2/parts
+	for(var i=0;i<=parts;i++) {
+		x = Math.cos(i*a)*.8
+		y = Math.sin(i*a)*.8
+		if (i==0) {
+			playerMask.moveTo(x,y)
+		} else {
+			playerMask.lineTo(x,y)
+		}
+	}
+
+	playerMask.endFill();	
+	return function() {
+		return playerMask.clone()
+	}
+})()
+
+var bubbleCircle = (function() {
+	var playerMask = new PIXI.Graphics()
+	playerMask.beginFill(0xFFFFFF,1);
+	parts = 10
+	a = Math.PI*2/parts
+	for(var i=0;i<=parts;i++) {
+		x = Math.cos(i*a)*.7
+		y = Math.sin(i*a)*.7
+		if (i==0) {
+			playerMask.moveTo(x,y)
+		} else {
+			xn = Math.cos(i*a-a/2)
+			yn = Math.sin(i*a-a/2)
+			playerMask.quadraticCurveTo(xn,yn,x,y)
+		}
+	}
+	playerMask.endFill();	
+	return function() {
+		return playerMask.clone()
+	}
+})()
+
+var virusBall = (function() {
+	var playerMask = new PIXI.Graphics()
+	playerMask.beginFill(0xFFFFFF,1);
+	parts = 10
+	a = Math.PI*2/parts
+	for(var i=0;i<=parts;i++) {
+		x = Math.cos(i*a)
+		y = Math.sin(i*a)
+		if (i==0) {
+			playerMask.moveTo(x,y)
+		} else {
+			xn = Math.cos(i*a-a/2)*.4
+			yn = Math.sin(i*a-a/2)*.4
+			playerMask.quadraticCurveTo(xn,yn,x,y)
+		}
+	}
+	playerMask.endFill();	
+	return function() {
+		return playerMask.clone()
+	}
+})()
+
+
+function genericCell(playerMask) {
+	var tilingSprite;
+
+	var c = new PIXI.Container()
+
+	var size = 50000
+	tilingSprite = new PIXI.extras.TilingSprite(texture, size, size);
+
+	tilingSprite.scale.x = .01
+	tilingSprite.scale.y = .01
+	tilingSprite.position.x = -size/2*tilingSprite.scale.x
+	tilingSprite.position.y = -size/2*tilingSprite.scale.y
+
+	tilingSprite.mask = playerMask;
+	c.addChild(tilingSprite);
+	c.addChild(playerMask);
+	
+	return {
+		container: c,
+		back: tilingSprite,
+		front: playerMask,
+	}
+}
+
+function fromRgb(r,g,b) {
+	c = Math.floor(r)*256*256+Math.floor(g)*256+Math.floor(b)
+	return c
 }
