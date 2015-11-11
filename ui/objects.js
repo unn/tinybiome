@@ -1,9 +1,7 @@
-var currentRoom;
-var myplayer;
 var hidingBbox = true;
 
-renderTileSize = 128
-tilePadding = 5
+var renderTileSize = 128;
+var tilePadding = 5;
 
 var darkGreen = "#303C00";
 var lightGreen = "#B4CC48";
@@ -22,11 +20,11 @@ function player(room, id) {
 	this.id = id
 	this.room.players[id] = this
 	this.owns = {}
-	renderable["player"+this.id] = this
+	this.room.renderable["player"+this.id] = this
 }
 player.prototype.remove = function() {
 	delete this.room.players[this.id]
-	delete renderable["player"+this.id]
+	delete this.room.renderable["player"+this.id]
 }
 player.prototype.render = function(ctx) {
 	myActors = []
@@ -69,11 +67,11 @@ player.prototype.bbox = function() {
 	}
 	if (!found) {
 		now = (new Date());
-		if (now-randomActorTime>5000 || !randomActorId || !actors[randomActorId]) {
+		if (now-randomActorTime>5000 || !randomActorId || !this.room.actors[randomActorId]) {
 			randomActorTime = now
-			randomActorId = pickRandomProperty(actors)
+			randomActorId = pickRandomProperty(this.room.actors)
 		}
-		a = actors[randomActorId]
+		a = this.room.actors[randomActorId]
 		if (!a) {
 			if (isNaN(x)) {
 				console.log("BB ERROR", x)
@@ -105,9 +103,10 @@ function renderTile(room,x,y) {
 	this.x = x
 	this.y = y
 	this.id = renderTile.id(x,y)
-	renderable[this.id] = this
+	this.room = room
+	this.room.renderable[this.id] = this
 	this.count = 0
-	room.tiles[this.id] = this
+	this.room.tiles[this.id] = this
 	this.canRender = false
 	this.renderables = {}
 	this.dirty = false
@@ -115,6 +114,7 @@ function renderTile(room,x,y) {
 	this.freeadd = true
 	this.clear = this.clearAny.bind(this)
 	this.visible = false
+	this.myplayer = null
 }
 renderTile.prototype.add = function(particle) {
 	this.count += 1
@@ -311,19 +311,25 @@ function room(width, height) {
 	this.tiles = {}
 	this.width = width
 	this.height = height
+
+	this.players = {}
+	this.actors = {}
+	this.steppers = {}
+	this.renderable = {}
+
 	for(var x=0; x<width; x+=renderTileSize) {
 		for(var y=0; y<height; y+=renderTileSize) {
 			new renderTile(this,x,y)
 		}
 	}
-	this.players = {}
+
 	this.particles = []
 	this.particleCount = 0;
 }
 room.prototype.step = function(seconds) {
 	var actor;
-	for (id in steppers) {
-		actor = steppers[id]
+	for (id in this.steppers) {
+		actor = this.steppers[id]
 		actor.step(seconds)
 	}
 
@@ -352,8 +358,8 @@ room.prototype.render = function(ctx) {
 	gfx.renderRoom(ctx,this.width,this.height)
 
 	padding = 10
-	for (id in renderable) {
-		objectToRender = renderable[id]
+	for (id in this.renderable) {
+		objectToRender = this.renderable[id]
 		bbox = objectToRender.bbox()
 		isTile = false
 		if ( objectToRender instanceof renderTile) {
@@ -407,12 +413,13 @@ room.prototype.findCollisions = function(actor) {
 }
 
 
-function pellet(x,y,style) {
+function pellet(room, x,y,style) {
 	this.style = style
 	this.x = x
 	this.y = y
 	this.id = ""+x+","+y
-	mytile = currentRoom.findTile(x,y)
+	this.room = room
+	mytile = this.room.findTile(x,y)
 	if (!mytile.contains(x,y)) {
 		console.log("WTF", this.id,mytile)
 	}
@@ -437,9 +444,9 @@ pellet.prototype.render = function(ctx) {
 }
 pellet.prototype.remove = function() {
 	for(var i=0;i<4;i+=1) {
-		currentRoom.addParticle(this.x,this.y,p.color)
+		this.room.addParticle(this.x,this.y,p.color)
 	}
-	myTile = currentRoom.findTile(this.x,this.y)
+	myTile = this.room.findTile(this.x,this.y)
 	if (!myTile) {
 		console.log(myTile)
 	}
@@ -450,11 +457,10 @@ pellet.prototype.bbox = function() {
 	return [this.x-r, this.y-r, this.x+r, this.y+r]
 }
 
-actors = {}
-steppers = {}
-renderable = {}
 
-function actor(id, x, y) {
+
+function actor(room, id, x, y) {
+	this.room = room
 	this.id = id
 	this.x = x
 	this.y = y
@@ -468,9 +474,9 @@ function actor(id, x, y) {
 	this.newmass = this.mass
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
-	renderable["b_a"+this.id] = this
-	steppers[this.id] = this
-	actors[this.id] = this
+	this.room.renderable["b_a"+this.id] = this
+	this.room.steppers[this.id] = this
+	this.room.actors[this.id] = this
 
 	this.owner = null
 	this.inview = false
@@ -501,7 +507,7 @@ actor.prototype.postRender = function() {
 	dist = Math.sqrt(dx*dx+dy*dy)
 	dx = dx / dist * (dist-10)
 	dy = dy / dist * (dist-10)
-	if (this.owner == myplayer.id) {
+	if (this.owner == this.room.myplayer.id) {
 		ctx.strokeStyle = "rgba(30,60,80,.4)";
 		ctx.beginPath();
 		ctx.moveTo(onCanvasX, onCanvasY);
@@ -512,7 +518,7 @@ actor.prototype.postRender = function() {
 actor.prototype.setmass = function(m) {
 	this.newmass = m
 }
-actor.prototype.radius = function() {return Math.pow(this.mass, currentRoom.sizemultiplier)}
+actor.prototype.radius = function() {return Math.pow(this.mass, this.room.sizemultiplier)}
 actor.prototype.render = function(ctx) {
 	this.inview = true
 	if (this.owner) if (this.owner.render) return this.owner.render(ctx)
@@ -528,7 +534,7 @@ actor.prototype.step = function(seconds) {
 	this.mass = (this.newmass+this.mass*4)/5
 
 
-	var room = currentRoom
+	var room = this.room
 
 	allowed = 500 / (room.speedmultiplier * Math.pow(this.mass + 50, .5))
 	distance = allowed * seconds * this.speed
@@ -563,35 +569,36 @@ actor.prototype.step = function(seconds) {
 	if (this.owner) if (this.owner.step) this.owner.step(seconds)
 }
 actor.prototype.remove = function() {
-	delete renderable["b_a"+this.id]
-	delete steppers[this.id]
-	delete actors[this.id]
+	delete this.room.renderable["b_a"+this.id]
+	delete this.room.steppers[this.id]
+	delete this.room.actors[this.id]
 	if (this.owner) if (this.owner.remove) this.owner.remove()
 }
 
-function playeractor(aid, pid) {
-	this.actor = actors[aid]
+function playeractor(room, aid, pid) {
+	this.room = room
+	this.actor = this.room.actors[aid]
 	this.actor.owner = this
 	this.owner = pid
-	currentRoom.players[pid].owns[aid] = this.actor
+	this.room.players[pid].owns[aid] = this.actor
 	this.id = "pa"+aid+","+pid
-	if (myplayer) {
-		if (pid == myplayer.id) {
+	if (this.room.myplayer) {
+		if (pid == this.room.myplayer.id) {
 			document.getElementById("mainfloat").style.display="none";
 		}
 	}
 	this.lastupdate = (new Date())
 }
 playeractor.prototype.remove = function() {
-	delete currentRoom.players[this.owner].owns[this.actor.id]
-	if (this.owner == myplayer.id) {
-		if (Object.keys(myplayer.owns).length==0) {
+	delete this.room.players[this.owner].owns[this.actor.id]
+	if (this.owner == this.room.myplayer.id) {
+		if (Object.keys(this.room.myplayer.owns).length==0) {
 			document.getElementById("mainfloat").style.display="block";
 		}
 	}
 }
 playeractor.prototype.step = function(seconds) {
-	if (this.owner==myplayer.id) {
+	if (this.owner==this.room.myplayer.id) {
 		var actor = this.actor;
 		onCanvasX = (actor.x - camera.x)*camera.xscale
 		onCanvasY = (actor.y - camera.y)*camera.yscale
@@ -604,8 +611,8 @@ playeractor.prototype.step = function(seconds) {
 		if (actor.speed<0) actor.speed=0
 		if (actor.speed>1) actor.speed=1
 
-		// for (i in myplayer.owns) {
-		// 	b = myplayer.owns[i]
+		// for (i in this.room.myplayer.owns) {
+		// 	b = this.room.myplayer.owns[i]
 		// 	if (this == b) {
 		// 		continue
 		// 	}
@@ -638,14 +645,15 @@ playeractor.prototype.render = function(ctx) {
 	radius = this.actor.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	this.actor.color = this.owner==myplayer.id ? "#33FF33" : "#3333FF";
-	n = currentRoom.players[this.owner].name
+	this.actor.color = this.owner==this.room.myplayer.id ? "#33FF33" : "#3333FF";
+	n = this.room.players[this.owner].name
 	n = n ? n : "Microbe"
 	gfx.renderActor(ctx,this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
 }
 
-function virus(aid) {
-	this.actor = actors[aid]
+function virus(room, aid) {
+	this.room = room
+	this.actor = this.room.actors[aid]
 	this.actor.owner = this
 	this.actor.color = red
 }
@@ -653,8 +661,9 @@ virus.prototype.render = function(ctx) {
 	gfx.renderVirus(ctx, this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 }
 
-function bacteria(aid) {
-	this.actor = actors[aid]
+function bacteria(room, aid) {
+	this.room = room
+	this.actor = this.room.actors[aid]
 	this.actor.owner = this
 	this.actor.color = lightBlue
 }

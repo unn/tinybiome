@@ -1,6 +1,5 @@
-var currentRoom;
 var currentSock;
-var myplayer;
+
 var tileSize = 50;
 var hidingBbox = true;
 var debugMode = false;
@@ -38,6 +37,7 @@ function server(location) {
 		if (d.meth=="rem") {
 			s = self.findServer(d.address)
 			self.removeServer(s)
+			s.remove()
 		}
 	}
 }
@@ -84,6 +84,7 @@ server.prototype.removeServer = function(sock) {
 
 function sock(location) {
 	console.log("NEW SERVER", this)
+	this.room = null
 	this.location = location
 	this.messageHandlers = [
 		this.handleNewRoom.bind(this),
@@ -102,7 +103,7 @@ function sock(location) {
 		this.handleSync.bind(this),
 		this.handlePong.bind(this)]
 	this.messageMap = []
-	this.latency = 100;
+	this.latency = 0;
 	this.ws = new WebSocket("ws://"+location)
 	this.lastPong = (new Date());
 
@@ -129,6 +130,8 @@ function sock(location) {
 			self.writeSync()
 		console.log("CONNECTED TO",location)
 		self.mytick()
+		self.start.apply(self)
+
 		servers.addServer(self)
 	}
 	this.ws.onerror = function() {
@@ -141,12 +144,30 @@ function sock(location) {
 	}
 	this.ws.onmessage = this.onmessage.bind(this)
 }
+sock.prototype.start = function() {
+	this.lastStep = (new Date())
+	setInterval(this.step.bind(this),1000/60);
+}
+sock.prototype.step = function() {
+	var actor;
+	now = (new Date())
+	diff = (now - this.lastStep) / 1000
+	if (this.room) {
+		if (!this.room.step) {
+			console.log(this.room)
+		} else {
+			this.room.step(diff)
+		}
+	}
+	this.lastStep = now
+}
 sock.prototype.dc = function() {
 	console.log("DISCON FROM", this)
 	if (currentSock==this) {
 		currentSock=null
 	}
 	this.ws.close()
+	servers.removeServer(this)
 	this.connected = false
 }
 sock.prototype.remove = function() {
@@ -154,9 +175,9 @@ sock.prototype.remove = function() {
 		currentSock=null
 	}
 	console.log("REMOVING", this)
-	servers.removeServer(this)
 	document.getElementById("serverlist").removeChild(this.ele)
-	new sock(this.location)
+	if (servers.servers.indexOf(this)!=-1)
+		new sock(this.location)
 }
 sock.prototype.tick = function() {
 	if (this.connected) {
@@ -197,182 +218,183 @@ sock.prototype.handleSync = function(dv, off) {
 	return off+l+2
 }
 sock.prototype.handleNewRoom = function(dv, off) {
-		var newroom;
-		console.log("NEW ROOM INCOMING")
-		width = dv.getInt32(off+1, true)
-		height = dv.getInt32(off+5, true)
-		newroom = new room(width,height)
-		newroom.sizemultiplier = .7
-		
-		currentRoom = newroom
-		newroom.startmass = dv.getInt32(off+9, true)
-		newroom.mergetime = dv.getInt32(off+13, true)
-		newroom.sizemultiplier = dv.getFloat32(off+17, true)
-		newroom.speedmultiplier = dv.getFloat32(off+21, true)
-		
-		console.log("NEW ROOM",{width:width,height:height,sm:newroom.sizemultiplier,mass:newroom.startmass})
-		return off + 25
+	console.log("NEW ROOM INCOMING")
+	width = dv.getInt32(off+1, true)
+	height = dv.getInt32(off+5, true)
+	if (!this.room) {
+		this.room = new room(width,height)
+	}
+	this.room.sizemultiplier = .7
+	this.room.startmass = dv.getInt32(off+9, true)
+	this.room.mergetime = dv.getInt32(off+13, true)
+	this.room.sizemultiplier = dv.getFloat32(off+17, true)
+	this.room.speedmultiplier = dv.getFloat32(off+21, true)
+	this.room.playercount = dv.getInt32(off+25, true)
+	
+	console.log("NEW ROOM",{width:width,height:height,sm:this.room.sizemultiplier,mass:this.room.startmass})
+	return off + 29
 }
 sock.prototype.handleNewActor = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		x = dv.getFloat32(off+5, true)
-		y = dv.getFloat32(off+9, true)
-		mass = dv.getFloat32(off+13, true)
-		console.log("CREATING ACTOR",id,"AT",x,y)
-		p = new actor(id, x, y)
-		p.mass = mass
-		return off + 17
+	id = dv.getInt32(off+1, true)
+	x = dv.getFloat32(off+5, true)
+	y = dv.getFloat32(off+9, true)
+	mass = dv.getFloat32(off+13, true)
+	console.log("CREATING ACTOR",id,"AT",x,y)
+	p = new actor(this.room, id, x, y)
+	p.mass = mass
+	return off + 17
 }
 sock.prototype.handleNewPellet = function(dv, off) {
-		p = new pellet(dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
-		return off + 13
+	p = new pellet(this.room, dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
+	return off + 13
 }
 sock.prototype.handleRemovePellet = function(dv, off) {
-		dx = dv.getInt32(off+1, true)
-		dy = dv.getInt32(off+5, true)
-		p = currentRoom.findTile(dx,dy).find(dx,dy)
+	dx = dv.getInt32(off+1, true)
+	dy = dv.getInt32(off+5, true)
+	p = this.room.findTile(dx,dy).find(dx,dy)
 
-		if (p) {
-			p.remove()	
-		} else {
-			console.log("COULDNT FIND", dx, dy)
-		}
-		return off + 9
+	if (p) {
+		p.remove()	
+	} else {
+		console.log("COULDNT FIND", dx, dy)
+	}
+	return off + 9
 }
 sock.prototype.handleNewPlayer = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		len = dv.getInt32(off+5, true)
-		if (len<100000 && len > -1) {
-			name = dv.getUTF8String(off+9,len)
-			console.log("CREATING PLAYER", id, "NAME(",len,")",name)
-			p = (new player(currentRoom, id))
-			p.name = name ? name : "";
-		} else {
-			console.log("INCORRECT LEN", len)
-		}
-		return off + 9 + len
+	id = dv.getInt32(off+1, true)
+	len = dv.getInt32(off+5, true)
+	if (len<100000 && len > -1) {
+		name = dv.getUTF8String(off+9,len)
+		console.log("CREATING PLAYER", id, "NAME(",len,")",name)
+		p = (new player(this.room, id))
+		p.name = name ? name : "";
+	} else {
+		console.log("INCORRECT LEN", len)
+	}
+	return off + 9 + len
 }
 sock.prototype.handleRenamePlayer = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		len = dv.getInt32(off+5, true)
-		if (len<100000 && len > -1) {
-			name = dv.getUTF8String(off+9,len)
-			console.log("RENAMING PLAYER", id)
-			currentRoom.players[id].name=name
-		} else {
-			console.log("INCORRECT LEN", len)
-		}
-		return off + 9 + len
+	id = dv.getInt32(off+1, true)
+	len = dv.getInt32(off+5, true)
+	if (len<100000 && len > -1) {
+		name = dv.getUTF8String(off+9,len)
+		console.log("RENAMING PLAYER", id)
+		this.room.players[id].name=name
+	} else {
+		console.log("INCORRECT LEN", len)
+	}
+	return off + 9 + len
 }
 sock.prototype.handleDestroyPlayer = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		console.log("DESTROYING PLAYER", id)
-		currentRoom.players[id].remove()
+	id = dv.getInt32(off+1, true)
+	console.log("DESTROYING PLAYER", id)
+	this.room.players[id].remove()
 
-		return off + 5
+	return off + 5
 }
 sock.prototype.handleOwnPlayer = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		console.log("NOW OWNS", id)
-		myplayer = currentRoom.players[id]
-		return off + 5
+	id = dv.getInt32(off+1, true)
+	console.log("NOW OWNS", id)
+	this.room.myplayer = this.room.players[id]
+	return off + 5
 }
 sock.prototype.handleRemoveActor = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		console.log("REMOVING ACTOR", id)
-		p = actors[id]
-		p.remove()
-		return off + 5
+	id = dv.getInt32(off+1, true)
+	console.log("REMOVING ACTOR", id)
+	p = this.room.actors[id]
+	p.remove()
+	return off + 5
 
 }
 sock.prototype.handleMoveActor = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		x = dv.getFloat32(off+5, true)
-		y = dv.getFloat32(off+9, true)
-		d = dv.getFloat32(off+13, true)
-		s = dv.getFloat32(off+17, true)
+	id = dv.getInt32(off+1, true)
+	x = dv.getFloat32(off+5, true)
+	y = dv.getFloat32(off+9, true)
+	d = dv.getFloat32(off+13, true)
+	s = dv.getFloat32(off+17, true)
 
-		p = actors[id]
-		p.xs = x
-		p.ys = y
-		p.direction = d
-		p.speed = s
+	p = this.room.actors[id]
+	p.xs = x
+	p.ys = y
+	p.direction = d
+	p.speed = s
 
-		return off + 21
+	return off + 21
 }
 sock.prototype.handleSetMass = function(dv, off) {
-		id = dv.getInt32(off+1, true)
-		mass = dv.getFloat32(off+5, true)
-		p = actors[id]
-		p.setmass( mass )
-		return off + 9
+	id = dv.getInt32(off+1, true)
+	mass = dv.getFloat32(off+5, true)
+	p = this.room.actors[id]
+	p.setmass( mass )
+	return off + 9
 }
 sock.prototype.handleMultiPellet = function(dv, off) {
-		amt = dv.getInt32(off+1, true)
-		if (amt<1000000) {
-			try {
-				for(i in currentRoom.tiles) {
-					currentRoom.tiles[i].freeadd = false
-				}
+	amt = dv.getInt32(off+1, true)
+	if (amt<1000000) {
+		try {
+			for(i in this.room.tiles) {
+				this.room.tiles[i].freeadd = false
 			}
-			catch(e) { console.log(e) }
-			console.log("MULTI PELLET", amt)
-
-			o = off + 5
-			for(var i=0;i<amt;i++) {
-				x = dv.getInt32(o, true)
-				y = dv.getInt32(o+4, true)
-				style = dv.getInt32(o+8, true)
-				if (Math.random()<.0001) {
-					console.log("CREATING PELLET", x, y, style)
-				}
-				p = new pellet(x, y, style)
-				o += 12
-			}
-
-
-			try {
-				for(i in currentRoom.tiles) {
-					currentRoom.tiles[i].freeadd = true
-				}
-			}
-			catch(e) { }
-		} else {
-			console.log("ERROR SIZE", amt)
 		}
-		
-		return off + 5 + amt * 12
+		catch(e) { console.log(e) }
+		console.log("MULTI PELLET", amt)
+
+		o = off + 5
+		for(var i=0;i<amt;i++) {
+			x = dv.getInt32(o, true)
+			y = dv.getInt32(o+4, true)
+			style = dv.getInt32(o+8, true)
+			if (Math.random()<.0001) {
+				console.log("CREATING PELLET", x, y, style)
+			}
+			p = new pellet(this.room, x, y, style)
+			o += 12
+		}
+
+
+		try {
+			for(i in this.room.tiles) {
+				this.room.tiles[i].freeadd = true
+			}
+		}
+		catch(e) { }
+	} else {
+		console.log("ERROR SIZE", amt)
+	}
+	
+	return off + 5 + amt * 12
 }
 sock.prototype.handleDescribeActor = function(dv, off) {
-		t = dv.getUint8(off+1)
-		switch (t) {
-		case 0:
-			aid = dv.getInt32(off+2, true)
-			pid = dv.getInt32(off+6, true)
-			console.log("ACTOR",aid,"IS PLAYERACTOR")
-			
-			a = new playeractor(aid,pid)
-			return off + 10
-		case 1:
-			aid = dv.getInt32(off+2, true)
-			console.log("ACTOR",aid,"IS VIRUS")
-			
-			a = new virus(aid)
-			return off + 6
-		case 2:
-			aid = dv.getInt32(off+2, true)
-			console.log("ACTOR",aid,"IS BACTERIA")
-			
-			a = new bacteria(aid)
-			return off + 6
+	t = dv.getUint8(off+1)
+	switch (t) {
+	case 0:
+		aid = dv.getInt32(off+2, true)
+		pid = dv.getInt32(off+6, true)
+		console.log("ACTOR",aid,"IS PLAYERACTOR")
+		
+		a = new playeractor(this.room, aid,pid)
+		return off + 10
+	case 1:
+		aid = dv.getInt32(off+2, true)
+		console.log("ACTOR",aid,"IS VIRUS")
+		
+		a = new virus(this.room, aid)
+		return off + 6
+	case 2:
+		aid = dv.getInt32(off+2, true)
+		console.log("ACTOR",aid,"IS BACTERIA")
+		
+		a = new bacteria(this.room, aid)
+		return off + 6
 
-		}
+	}
 }
 sock.prototype.handlePong = function(dv, off) {
 	now = (new Date());
-	this.latency = now-this.lastPing;
+	if (this.latency==0) this.latency = now-this.lastPing
+	else this.latency = (this.latency*5+(now-this.lastPing))/6;
 	console.log("PING",this.latency)
-	this.ele.innerHTML = "(PING "+this.latency+"ms) "+this.location
+	this.ele.innerHTML = "(PING "+Math.floor(this.latency*10)/10+"ms) "+this.location+" ("+this.room.playercount+" PLAYERS)"
 	return off+1
 }
 
@@ -404,9 +426,6 @@ sock.prototype.writeSplit = function() {
 }
 sock.prototype.writeSync = function() {
 	console.log("SYNCING",this.location)
-	actors = {}
-	renderable = {}
-	steppers = {}
 	sab = new DataView(new ArrayBuffer(1))
 	sab.setUint8(0,3,true)
 	this.ws.send(sab)
@@ -635,8 +654,8 @@ function render() {
 	gfx.renderArea(ctx,canvas.width,canvas.height)
 	ctx.save()
 
-	if (myplayer) {
-		size = myplayer.bbox()
+	if (currentSock && currentSock.room && currentSock.room.myplayer) {
+		size = currentSock.room.myplayer.bbox()
 		if (Math.random()<.01) {
 			console.log("CAMERA",size)
 		}
@@ -679,8 +698,8 @@ function render() {
 
 	gfx.renderBackground(ctx, x, y, w, h)
 
-	if (currentRoom) {
-		currentRoom.render(ctx)
+	if (currentSock && currentSock.room) {
+		currentSock.room.render(ctx)
 	}
 
 	ctx.restore()
@@ -688,10 +707,12 @@ function render() {
 
 
 	var actor;
-	for (id in renderable) {
-		actor = renderable[id]
-		if (actor.postRender) {
-			actor.postRender()
+	if (currentSock && currentSock.room) {
+		for (id in currentSock.room.renderable) {
+			actor = currentSock.room.renderable[id]
+			if (actor.postRender) {
+				actor.postRender()
+			}
 		}
 	}
 
@@ -700,8 +721,8 @@ function render() {
 	ctx.arc(mousex, mousey, 10, 0, 2 * Math.PI);
 	ctx.stroke();
 
-	if (currentRoom) {
-		draw_leaderboard(ctx,currentRoom)
+	if (currentSock && currentSock.room) {
+		draw_leaderboard(ctx,currentSock.room)
 	}
 }
 
@@ -724,20 +745,6 @@ function draw_leaderboard(ctx, room) {
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
 	gfx.renderLeaderBoard(ctx, playersWithScore, canvas.width-400, 0, 400, 800, total)
 }
-
-lastStep = (new Date())
-function step() {
-	var actor;
-	now = (new Date())
-	diff = (now - lastStep) / 1000
-	if (currentRoom) {
-		currentRoom.step(diff)
-	}
-	lastStep = now
-
-
-}
-setInterval(step,1000/60);
 
 // utils
 

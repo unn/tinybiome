@@ -51,6 +51,7 @@ type Room struct {
 	PelletCount     int64
 	SizeMultiplier  float64
 	SpeedMultiplier float64
+	PlayerCount     int64
 
 	VirusCount    int64
 	BacteriaCount int64
@@ -231,6 +232,7 @@ func (r *Room) Accept(p Protocol) {
 	player := &Player{Net: p, room: r, Connected: true}
 	go player.SendUpdates()
 	log.Println(player, "STARTING LOOP")
+	p.WriteRoom(r)
 	player.ReceiveUpdates()
 	player.Remove()
 }
@@ -279,6 +281,7 @@ type Player struct {
 	WriteChan chan []byte
 	ClanName  string
 	Synced    bool
+	Joined    bool
 }
 
 func (p *Player) Tick(d time.Duration) {
@@ -296,7 +299,6 @@ func (p *Player) Sync() {
 	r := p.room
 
 	r.ChangeLock.Lock()
-	r.AddTicker(p)
 	p.ID = r.getPlayerId(p)
 
 	start := time.Now()
@@ -317,9 +319,6 @@ func (p *Player) Sync() {
 	log.Println("SYNCING OTHER PLAYERS")
 	for _, oPlayer := range r.Players {
 		if oPlayer == nil {
-			continue
-		}
-		if oPlayer == p {
 			continue
 		}
 		oPlayer.Net.WriteNewPlayer(p)
@@ -418,10 +417,22 @@ func (p *Player) Split() {
 	}
 	p.room.ChangeLock.Unlock()
 }
+func (p *Player) Ping() {
+	p.room.ChangeLock.Lock()
+	p.Net.WritePong()
+	p.Net.WriteRoom(p.room)
+	p.Net.Save()
+	p.room.ChangeLock.Unlock()
+}
 func (p *Player) Join(name string) {
 	if !p.Synced {
 		log.Println("PLAYER NOT SYNCED YET", p)
 		return
+	}
+	if !p.Joined {
+		p.Joined = true
+		p.room.AddTicker(p)
+		p.room.PlayerCount += 1
 	}
 	r := p.room
 	log.Println("Lock 3")
@@ -451,6 +462,10 @@ func (p *Player) Remove() {
 		actor.Remove()
 	}
 	r.Players[p.ID] = nil
+	if p.Joined {
+		r.PlayerCount -= 1
+		r.RemoveTicker(p)
+	}
 	for _, oPlayer := range r.Players {
 		if oPlayer == nil {
 			continue
@@ -460,7 +475,6 @@ func (p *Player) Remove() {
 
 	log.Println("Unlock 4")
 	log.Println("CLOSING CHAN")
-	r.RemoveTicker(p)
 	r.ChangeLock.Unlock()
 }
 

@@ -146,8 +146,7 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		}
 		p.Sync()
 	case 4:
-		s.WritePong()
-		s.Save()
+		p.Ping()
 	default:
 		log.Println("READ ERROR, TYPE", act)
 		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
@@ -185,7 +184,7 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 	if s.Logging {
 		log.Println("SENDING WriteRoom", r)
 	}
-	log.Println(s, "WRITEROOM INDEX", s.MessageMap[0])
+	log.Println("WRITEROOM INDEX", s.MessageMap[0])
 	s.W.WriteByte(s.MessageMap[0])
 	WriteInt32(s.W, r.Width)
 	WriteInt32(s.W, r.Height)
@@ -193,6 +192,7 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 	WriteInt32(s.W, r.MergeTime)
 	WriteFloat32(s.W, r.SizeMultiplier)
 	WriteFloat32(s.W, r.SpeedMultiplier)
+	WriteInt32(s.W, r.PlayerCount)
 }
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
@@ -390,7 +390,7 @@ func (s *BinaryProtocol) WritePong() {
 
 func (s *BinaryProtocol) Save() {
 	s.Lock.Lock()
-	if rand.Intn(1000) == 0 {
+	if rand.Intn(10000) == 0 {
 		s.WriteNewMessageMap()
 	}
 	oldW := s.W

@@ -19,24 +19,16 @@ func main() {
 	if p != nil {
 		port = *p
 	}
-	d, e := websocket.Dial("ws://www.tinybio.me:4000", "", "http://server.go")
+	d, e := websocket.Dial("ws://localhost:4000", "", "http://server.go")
 	if e != nil {
-		log.Println("MASTER SERVER DOWN", e)
-		d, e = websocket.Dial("ws://localhost:4000", "", "http://server.go")
+		d, e = websocket.Dial("ws://www.tinybio.me:4000", "", "http://server.go")
+		log.Println("LOCAL SERVER DOWN", e)
 		if e != nil {
-			log.Panicln("LOCAL SERVER DOWN", e)
+			log.Panicln("MASTER SERVER DOWN", e)
 		}
 	}
 	writer := json.NewEncoder(d)
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			if e := writer.Encode(map[string]interface{}{"meth": "ping"}); e != nil {
-				break
-			}
-		}
-	}()
-	writer.Encode(map[string]interface{}{"meth": "addme", "port": port})
+
 	runtime.SetBlockProfileRate(1)
 	room := client.NewRoom()
 	room.SetDimensions(5000, 5000)
@@ -47,8 +39,20 @@ func main() {
 	m.HandleFunc("/", cli.Handler)
 	add := fmt.Sprintf("0.0.0.0:%d", port)
 	log.Println("STARTING ON", add)
-	err := http.ListenAndServe(add, m)
-	if err != nil {
-		log.Println("ERROR", err)
+
+	go func() {
+		err := http.ListenAndServe(add, m)
+		if err != nil {
+			log.Println("ERROR", err)
+		}
+	}()
+
+	writer.Encode(map[string]interface{}{"meth": "addme", "port": port})
+	for {
+		time.Sleep(time.Second)
+		if e := writer.Encode(map[string]interface{}{"meth": "ping"}); e != nil {
+			break
+		}
 	}
+
 }
