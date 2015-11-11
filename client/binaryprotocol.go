@@ -30,6 +30,7 @@ type ProtocolDown interface {
 	WritePlayerActor(*PlayerActor)
 	WriteVirus(*Virus)
 	WriteBacteria(*Bacteria)
+	WritePong()
 	Flush() error
 	Save()
 }
@@ -139,6 +140,14 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 			log.Println(p, "SENT SPLIT")
 		}
 		p.Split()
+	case 3:
+		if s.Logging {
+			log.Println(p, "SENT CONNECT")
+		}
+		p.Sync()
+	case 4:
+		s.WritePong()
+		s.Save()
 	default:
 		log.Println("READ ERROR, TYPE", act)
 		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
@@ -176,7 +185,7 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 	if s.Logging {
 		log.Println("SENDING WriteRoom", r)
 	}
-	log.Println("WRITEROOM INDEX", s.MessageMap[0])
+	log.Println(s, "WRITEROOM INDEX", s.MessageMap[0])
 	s.W.WriteByte(s.MessageMap[0])
 	WriteInt32(s.W, r.Width)
 	WriteInt32(s.W, r.Height)
@@ -370,6 +379,13 @@ func (s *BinaryProtocol) WriteNewMessageMap() {
 		s.MessageMap[n] = byte(om)
 		s.W.WriteByte(byte(om))
 	}
+}
+
+func (s *BinaryProtocol) WritePong() {
+	if s.Logging {
+		log.Println("SENDING WritePong")
+	}
+	s.W.WriteByte(s.MessageMap[14])
 }
 
 func (s *BinaryProtocol) Save() {

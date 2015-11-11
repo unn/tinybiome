@@ -149,7 +149,10 @@ func (r *Room) sendUpdates() {
 			}
 			if actor.moved {
 				player.Net.WriteMoveActor(actor)
+			}
+			if actor.oldm != actor.Mass {
 				player.Net.WriteSetMassActor(actor)
+				actor.oldm = actor.Mass
 			}
 		}
 	}
@@ -225,7 +228,10 @@ func (r *Room) getActor(id int64) *Actor {
 
 func (r *Room) Accept(p Protocol) {
 	player := &Player{Net: p, room: r, Connected: true}
-	player.Sync()
+	go player.SendUpdates()
+	log.Println(player, "STARTING LOOP")
+	player.ReceiveUpdates()
+	player.Remove()
 }
 
 func (r *Room) MergeTimeFromMass(mass float64) time.Duration {
@@ -271,6 +277,7 @@ type Player struct {
 	Connected bool
 	WriteChan chan []byte
 	ClanName  string
+	Synced    bool
 }
 
 func (p *Player) Tick(d time.Duration) {
@@ -281,6 +288,10 @@ func (p *Player) Tick(d time.Duration) {
 	}
 }
 func (p *Player) Sync() {
+	if p.Synced {
+		return
+	}
+	p.Synced = true
 	r := p.room
 
 	r.ChangeLock.Lock()
@@ -319,10 +330,6 @@ func (p *Player) Sync() {
 
 	r.ChangeLock.Unlock()
 	log.Println(p, "SENDING")
-	go p.SendUpdates()
-	log.Println(p, "STARTING LOOP")
-	p.ReceiveUpdates()
-	p.Remove()
 }
 func (p *Player) Write(pn ProtocolDown) {
 	pn.WriteNewPlayer(p)
@@ -416,6 +423,9 @@ func (p *Player) Split() {
 	p.room.ChangeLock.Unlock()
 }
 func (p *Player) Join(name string) {
+	if !p.Synced {
+		return
+	}
 	r := p.room
 	log.Println("Lock 3")
 	r.ChangeLock.Lock()

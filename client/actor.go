@@ -74,6 +74,7 @@ type Actor struct {
 	XSpeed float64
 	YSpeed float64
 	radius float64
+	oldm   float64
 }
 
 func NewActor(r *Room) *Actor {

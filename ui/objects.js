@@ -532,11 +532,12 @@ actor.prototype.step = function(seconds) {
 	}
 
 
+
+	this.x = (this.xs+this.x*3)/4
+	this.y = (this.ys+this.y*3)/4
+
 	this.x += mdx
 	this.y += mdy
-
-	this.x = (this.xs+this.x*2)/3
-	this.y = (this.ys+this.y*2)/3
 
 	this.x = median(this.x, 0, room.width);
 	this.y = median(this.y, 0, room.height);
@@ -582,7 +583,7 @@ playeractor.prototype.step = function(seconds) {
 		mdy = mousey - onCanvasY
 
 		actor.direction = Math.atan2(mdy,mdx)
-		actor.speed = (Math.sqrt(mdx*mdx+mdy*mdy)-20) / 100
+		actor.speed = (Math.sqrt(mdx*mdx+mdy*mdy)*canvas.cwidth/canvas.width-20) / 100
 		if (actor.speed<0) actor.speed=0
 		if (actor.speed>1) actor.speed=1
 
@@ -611,7 +612,7 @@ playeractor.prototype.step = function(seconds) {
 
 		now = (new Date())
 		if (now-this.lastupdate>3) {
-			writeMove(actor.id,actor.direction,actor.speed)
+			currentSock.writeMove(actor.id,actor.direction,actor.speed)
 			this.lastupdate = now
 		}
 	}
