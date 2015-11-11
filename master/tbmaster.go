@@ -23,7 +23,8 @@ func main() {
 	fs := http.FileServer(http.Dir("./ui"))
 	w.Handle("/", fs)
 
-	http.ListenAndServe("0.0.0.0:8080", w)
+	log.Println("ABOUT TO LISTEN FOR HTTP")
+	http.ListenAndServe("0.0.0.0:80", w)
 }
 
 type server struct {

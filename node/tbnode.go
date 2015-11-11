@@ -19,7 +19,7 @@ func main() {
 	if p != nil {
 		port = *p
 	}
-	d, e := websocket.Dial("ws://tinybio.me:4000", "", "http://server.go")
+	d, e := websocket.Dial("ws://www.tinybio.me:4000", "", "http://server.go")
 	if e != nil {
 		log.Println("MASTER SERVER DOWN", e)
 		d, e = websocket.Dial("ws://localhost:4000", "", "http://server.go")
