@@ -46,6 +46,7 @@ func main() {
 	m := http.NewServeMux()
 	m.HandleFunc("/", cli.Handler)
 	add := fmt.Sprintf("0.0.0.0:%d", port)
+	log.Println("STARTING ON", add)
 	err := http.ListenAndServe(add, m)
 	if err != nil {
 		log.Println("ERROR", err)

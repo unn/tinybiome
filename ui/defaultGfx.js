@@ -377,7 +377,7 @@ gfx.renderLeaderBoard = function(ctx, leaders, x, y, width, height, connected) {
 		leaders.length = 8
 	}
 
-	l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality
+	l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+currentSock.latency+"ms"
 
 	nPxHeight = 14;
 	t = getTextCanvas(l, nPxHeight, nPxHeight)

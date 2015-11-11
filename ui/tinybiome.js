@@ -371,8 +371,8 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 sock.prototype.handlePong = function(dv, off) {
 	now = (new Date());
 	this.latency = now-this.lastPing;
-	console.log("LATENCY",this.latency)
-	this.ele.innerHTML = "(LATENCY "+this.latency+"ms) "+this.location
+	console.log("PING",this.latency)
+	this.ele.innerHTML = "(PING "+this.latency+"ms) "+this.location
 	return off+1
 }
 

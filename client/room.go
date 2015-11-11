@@ -152,7 +152,7 @@ func (r *Room) sendUpdates() {
 			}
 			if actor.oldm != actor.Mass {
 				player.Net.WriteSetMassActor(actor)
-				actor.oldm = actor.Mass
+
 			}
 		}
 	}
@@ -161,6 +161,7 @@ func (r *Room) sendUpdates() {
 			continue
 		}
 		actor.moved = false
+		actor.oldm = actor.Mass
 	}
 }
 
