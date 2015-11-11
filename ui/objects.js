@@ -34,32 +34,32 @@ player.prototype.free = function() {
 	this.gfx.free()
 }
 player.prototype.render = function(ctx) {
-	myActors = []
-	mass = 0
+	var myActors = []
+	var mass = 0
 	
-	for (i in this.owns) {
-		b = this.owns[i]
+	for (var i in this.owns) {
+		var b = this.owns[i]
 		myActors.push(b)
 		mass += b.mass
 	}
 	if (myActors.length>0) {
-		bbox = this.bbox()
-		n = this.name ? this.name : "Microbe"
+		var bbox = this.bbox()
+		var n = this.name ? this.name : "Microbe"
 		this.gfx.update(bbox, n, mass, myActors)
 	}
 }
 var randomActorId = null;
 var randomActorTime = (new Date());
 player.prototype.bbox = function() {
-	x = this.room.width
-	y = this.room.height
-	xr = 0
-	yr = 0
+	var x = this.room.width
+	var y = this.room.height
+	var xr = 0
+	var yr = 0
 	
-	found = false
-	for (i in this.owns) {
-		b = this.owns[i]
-		bb = b.bbox()
+	var found = false
+	for (var i in this.owns) {
+		var b = this.owns[i]
+		var bb = b.bbox()
 		if (!bb) {
 			console.log("BB ERROR",bb)
 		}
@@ -73,12 +73,12 @@ player.prototype.bbox = function() {
 		found = true
 	}
 	if (!found) {
-		now = (new Date());
+		var now = (new Date());
 		if (now-randomActorTime>5000 || !randomActorId || !this.room.actors[randomActorId]) {
 			randomActorTime = now
 			randomActorId = pickRandomProperty(this.room.actors)
 		}
-		a = this.room.actors[randomActorId]
+		var a = this.room.actors[randomActorId]
 		if (!a) {
 			if (isNaN(x)) {
 				console.log("BB ERROR", x)
@@ -86,7 +86,7 @@ player.prototype.bbox = function() {
 			return [x/2-400,y/2-400,x/2+400,y/2+400]
 		}
 
-		bb = a.bbox()
+		var bb = a.bbox()
 		if (!bb) {
 			console.log("BB ERROR",bb)
 		}
@@ -145,9 +145,9 @@ renderTile.prototype.render = function(ctx) {
 	this.gfx.update()
 
 	if (Math.random()*1000<Object.keys(this.renderables).length) {
-		r = pickRandomProperty(this.renderables)
+		var r = pickRandomProperty(this.renderables)
 		if (r) {
-			r = this.renderables[r]
+			var r = this.renderables[r]
 			this.room.addParticle(r.x,r.y,r.color)	
 		}
 	}
@@ -188,7 +188,7 @@ renderTile.prototype.bbox = function() {
 }
 renderTile.prototype.findCollisions = function(actor) {
 	for(pel in this.renderables) {
-		p = this.renderables[pel]
+		var p = this.renderables[pel]
 		if (actor.contains(p)) {
 			p.remove()
 			actor.mass += 5
@@ -196,7 +196,7 @@ renderTile.prototype.findCollisions = function(actor) {
 	}
 }
 renderTile.prototype.find = function(x,y) {
-	id = ""+x+","+y
+	var id = ""+x+","+y
 	return this.renderables[id]
 }
 renderTile.id = function(x,y) {
@@ -266,39 +266,39 @@ function room(width, height) {
 }
 room.prototype.step = function(seconds) {
 	var actor;
-	for (id in this.steppers) {
+	for (var id in this.steppers) {
 		actor = this.steppers[id]
 		actor.step(seconds)
 	}
 
 	for(var i=0; i<this.particleCount;i++) {
-		p = this.particles[i]
+		var p = this.particles[i]
 		p.step(seconds)
 	}
 }
 room.prototype.findTile = function(ox,oy) {
-	x = Math.floor(ox/renderTileSize)*renderTileSize
-	y = Math.floor(oy/renderTileSize)*renderTileSize
+	var x = Math.floor(ox/renderTileSize)*renderTileSize
+	var y = Math.floor(oy/renderTileSize)*renderTileSize
 	var tile_id = renderTile.id(x,y)
 
 	return this.tiles[tile_id]
 }
 room.prototype.addParticle = function(x,y,color) {
-	id = this.particleCount
+	var id = this.particleCount
 
 	this.particleCount += 1
 
-	p = new particle(id,this,x,y,color)
+	var p = new particle(id,this,x,y,color)
 	return p
 }
 room.prototype.render = function(ctx) {
-	start = (new Date())
+	var start = (new Date())
 
-	padding = 10
-	for (id in this.renderable) {
-		objectToRender = this.renderable[id]
-		bbox = objectToRender.bbox()
-		isTile = false
+	var padding = 10
+	for (var id in this.renderable) {
+		var objectToRender = this.renderable[id]
+		var bbox = objectToRender.bbox()
+		var isTile = false
 		if ( objectToRender instanceof renderTile) {
 			isTile = true
 		}
@@ -319,10 +319,10 @@ room.prototype.render = function(ctx) {
 		}
 	}
 
-	startP = (new Date())
+	var startP = (new Date())
 	graphicsCounts.renderTime += startP - start
 	for(var i=0; i<this.particleCount;i++) {
-		p = this.particles[i]
+		var p = this.particles[i]
 		if (p.x < camera.x - padding || p.y < camera.y - padding
 			|| p.x > camera.x + camera.width + padding
 			|| p.y > camera.y + camera.height + padding) {
@@ -356,7 +356,7 @@ function pellet(room, x,y,style) {
 	this.y = y
 	this.id = ""+x+","+y
 	this.room = room
-	mytile = this.room.findTile(x,y)
+	var mytile = this.room.findTile(x,y)
 	if (!mytile.contains(x,y)) {
 		console.log("WTF", this.id,mytile)
 	}
@@ -386,9 +386,9 @@ pellet.prototype.free = function() {
 }
 pellet.prototype.remove = function() {
 	for(var i=0;i<4;i+=1) {
-		this.room.addParticle(this.x,this.y,p.color)
+		this.room.addParticle(this.x,this.y,this.color)
 	}
-	myTile = this.room.findTile(this.x,this.y)
+	var myTile = this.room.findTile(this.x,this.y)
 	if (!myTile) {
 		console.log(myTile)
 	}
@@ -439,7 +439,7 @@ actor.prototype.contains = function(actor) {
 	return false
 }
 actor.prototype.bbox = function() {
-	r = this.radius()
+	var r = this.radius()
 	this.bb[0] = this.x-r
 	this.bb[1] = this.y-r
 	this.bb[2] = this.x+r
@@ -449,20 +449,13 @@ actor.prototype.bbox = function() {
 	return this.bb
 }
 actor.prototype.postRender = function() {
-	onCanvasX = (this.x - camera.x)*camera.xscale
-	onCanvasY = (this.y - camera.y)*camera.yscale
-	dx = mousex-onCanvasX
-	dy = mousey-onCanvasY
-	dist = Math.sqrt(dx*dx+dy*dy)
-	dx = dx / dist * (dist-10)
-	dy = dy / dist * (dist-10)
-	if (this.owner == this.room.myplayer.id) {
-		// ctx.strokeStyle = "rgba(30,60,80,.4)";
-		// ctx.beginPath();
-		// ctx.moveTo(onCanvasX, onCanvasY);
-	 //    ctx.lineTo(onCanvasX+dx, onCanvasY+dy);
-		// ctx.stroke();
-	}
+	var onCanvasX = (this.x - camera.x)*camera.xscale
+	var onCanvasY = (this.y - camera.y)*camera.yscale
+	var dx = mousex-onCanvasX
+	var dy = mousey-onCanvasY
+	var dist = Math.sqrt(dx*dx+dy*dy)
+	var dx = dx / dist * (dist-10)
+	var dy = dy / dist * (dist-10)
 }
 actor.prototype.setmass = function(m) {
 	this.newmass = m
@@ -486,19 +479,19 @@ actor.prototype.step = function(seconds) {
 
 	var room = this.room
 
-	allowed = 500 / (room.speedmultiplier * Math.pow(this.mass + 50, .5))
-	distance = allowed * seconds * this.speed
-	mdx = Math.cos(this.direction) * distance
-	mdy = Math.sin(this.direction) * distance
+	var allowed = 500 / (room.speedmultiplier * Math.pow(this.mass + 50, .5))
+	var distance = allowed * seconds * this.speed
+	var mdx = Math.cos(this.direction) * distance
+	var mdy = Math.sin(this.direction) * distance
 
 
 	if (this.inview) {
-		particleChance = 1-1/((10 * seconds)*this.speed*this.radius())
+		var particleChance = 1-1/((10 * seconds)*this.speed*this.radius())
 		if (Math.random()<particleChance*renderQuality/4) {
-			a = this.direction + Math.random()*Math.PI-Math.PI/2
-			dx = Math.cos(a)*this.radius()
-			dy = Math.sin(a)*this.radius()
-			p = room.addParticle(this.x-dx,this.y-dy,this.color)
+			var a = this.direction + Math.random()*Math.PI-Math.PI/2
+			var dx = Math.cos(a)*this.radius()
+			var dy = Math.sin(a)*this.radius()
+			var p = room.addParticle(this.x-dx,this.y-dy,this.color)
 			p.xspeed = -mdx
 			p.yspeed = -mdy
 		}
@@ -556,11 +549,11 @@ playeractor.prototype.free = function() {
 playeractor.prototype.step = function(seconds) {
 	if (this.owner==this.room.myplayer.id) {
 		var actor = this.actor;
-		onCanvasX = (actor.x - camera.x)*camera.xscale
-		onCanvasY = (actor.y - camera.y)*camera.yscale
+		var onCanvasX = (actor.x - camera.x)*camera.xscale
+		var onCanvasY = (actor.y - camera.y)*camera.yscale
 
-		mdx = mousex - onCanvasX
-		mdy = mousey - onCanvasY
+		var mdx = mousex - onCanvasX
+		var mdy = mousey - onCanvasY
 
 		actor.direction = Math.atan2(mdy,mdx)
 		actor.speed = (Math.sqrt(mdx*mdx+mdy*mdy)*canvas.cwidth/canvas.width-20) / 100
@@ -590,7 +583,7 @@ playeractor.prototype.step = function(seconds) {
 		// 	}
 		// }
 
-		now = (new Date())
+		var now = (new Date())
 		if (now-this.lastupdate>3) {
 			currentSock.writeMove(actor.id,actor.direction,actor.speed)
 			this.lastupdate = now
@@ -598,11 +591,11 @@ playeractor.prototype.step = function(seconds) {
 	}
 }
 playeractor.prototype.render = function(ctx) {
-	radius = this.actor.radius()
+	var radius = this.actor.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
 	this.actor.color = this.owner==this.room.myplayer.id ? 0x33FF33 : 0x3333FF;
-	n = this.room.players[this.owner].name
+	var n = this.room.players[this.owner].name
 	n = n ? n : "Microbe"
 	this.gfx.update(this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
 }

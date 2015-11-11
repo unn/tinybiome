@@ -12,10 +12,7 @@ cellImg.pattern = false;
 
 var texture = PIXI.Texture.fromImage("imgs/cells.jpg");
 
-font = "Verdana, Geneva, sans-serif"
-fontPrefix = "bold "
-
-mPlier = 4
+var mPlier = 4
 
 var tileSize = 100;
 
@@ -209,7 +206,7 @@ gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
 				pix.stage.addChild(bunny);
 				rendered = true
 			}
-			r = life / 50
+			var r = life / 50
 			bunny.scale.x = r
 			bunny.scale.y = r
 			bunny.position.x = x
@@ -377,11 +374,11 @@ var genericCircle = (function() {
 	playerMask.beginFill(0xFFFFFF,1);
 	// playerMask.arc(0,0,1,0,Math.PI*2)
 
-	parts = 12
-	a = Math.PI*2/parts
+	var parts = 12
+	var a = Math.PI*2/parts
 	for(var i=0;i<=parts;i++) {
-		x = Math.cos(i*a)*.8
-		y = Math.sin(i*a)*.8
+		var x = Math.cos(i*a)*.8
+		var y = Math.sin(i*a)*.8
 		if (i==0) {
 			playerMask.moveTo(x,y)
 		} else {
@@ -398,16 +395,16 @@ var genericCircle = (function() {
 var bubbleCircle = (function() {
 	var playerMask = new PIXI.Graphics()
 	playerMask.beginFill(0xFFFFFF,1);
-	parts = 10
-	a = Math.PI*2/parts
+	var parts = 10
+	var a = Math.PI*2/parts
 	for(var i=0;i<=parts;i++) {
-		x = Math.cos(i*a)*.7
-		y = Math.sin(i*a)*.7
+		var x = Math.cos(i*a)*.7
+		var y = Math.sin(i*a)*.7
 		if (i==0) {
 			playerMask.moveTo(x,y)
 		} else {
-			xn = Math.cos(i*a-a/2)
-			yn = Math.sin(i*a-a/2)
+			var xn = Math.cos(i*a-a/2)
+			var yn = Math.sin(i*a-a/2)
 			playerMask.quadraticCurveTo(xn,yn,x,y)
 		}
 	}
@@ -420,16 +417,16 @@ var bubbleCircle = (function() {
 var virusBall = (function() {
 	var playerMask = new PIXI.Graphics()
 	playerMask.beginFill(0xFFFFFF,1);
-	parts = 10
-	a = Math.PI*2/parts
+	var parts = 10
+	var a = Math.PI*2/parts
 	for(var i=0;i<=parts;i++) {
-		x = Math.cos(i*a)
-		y = Math.sin(i*a)
+		var x = Math.cos(i*a)
+		var y = Math.sin(i*a)
 		if (i==0) {
 			playerMask.moveTo(x,y)
 		} else {
-			xn = Math.cos(i*a-a/2)*.4
-			yn = Math.sin(i*a-a/2)*.4
+			var xn = Math.cos(i*a-a/2)*.4
+			var yn = Math.sin(i*a-a/2)*.4
 			playerMask.quadraticCurveTo(xn,yn,x,y)
 		}
 	}
@@ -465,6 +462,6 @@ function genericCell(playerMask) {
 }
 
 function fromRgb(r,g,b) {
-	c = Math.floor(r)*256*256+Math.floor(g)*256+Math.floor(b)
+	var c = Math.floor(r)*256*256+Math.floor(g)*256+Math.floor(b)
 	return c
 }

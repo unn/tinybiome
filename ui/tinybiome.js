@@ -1,5 +1,6 @@
 "use strict"
 
+var servers;
 var currentSock;
 
 var tileSize = 50;
@@ -36,12 +37,12 @@ function server(location) {
 		ohno("Websocket Closed?")
 	}
 	this.ws.onmessage = function(m) {
-		d = JSON.parse(m.data)
+		var d = JSON.parse(m.data)
 		if (d.meth=="add") {
 			new sock(d.address);
 		}
 		if (d.meth=="rem") {
-			s = self.findServer(d.address)
+			var s = self.findServer(d.address)
 			self.removeServer(s)
 			s.remove()
 		}
@@ -156,8 +157,8 @@ sock.prototype.start = function() {
 }
 sock.prototype.step = function() {
 	var actor;
-	now = (new Date())
-	diff = (now - this.lastStep) / 1000
+	var now = (new Date())
+	var diff = (now - this.lastStep) / 1000
 	if (this.room) {
 		if (!this.room.step) {
 			console.log(this.room)
@@ -192,10 +193,10 @@ sock.prototype.tick = function() {
 	}
 }
 sock.prototype.onmessage = function(m){
-	dv = new DataView(m.data)
-	off = 0
+	var dv = new DataView(m.data)
+	var off = 0
 	while (off < dv.byteLength) {
-		olf = off
+		var olf = off
 		if (this.synced) {
 			off = this.readMessage(dv, off)
 		} else {
@@ -206,17 +207,17 @@ sock.prototype.onmessage = function(m){
 	}
 }
 sock.prototype.readMessage = function(dv, off) {
-	t = dv.getUint8(off)
-	h = this.messageHandlers[this.messageMap[t]]
+	var t = dv.getUint8(off)
+	var h = this.messageHandlers[this.messageMap[t]]
 	if (!h) {
 		console.log("UNKNOWN TYPE", t, "MAPPED TO", this.messageMap[t])
 		return off+1000000
 	}
-	v = h(dv, off)
+	var v = h(dv, off)
 	return v
 }
 sock.prototype.handleSync = function(dv, off) {
-	l = dv.getUint8(off+1)
+	var l = dv.getUint8(off+1)
 	this.messageMap = []
 	for(var i=0; i<l; i++) {
 		this.messageMap[dv.getUint8(off+2+i)] = i
@@ -225,8 +226,8 @@ sock.prototype.handleSync = function(dv, off) {
 }
 sock.prototype.handleNewRoom = function(dv, off) {
 	console.log("NEW ROOM INCOMING")
-	width = dv.getInt32(off+1, true)
-	height = dv.getInt32(off+5, true)
+	var width = dv.getInt32(off+1, true)
+	var height = dv.getInt32(off+5, true)
 	if (!this.room) {
 		this.room = new room(width,height)
 	}
@@ -241,23 +242,23 @@ sock.prototype.handleNewRoom = function(dv, off) {
 	return off + 29
 }
 sock.prototype.handleNewActor = function(dv, off) {
-	id = dv.getInt32(off+1, true)
-	x = dv.getFloat32(off+5, true)
-	y = dv.getFloat32(off+9, true)
-	mass = dv.getFloat32(off+13, true)
+	var id = dv.getInt32(off+1, true)
+	var x = dv.getFloat32(off+5, true)
+	var y = dv.getFloat32(off+9, true)
+	var mass = dv.getFloat32(off+13, true)
 	console.log("CREATING ACTOR",id,"AT",x,y)
-	p = new actor(this.room, id, x, y)
+	var p = new actor(this.room, id, x, y)
 	p.mass = mass
 	return off + 17
 }
 sock.prototype.handleNewPellet = function(dv, off) {
-	p = new pellet(this.room, dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
+	var p = new pellet(this.room, dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
 	return off + 13
 }
 sock.prototype.handleRemovePellet = function(dv, off) {
-	dx = dv.getInt32(off+1, true)
-	dy = dv.getInt32(off+5, true)
-	p = this.room.findTile(dx,dy).find(dx,dy)
+	var dx = dv.getInt32(off+1, true)
+	var dy = dv.getInt32(off+5, true)
+	var p = this.room.findTile(dx,dy).find(dx,dy)
 
 	if (p) {
 		p.remove()	
@@ -267,12 +268,12 @@ sock.prototype.handleRemovePellet = function(dv, off) {
 	return off + 9
 }
 sock.prototype.handleNewPlayer = function(dv, off) {
-	id = dv.getInt32(off+1, true)
-	len = dv.getInt32(off+5, true)
+	var id = dv.getInt32(off+1, true)
+	var len = dv.getInt32(off+5, true)
 	if (len<100000 && len > -1) {
-		name = dv.getUTF8String(off+9,len)
+		var name = dv.getUTF8String(off+9,len)
 		console.log("CREATING PLAYER", id, "NAME(",len,")",name)
-		p = (new player(this.room, id))
+		var p = (new player(this.room, id))
 		p.name = name ? name : "";
 	} else {
 		console.log("INCORRECT LEN", len)
@@ -280,10 +281,10 @@ sock.prototype.handleNewPlayer = function(dv, off) {
 	return off + 9 + len
 }
 sock.prototype.handleRenamePlayer = function(dv, off) {
-	id = dv.getInt32(off+1, true)
-	len = dv.getInt32(off+5, true)
+	var id = dv.getInt32(off+1, true)
+	var len = dv.getInt32(off+5, true)
 	if (len<100000 && len > -1) {
-		name = dv.getUTF8String(off+9,len)
+		var name = dv.getUTF8String(off+9,len)
 		console.log("RENAMING PLAYER", id)
 		this.room.players[id].name=name
 	} else {
@@ -292,34 +293,34 @@ sock.prototype.handleRenamePlayer = function(dv, off) {
 	return off + 9 + len
 }
 sock.prototype.handleDestroyPlayer = function(dv, off) {
-	id = dv.getInt32(off+1, true)
+	var id = dv.getInt32(off+1, true)
 	console.log("DESTROYING PLAYER", id)
 	this.room.players[id].remove()
 
 	return off + 5
 }
 sock.prototype.handleOwnPlayer = function(dv, off) {
-	id = dv.getInt32(off+1, true)
+	var id = dv.getInt32(off+1, true)
 	console.log("NOW OWNS", id)
 	this.room.myplayer = this.room.players[id]
 	return off + 5
 }
 sock.prototype.handleRemoveActor = function(dv, off) {
-	id = dv.getInt32(off+1, true)
+	var id = dv.getInt32(off+1, true)
 	console.log("REMOVING ACTOR", id)
-	p = this.room.actors[id]
+	var p = this.room.actors[id]
 	p.remove()
 	return off + 5
 
 }
 sock.prototype.handleMoveActor = function(dv, off) {
-	id = dv.getInt32(off+1, true)
-	x = dv.getFloat32(off+5, true)
-	y = dv.getFloat32(off+9, true)
-	d = dv.getFloat32(off+13, true)
-	s = dv.getFloat32(off+17, true)
+	var id = dv.getInt32(off+1, true)
+	var x = dv.getFloat32(off+5, true)
+	var y = dv.getFloat32(off+9, true)
+	var d = dv.getFloat32(off+13, true)
+	var s = dv.getFloat32(off+17, true)
 
-	p = this.room.actors[id]
+	var p = this.room.actors[id]
 	p.xs = x
 	p.ys = y
 	p.direction = d
@@ -328,14 +329,14 @@ sock.prototype.handleMoveActor = function(dv, off) {
 	return off + 21
 }
 sock.prototype.handleSetMass = function(dv, off) {
-	id = dv.getInt32(off+1, true)
-	mass = dv.getFloat32(off+5, true)
-	p = this.room.actors[id]
+	var id = dv.getInt32(off+1, true)
+	var mass = dv.getFloat32(off+5, true)
+	var p = this.room.actors[id]
 	p.setmass( mass )
 	return off + 9
 }
 sock.prototype.handleMultiPellet = function(dv, off) {
-	amt = dv.getInt32(off+1, true)
+	var amt = dv.getInt32(off+1, true)
 	if (amt<1000000) {
 		try {
 			for(i in this.room.tiles) {
@@ -345,15 +346,15 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 		catch(e) { console.log(e) }
 		console.log("MULTI PELLET", amt)
 
-		o = off + 5
+		var o = off + 5
 		for(var i=0;i<amt;i++) {
-			x = dv.getInt32(o, true)
-			y = dv.getInt32(o+4, true)
-			style = dv.getInt32(o+8, true)
+			var x = dv.getInt32(o, true)
+			var y = dv.getInt32(o+4, true)
+			var style = dv.getInt32(o+8, true)
 			if (Math.random()<.0001) {
 				console.log("CREATING PELLET", x, y, style)
 			}
-			p = new pellet(this.room, x, y, style)
+			var p = new pellet(this.room, x, y, style)
 			o += 12
 		}
 
@@ -371,32 +372,32 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 	return off + 5 + amt * 12
 }
 sock.prototype.handleDescribeActor = function(dv, off) {
-	t = dv.getUint8(off+1)
+	var t = dv.getUint8(off+1)
 	switch (t) {
 	case 0:
-		aid = dv.getInt32(off+2, true)
-		pid = dv.getInt32(off+6, true)
+		var aid = dv.getInt32(off+2, true)
+		var pid = dv.getInt32(off+6, true)
 		console.log("ACTOR",aid,"IS PLAYERACTOR")
 		
-		a = new playeractor(this.room, aid,pid)
+		var a = new playeractor(this.room, aid,pid)
 		return off + 10
 	case 1:
-		aid = dv.getInt32(off+2, true)
+		var aid = dv.getInt32(off+2, true)
 		console.log("ACTOR",aid,"IS VIRUS")
 		
-		a = new virus(this.room, aid)
+		var a = new virus(this.room, aid)
 		return off + 6
 	case 2:
-		aid = dv.getInt32(off+2, true)
+		var aid = dv.getInt32(off+2, true)
 		console.log("ACTOR",aid,"IS BACTERIA")
 		
-		a = new bacteria(this.room, aid)
+		var a = new bacteria(this.room, aid)
 		return off + 6
 
 	}
 }
 sock.prototype.handlePong = function(dv, off) {
-	now = (new Date());
+	var now = (new Date());
 	if (this.latency==0) this.latency = now-this.lastPing
 	else this.latency = (this.latency*5+(now-this.lastPing))/6;
 	console.log("PING",this.latency)
@@ -405,9 +406,9 @@ sock.prototype.handlePong = function(dv, off) {
 }
 
 sock.prototype.writeJoin = function(name) {
-	asString = str2ab(name)
-	ab = new ArrayBuffer(1+4+asString.length)
-	dv = new DataView(ab)
+	var asString = str2ab(name)
+	var ab = new ArrayBuffer(1+4+asString.length)
+	var dv = new DataView(ab)
 	dv.setUint8(0,0,true)
 	dv.setInt32(1,asString.length,true)
 	for(var i=0;i<asString.length;i+=1) {
@@ -416,30 +417,29 @@ sock.prototype.writeJoin = function(name) {
 	this.ws.send(ab)
 }
 
-mab = new DataView(new ArrayBuffer(13))
+var mab = new DataView(new ArrayBuffer(13))
 mab.setUint8(0,1,true)
 sock.prototype.writeMove = function(id,d,s) {
-
 	mab.setInt32(1,id,true)
 	mab.setFloat32(5,d,true)
 	mab.setFloat32(9,s,true)
 	this.ws.send(mab)
 }
 sock.prototype.writeSplit = function() {
-	sab = new DataView(new ArrayBuffer(1))
+	var sab = new DataView(new ArrayBuffer(1))
 	sab.setUint8(0,2,true)
 	this.ws.send(sab)
 }
 sock.prototype.writeSync = function() {
 	console.log("SYNCING",this.location)
-	sab = new DataView(new ArrayBuffer(1))
+	var sab = new DataView(new ArrayBuffer(1))
 	sab.setUint8(0,3,true)
 	this.ws.send(sab)
 }
 
 sock.prototype.writePing = function() {
 	this.lastPing = (new Date())
-	sab = new DataView(new ArrayBuffer(1))
+	var sab = new DataView(new ArrayBuffer(1))
 	sab.setUint8(0,4,true)
 	this.ws.send(sab)
 
@@ -451,7 +451,7 @@ function ab2str(buf) {
   return String.fromCharCode.apply(null, buf);
 }
 function str2ab(str) {
-	uintArray = []
+	var uintArray = []
 	for (var i=0, strLen=str.length; i<strLen; i++) {
 		uintArray.push(str.charCodeAt(i));
 	}
@@ -488,7 +488,7 @@ window.onload = function() {
 	graphicsChanged();
 	document.getElementById("loginButton").onclick = function() {
 		console.log("JOINING")
-		n = document.getElementById("name").value;
+		var n = document.getElementById("name").value;
 		currentSock.writeJoin(n)
 	}
 }
@@ -525,7 +525,8 @@ canvas.onmousemove = function(e) {
 	mousex = e.offsetX/canvas.cwidth*canvas.width;
 	mousey = e.offsetY/canvas.cheight*canvas.height;
 }
-canSplit = true
+
+var canSplit = true
 document.onkeydown = function(e) {
     e = e || window.event;
 
@@ -621,7 +622,7 @@ var renderLeaderBoard
 function render() {
 	window.requestAnimationFrame(render)
 	newFps += 1
-	now = (new Date())
+	var now = (new Date())
 	if (now-lastFps>1000) {
 		lastFps = now
 		fps = newFps
@@ -668,7 +669,7 @@ function render() {
 	
 
 	if (currentSock && currentSock.room && currentSock.room.myplayer) {
-		size = currentSock.room.myplayer.bbox()
+		var size = currentSock.room.myplayer.bbox()
 		if (Math.random()<.01) {
 			console.log("CAMERA",size)
 		}
@@ -677,18 +678,18 @@ function render() {
 		size[2] += camPad
 		size[3] += camPad
 
-		width = size[2]-size[0]
-		height = size[3]-size[1]
-		ratio = canvas.width/canvas.height
-		haveRatio = width/height
+		var width = size[2]-size[0]
+		var height = size[3]-size[1]
+		var ratio = canvas.width/canvas.height
+		var haveRatio = width/height
 		if (haveRatio<ratio) {
 			width = width/haveRatio*ratio
 		}
 		if (haveRatio>ratio) {
 			height = height*haveRatio/ratio
 		}
-		midPointX = (size[2]+size[0])/2
-		midPointY = (size[3]+size[1])/2
+		var midPointX = (size[2]+size[0])/2
+		var midPointY = (size[3]+size[1])/2
 
 		camera.x = (midPointX -width/2 + camera.x*3) / 4;
 		camera.y = (midPointY -height/2 + camera.y*3) / 4;
@@ -703,15 +704,15 @@ function render() {
 
 	
 
-	x = camera.x<0 ? 0 : camera.x
-	y = camera.y<0 ? 0 : camera.y
-	w = x + camera.width > room.width ? room.width - x : camera.width
-	h = y + camera.height > room.height ? room.height - y : camera.height 
+	var x = camera.x<0 ? 0 : camera.x
+	var y = camera.y<0 ? 0 : camera.y
+	var w = x + camera.width > room.width ? room.width - x : camera.width
+	var h = y + camera.height > room.height ? room.height - y : camera.height 
 
-	x = camera.x
-	y = camera.y
-	w = camera.width
-	h = camera.height 
+	var x = camera.x
+	var y = camera.y
+	var w = camera.width
+	var h = camera.height 
 
 
 	renderBackground.update(x, y, w, h)
@@ -726,8 +727,8 @@ function render() {
 
 	var actor;
 	if (currentSock && currentSock.room) {
-		for (id in currentSock.room.renderable) {
-			actor = currentSock.room.renderable[id]
+		for (var id in currentSock.room.renderable) {
+			var actor = currentSock.room.renderable[id]
 			if (actor.postRender) {
 				actor.postRender()
 			}
@@ -741,17 +742,17 @@ function render() {
 
 function draw_leaderboard(ctx, room) {
 	var playersWithScore = []
-	total = 0
-	for(k in room.players) {
+	var total = 0
+	for(var k in room.players) {
 		total += 1
-		p = room.players[k]
-		s = 0
-		for(i in p.owns) {
-			a = p.owns[i];
+		var p = room.players[k]
+		var s = 0
+		for(var i in p.owns) {
+			var a = p.owns[i];
 			s += a.mass
 		}
 		if (s!=0) {
-			n = p.name ? p.name : "Microbe"
+			var n = p.name ? p.name : "Microbe"
 			playersWithScore.push([n,Math.floor(s)])
 		}
 	}
