@@ -123,23 +123,23 @@ function renderTile(room,x,y) {
 	this.visible = false
 	this.gfx = gfx.createRenderTile(pix)
 }
-renderTile.prototype.add = function(particle) {
+renderTile.prototype.add = function(pell) {
 	this.count += 1
-	if (particle.id in this.renderables) {
-		console.log("Duplicate Pellet", particle)
-		return
+	if (pell.id in this.renderables) {
+		console.log("Duplicate Pellet", pell)
+		this.renderables[pell.id].remove()
 	}
 
-	this.renderables[particle.id] = particle
-	particle.render({stage:this.gfx.container})
+	this.renderables[pell.id] = pell
+	pell.render({stage:this.gfx.container})
+	pell.gfx.show()
 
 }
 renderTile.prototype.free = function() {
 	this.gfx.free()
 }
-renderTile.prototype.remove = function(particle) {
-	this.free()
-	delete this.renderables[particle.id]
+renderTile.prototype.remove = function(pell) {
+	delete this.renderables[pell.id]
 }
 renderTile.prototype.render = function(ctx) {
 	this.gfx.update()
@@ -223,6 +223,7 @@ function particle(id,room,x,y,color) {
 	this.room = room
 	this.room.particles[id] = this
 	this.gfx = gfx.createParticle(pix)
+	this.destroyed = false
 }
 particle.prototype.render = function(ctx) {
 	this.gfx.update(this.x, this.y, this.life, this.color)
@@ -238,6 +239,10 @@ particle.prototype.step = function(seconds) {
 	if (this.life<=0) this.destroy()
 }
 particle.prototype.destroy = function() {
+	if (this.destroyed) {
+		throw new Exception("DOUBLE DESTROY")
+	}
+	this.destroyed = true
 	this.gfx.free()
 	this.room.particleCount -= 1
 	this.room.particles[this.id] = this.room.particles[this.room.particleCount]
@@ -274,6 +279,10 @@ room.prototype.step = function(seconds) {
 	for(var i=0; i<this.particleCount;i++) {
 		var p = this.particles[i]
 		p.step(seconds)
+		while (p!=this.particles[i]) {
+			p = this.particles[i]
+			p.step(seconds)
+		}
 	}
 }
 room.prototype.findTile = function(ox,oy) {
@@ -309,10 +318,14 @@ room.prototype.render = function(ctx) {
 				if (isTile) {
 					graphicsCounts.tileSkips += 1
 				}
-				objectToRender.free()
+				objectToRender.gfx.hide()
 				continue
 			}
 		}
+		objectToRender.gfx.show()
+		// if (Math.random()<.01) {
+		// 	console.log("RENDERING",objectToRender)
+		// }
 		objectToRender.render(ctx)
 		if (isTile) {
 			graphicsCounts.tiles += 1
@@ -327,9 +340,11 @@ room.prototype.render = function(ctx) {
 			|| p.x > camera.x + camera.width + padding
 			|| p.y > camera.y + camera.height + padding) {
 				graphicsCounts.particleSkips += 1
+				p.gfx.hide()
 				continue
 		}
 		graphicsCounts.particles += 1
+		p.gfx.show()
 		p.render(ctx)
 	}
 	graphicsCounts.particleTime += (new Date()) - startP
@@ -381,9 +396,6 @@ pellet.prototype.render = function(ctx) {
 	}
 	this.gfx.update(this.x, this.y, this.color, this._radius)
 }
-pellet.prototype.free = function() {
-	this.gfx.free()
-}
 pellet.prototype.remove = function() {
 	for(var i=0;i<4;i+=1) {
 		this.room.addParticle(this.x,this.y,this.color)
@@ -424,7 +436,7 @@ function actor(room, id, x, y) {
 	this.owner = null
 	this.inview = false
 
-	this.gfx = gfx.createActor(pix)
+	this.gfx = noop;
 	this.bb = []
 }
 
@@ -448,15 +460,6 @@ actor.prototype.bbox = function() {
 	// Object {x: 2237.860989646591, y: 2852.517463089905, width: 950, height: 480}
 	return this.bb
 }
-actor.prototype.postRender = function() {
-	var onCanvasX = (this.x - camera.x)*camera.xscale
-	var onCanvasY = (this.y - camera.y)*camera.yscale
-	var dx = mousex-onCanvasX
-	var dy = mousey-onCanvasY
-	var dist = Math.sqrt(dx*dx+dy*dy)
-	var dx = dx / dist * (dist-10)
-	var dy = dy / dist * (dist-10)
-}
 actor.prototype.setmass = function(m) {
 	this.newmass = m
 }
@@ -472,7 +475,6 @@ actor.prototype.render = function(ctx) {
 	this.gfx.update(this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 
 }
-actor.prototype.free = function() {}
 actor.prototype.step = function(seconds) {
 	this.mass = (this.newmass+this.mass*4)/5
 
@@ -492,12 +494,12 @@ actor.prototype.step = function(seconds) {
 			var dx = Math.cos(a)*this.radius()
 			var dy = Math.sin(a)*this.radius()
 			var p = room.addParticle(this.x-dx,this.y-dy,this.color)
-			p.xspeed = -mdx
-			p.yspeed = -mdy
+			if (p) {
+				p.xspeed = -mdx
+				p.yspeed = -mdy
+			}
 		}
 	}
-
-
 
 	this.x = (this.xs+this.x*3)/4
 	this.y = (this.ys+this.y*3)/4
@@ -533,6 +535,7 @@ function playeractor(room, aid, pid) {
 	}
 	this.lastupdate = (new Date())
 	this.gfx = gfx.createPlayerActor(pix)
+	this.actor.gfx = this.gfx
 }
 playeractor.prototype.remove = function() {
 	delete this.room.players[this.owner].owns[this.actor.id]
@@ -541,10 +544,6 @@ playeractor.prototype.remove = function() {
 			document.getElementById("mainfloat").style.display="block";
 		}
 	}
-	this.gfx.free()
-}
-playeractor.prototype.free = function() {
-	this.gfx.free()
 }
 playeractor.prototype.step = function(seconds) {
 	if (this.owner==this.room.myplayer.id) {
@@ -606,16 +605,12 @@ function virus(room, aid) {
 	this.actor.owner = this
 	this.actor.color = 0xFF0000
 	this.gfx = gfx.createVirus(pix)
+	this.actor.gfx = this.gfx
 }
 virus.prototype.render = function(ctx) {
 	this.gfx.update(this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 }
-virus.prototype.remove = function() {
-	this.gfx.free()
-}
-virus.prototype.free = function() {
-	this.gfx.free()
-}
+
 
 function bacteria(room, aid) {
 	this.room = room
@@ -623,13 +618,8 @@ function bacteria(room, aid) {
 	this.actor.owner = this
 	this.actor.color = lightBlue
 	this.gfx = gfx.createBacteria(pix)
+	this.actor.gfx = this.gfx
 }
 bacteria.prototype.render = function(ctx) {
 	this.gfx.update(this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
-}
-bacteria.prototype.remove = function() {
-	this.gfx.free()
-}
-bacteria.prototype.free = function() {
-	this.gfx.free()
 }

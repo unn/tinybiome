@@ -3,6 +3,8 @@
 
 
 
+go build node/tbnode.go
+go build master/tbmaster.go
 for i in www.tinybio.me; do
 rsync tbmaster "root@$i:/tmp/new";
 ssh "root@$i" "
@@ -18,8 +20,6 @@ if ! cmp /tmp/new tbmaster ; then
 	nohup ./tbmaster </dev/null >tbmaster.log 2>&1 &
 fi";
 done;
-
-
 for i in 139.162.220.253 45.79.166.39 45.79.110.252; do
 rsync tbnode "root@$i:/tmp/new";
 ssh "root@$i" "
@@ -66,4 +66,9 @@ echo 'COPYING'
 /bin/cp -f /tmp/new tbnode
 nohup ./tbnode </dev/null >tbnode.log 2>&1 &";
 done;
+
+
+for i in 139.162.220.253 45.79.166.39 45.79.110.252; do
+ssh "root@$i" "rm tbnode.log";
+done
 

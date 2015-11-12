@@ -24,6 +24,21 @@ var pix = {
 pix.scale.addChild(pix.stage)
 pix.top.addChild(pix.scale)
 
+var renderRenderBackground = true;
+var renderActor = true;
+
+var renderLeaderBoard = true;
+var renderGroup = true;
+var renderParticle = true;
+var renderRenderTile = true;
+var renderVitamin = true;
+var renderMineral = true;
+var renderPlayerActor = true;
+var renderVirus = true;
+var renderBacteria = true;
+
+var noop = {update:function(){},free:function(){},hide:function(){},show:function(){}};
+
 gfx.getContext = function(canvas) {
 	if (!pix.renderer) {
 		pix.renderer = PIXI.autoDetectRenderer(canvas.width, canvas.height, {view:canvas})
@@ -52,144 +67,184 @@ gfx.done = function(ctx) {
 
 
 
+var countCreateRenderBackground = 0
 gfx.createRenderBackground = function(pix) {
+	if (!renderRenderBackground) return noop
 	var g = new PIXI.Graphics();
 	pix.stage.addChild(g)
-	return {update:function(x,y,w,h) {
-		g.clear();
-		g.beginFill(0xFFFFFF,1)
-		g.drawRect(x,y,w,h)
-		g.endFill()
-	}, free:function(){}}
+	return {
+		show: function(){},
+		hide: function(){},
+		free: function(){},
+		update:function(x,y,w,h) {
+			g.clear();
+			g.beginFill(0xFFFFFF,1)
+			g.drawRect(x,y,w,h)
+			g.endFill()
+		}}
 }
 
+var countCreateGroup = 0
 gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
+	if (!renderGroup) return noop
 	var last;
-	return {update:function(bbox,n,mass,myActors){
-		// if (last) {
-		// 	pix.stage.removeChild(last)
-		// }
-		// last = new PIXI.Container()
+	return {
+		hide: function() {
+		},
+		show: function() {
 
-		// var text = new PIXI.Text(n,{
-		// 	font: '24px Arial', 
-		// 	stroke: "black", 
-		// 	fill: "white", 
-		// 	strokeThickness: 1});
+		},
+		update:function(bbox,n,mass,myActors){
+			if (last) {
+				pix.stage.removeChild(last)
+				last.destroy()
+			}
+			last = new PIXI.Container()
 
-		// last.addChild(text)
-		// last.position.x = bbox[0]
-		// last.position.y = bbox[1]
+			var text = new PIXI.Text(n,{
+				font: '48px Arial', 
+				stroke: "black", 
+				fill: "white", 
+				strokeThickness: 1});
 
-		// text.anchor.x = .5;
-		// text.position.x = (bbox[2]-bbox[0])/2
-		// text.position.y = bbox[3]-bbox[1]
-		// pix.stage.addChild(last)
+			last.addChild(text)
+			last.position.x = bbox[0]
+			last.position.y = bbox[1]
 
-	},free:function(){
-		pix.stage.removeChild(last)
-	}}
+			text.anchor.x = .5;
+			text.scale.x = .5;
+			text.scale.y = .5;
+			text.position.x = (bbox[2]-bbox[0])/2
+			text.position.y = bbox[3]-bbox[1]
+			pix.stage.addChild(last) 
+		},
+		free:function(){
+			pix.stage.removeChild(last)
+			last.destroy()
+		}}
 }
 
 var frame = 0
+var countCreateLeaderBoard = 0
 gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
+	if (!renderLeaderBoard) return noop
 	var last;
-	return {update:function(leaders,x, y, width, height, connected){
-		// if (last) {
-		// 	pix.stage.removeChild(last)
-		// }
-		// last = new PIXI.Container()
+	return {
+		hide: function() {
 
-		// frame += 1;
-		// if (frame>1000) {
-		// 	frame = 0
-		// }
+		},
+		show: function() {
 
-		// total = leaders.length
-		// if (leaders.length <= 0) {
-		// 	return
-		// }
-		// if (leaders.length > 8) {
-		// 	leaders.length = 8
-		// }
+		},
+		update:function(leaders,x, y, width, height, connected){
+			if (last) {
+				pix.stage.removeChild(last)
+				last.destroy()
+			}
+			last = new PIXI.Container()
 
-		// l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+Math.floor(currentSock.latency*10)/10+"ms"
+			frame += 1;
+			if (frame>1000) {
+				frame = 0
+			}
 
-		// nPxHeight = 14;
-		// var text = new PIXI.Text(l,{
-		// 	font: '24px Arial', 
-		// 	stroke: "black", 
-		// 	fill: "white", 
-		// 	strokeThickness: 1});
-		// text.anchor.x = 1;
-		// text.position.x = x+width
-		// text.position.y = 0
-		// last.addChild(text)
+			var total = leaders.length
+			if (leaders.length <= 0) {
+				return
+			}
+			if (leaders.length > 8) {
+				leaders.length = 8
+			}
 
-		// pxHeight = 20
+			var l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+Math.floor(currentSock.latency*10)/10+"ms"
 
-		// ctx.lineWidth = .7;
-		// l = "Top "+leaders.length+":"
-		// var text = new PIXI.Text(l,{
-		// 	font: '24px Arial', 
-		// 	stroke: "black", 
-		// 	fill: "white", 
-		// 	strokeThickness: 1});
-		// text.anchor.x = 1;
-		// text.position.x = x+width
-		// text.position.y = nPxHeight
-		// last.addChild(text)
+			var nPxHeight = 14;
+			var text = new PIXI.Text(l,{
+				font: nPxHeight+'px Arial', 
+				stroke: "black", 
+				fill: "white", 
+				strokeThickness: 1});
+			text.anchor.x = 1;
+			text.position.x = width
+			text.position.y = 0
+			last.addChild(text)
 
-		// for(var i=0; i<leaders.length; i+=1) {
-		// 	n = leaders[i][0]
-		// 	var text = new PIXI.Text(n,{
-		// 		font: '24px Arial', 
-		// 		stroke: "black", 
-		// 		fill: "white", 
-		// 		strokeThickness: 1});
-		// 	text.anchor.x = 1;
-		// 	text.position.x = x+width - 200
-		// 	text.position.y = i*pxHeight+nPxHeight+pxHeight
-		// 	last.addChild(text)
+			var pxHeight = 20
 
-		// 	m = leaders[i][1]
-		// 	var text = new PIXI.Text(m,{
-		// 		font: '24px Arial', 
-		// 		stroke: "black", 
-		// 		fill: "white", 
-		// 		strokeThickness: 1});
-		// 	text.anchor.x = 1;
-		// 	text.position.x = x+width
-		// 	text.position.y = i*pxHeight+nPxHeight+pxHeight
-		// 	last.addChild(text)
-		// }
+			ctx.lineWidth = .7;
+			l = "Top "+leaders.length+":"
+			var text = new PIXI.Text(l,{
+				font: pxHeight+'px Arial', 
+				stroke: "black", 
+				fill: "white", 
+				strokeThickness: 1});
+			text.anchor.x = 1;
+			text.position.x = width
+			text.position.y = nPxHeight
+			last.addChild(text)
 
-		// last.position.x = width
-		// last.position.y = 0
-		// pix.stage.addChild(last)
+			for(var i=0; i<leaders.length; i+=1) {
+				var n = leaders[i][0]
+				var text = new PIXI.Text(n,{
+					font: pxHeight+'px Arial', 
+					stroke: "black", 
+					fill: "white", 
+					strokeThickness: 1});
+				text.anchor.x = 1;
+				text.position.x = width - 200
+				text.position.y = i*pxHeight+nPxHeight+pxHeight
+				last.addChild(text)
 
-	},free:function(){
-		pix.stage.removeChild(last)
-	}}
+				var m = leaders[i][1]
+				var text = new PIXI.Text(m,{
+					font: pxHeight+'px Arial', 
+					stroke: "black", 
+					fill: "white", 
+					strokeThickness: 1});
+				text.anchor.x = 1;
+				text.position.x = width
+				text.position.y = i*pxHeight+nPxHeight+pxHeight
+				last.addChild(text)
+			}
+
+			last.position.x = x
+			last.position.y = 0
+			pix.stage.addChild(last)
+		},
+		free:function(){
+			pix.stage.removeChild(last)
+			last.destroy()
+		}}
 }
 
 
+var countCreateRenderTile = 0
 gfx.createRenderTile = function(pix) {
+	if (!renderRenderTile) return noop
 	var container = new PIXI.Container();
-	var rendered = false;
+	var visible = false;
+	countCreateRenderTile += 1
 	return {
-		container: container,
-		update:function(){
-			if (!rendered) {
-				rendered = true
+		hide: function() {
+			if (visible) {
+				pix.stage.removeChild(container)
+			}
+			visible = false
+		},
+		show: function() {
+			if (!visible) {
 				pix.stage.addChild(container);
 			}
+			visible = true
+		},
+		container: container,
+		update:function(){
+
 		},
 		free:function(){
-			if (rendered) {
-				rendered = false
-				pix.stage.removeChild(container);
-			}	
+			if (visible) pix.stage.removeChild(container)
+			container.destroy()
+			countCreateRenderTile -= 1
 		}
 	}
 }
@@ -197,15 +252,27 @@ gfx.createRenderTile = function(pix) {
 gfx.renderArea = function() {}
 gfx.renderBackground = function() {}
 
+var countCreateParticle = 0
 gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
-	var rendered = false;
+	if (!renderParticle) return noop
 	var bunny = genericCircle();
+	var visible = false;
+	var destroyed = false;
+	countCreateParticle += 1
 	return {
-		update: function(x,y,life,c) {
-			if (!rendered) {
-				pix.stage.addChild(bunny);
-				rendered = true
+		hide: function() {
+			if (visible){
+				pix.stage.removeChild(bunny)
 			}
+			visible = false
+		},
+		show: function() {
+			if (!visible){
+				pix.stage.addChild(bunny);
+			}
+			visible = true
+		},
+		update: function(x,y,life,c) {
 			var r = life / 50
 			bunny.scale.x = r
 			bunny.scale.y = r
@@ -214,26 +281,37 @@ gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
 			bunny.tint = c
 		},
 		free: function() {
-			if (rendered) {
-				rendered = false
-				bunny.clear()
+			if (visible)
 				pix.stage.removeChild(bunny)
-			}
+
+			destroyed = true
+			bunny.destroy()
+			countCreateParticle -= 1
 		}
 	}
-	return {update:function(){},free:function(){}}
+	return noop
 }
 
 
+var countCreateVitamin = 0
 gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius)
+	if (!renderVitamin) return noop
 	var rendered = false;
 	var bunny = genericCircle()
+	var visible = false;
+	countCreateVitamin += 1
 	return {
-		update: function(x,y,c,r) {
-			if (!rendered) {
+		hide: function() {
+			if (visible)
+				pix.stage.removeChild(bunny)
+			visible = false
+		},
+		show: function() {
+			if (!visible)
 				pix.stage.addChild(bunny);
-				rendered = true
-			}
+			visible = true
+		},
+		update: function(x,y,c,r) {
 			bunny.tint = c
 			bunny.scale.x = r
 			bunny.scale.y = r
@@ -241,24 +319,32 @@ gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius
 			bunny.position.y = y
 		},
 		free: function() {
-			if (rendered) {
-				rendered = false
+			if (visible)
 				pix.stage.removeChild(bunny)
-			}
+			bunny.destroy()
+			countCreateVitamin -= 1
 		}
 	}
-	return {update:function(){},free:function(){}}
 }
 
+var countCreateMineral = 0
 gfx.createMineral = function(pix) { // (this.x, this.y, this.color, this._radius)
-	var rendered = false;
+	if (!renderMineral) return noop
 	var bunny = genericCircle()
+	var visible = false;
+	countCreateMineral += 1
 	return {
-		update: function(x,y,c,r) {
-			if (!rendered) {
+		hide: function() {
+			if (visible)
+				pix.stage.removeChild(bunny)
+			visible = false
+		},
+		show: function() {
+			if (!visible)
 				pix.stage.addChild(bunny);
-				rendered = true
-			}
+			visible = true
+		},
+		update: function(x,y,c,r) {
 			bunny.tint = c
 			bunny.scale.x = r
 			bunny.scale.y = r
@@ -266,69 +352,84 @@ gfx.createMineral = function(pix) { // (this.x, this.y, this.color, this._radius
 			bunny.position.y = y
 		},
 		free: function() {
-			if (rendered) {
-				rendered = false
+			if (visible)
 				pix.stage.removeChild(bunny)
-			}
+			bunny.destroy()
+			countCreateMineral -= 1
 		}
 	}
-	return {update:function(){},free:function(){}}
+	return noop
 }
 
+var countCreateActor = 0
 gfx.createActor = function(pix) { // (this.x,this.y,this.color,n, Math.floor(this.mass),radius)
-	return {update:function(){},free:function(){}}
+	if (!renderActor) return noop
+	return noop
 }
 
+var countCreatePlayerActor = 0
 gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
-	var rendered = false;
-	var playerMask;
-	var tilingSprite;
+	if (!renderPlayerActor) return noop
+	var bunny = genericCell(genericCircle());
+	var visible = false;
+	countCreatePlayerActor += 1
 	return {
-		update: function(x,y,c,mass,r) {
-			if (!rendered) {
-				tilingSprite = new PIXI.extras.TilingSprite(texture, 5000, 5000);
-				playerMask = new PIXI.Graphics()
-				playerMask.beginFill(fromRgb(40,250,190),1);
-				playerMask.arc(0,0,1,0,Math.PI*2)
-				playerMask.endFill();
-				pix.stage.addChild(playerMask);
-
-				tilingSprite.mask = playerMask;
-				pix.stage.addChild(tilingSprite);
-				rendered = true
+		hide: function() {
+			if (visible) {
+				pix.stage.removeChild(bunny.container)
 			}
-			playerMask.scale.x = r
-			playerMask.scale.y = r
-			playerMask.position.x = x
-			playerMask.position.y = y
-			tilingSprite.tint = c
-			tilingSprite.scale.x = .3
-			tilingSprite.scale.y = .3
-			tilingSprite.position.x = x-2500*tilingSprite.scale.x
-			tilingSprite.position.y = y-2500*tilingSprite.scale.y
+			visible = false
+		},
+		show: function() {
+			if (!visible) {
+				pix.stage.addChild(bunny.container)
+			}
+			visible = true
+		},
+		update: function(x,y,c,mass, r) {
+			bunny.front.scale.x = r
+			bunny.front.scale.y = r
+			// bunny.front.tint = c
+			bunny.container.position.x = x
+			bunny.container.position.y = y
 
+			bunny.container.rotation = (x+y)/200
+			bunny.back.tint = c
 		},
 		free: function() {
-			rendered = false
-			pix.stage.removeChild(tilingSprite)
-			pix.stage.removeChild(playerMask);
+			if (visible) {
+				pix.stage.removeChild(bunny.container)
+			}
+			bunny.container.destroy()
+			countCreatePlayerActor -= 1
 		}
 	}
-	return {update:function(){},free:function(){}}
+	return noop
 }
 
+var countCreateVirus = 0
 gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
-	var rendered = false;
+	if (!renderVirus) return noop
 	var bunny = genericCell(virusBall());
+	var visible = false;
+	countCreateVirus += 1
 	return {
-		update: function(x,y,c,mass, r) {
-			if (!rendered) {
-				pix.stage.addChild(bunny.container);
-				rendered = true
+		hide: function() {
+			if (visible) {
+				pix.stage.removeChild(bunny.container)
 			}
-			bunny.container.scale.x = r
-			bunny.container.scale.y = r
-			// bunny.container.tint = c
+			visible = false
+		},
+		show: function() {
+			if (!visible) {
+				pix.stage.addChild(bunny.container)
+			}
+			visible = true
+		},
+		update: function(x,y,c,mass, r) {
+			bunny.front.scale.x = r
+			bunny.front.scale.y = r
+			// bunny.front.tint = c
 			bunny.container.position.x = x
 			bunny.container.position.y = y
 
@@ -336,35 +437,51 @@ gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.col
 			bunny.back.tint = c
 		},
 		free: function() {
-			rendered = false
-			pix.stage.removeChild(bunny.container)
+			if (visible) {
+				pix.stage.removeChild(bunny.container)
+			}
+			bunny.container.destroy()
+			countCreateVirus -= 1
 		}
 	}
-	return {update:function(){},free:function(){}}
+	return noop
 }
 
+var countCreateBacteria = 0
 gfx.createBacteria = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
-	var rendered = false;
+	if (!renderBacteria) return noop
 	var bunny = genericCell(bubbleCircle());
+	var visible = false;
+	countCreateBacteria += 1
 	return {
-		update: function(x,y,c,mass, r) {
-			if (!rendered) {
-				pix.stage.addChild(bunny.container);
-				rendered = true
+		hide: function() {
+			if (visible) {
+				pix.stage.removeChild(bunny.container)
 			}
-			bunny.container.scale.x = r
-			bunny.container.scale.y = r
-			// bunny.container.tint = c
+			visible = false
+		},
+		show: function() {
+			if (!visible) {
+				pix.stage.addChild(bunny.container)
+			}
+			visible = true
+		},
+		update: function(x,y,c,mass, r) {
+			bunny.front.scale.x = r
+			bunny.front.scale.y = r
+			// bunny.front.tint = c
 			bunny.container.position.x = x
 			bunny.container.position.y = y
 
 			bunny.container.rotation = (x+y)/200
-
 			bunny.back.tint = c
 		},
 		free: function() {
-			rendered = false
-			pix.stage.removeChild(bunny.container)
+			if (visible) {
+				pix.stage.removeChild(bunny.container)
+			}
+			bunny.container.destroy()
+			countCreateBacteria -= 1
 		}
 	}
 }
@@ -377,8 +494,8 @@ var genericCircle = (function() {
 	var parts = 12
 	var a = Math.PI*2/parts
 	for(var i=0;i<=parts;i++) {
-		var x = Math.cos(i*a)*.8
-		var y = Math.sin(i*a)*.8
+		var x = Math.cos(i*a)
+		var y = Math.sin(i*a)
 		if (i==0) {
 			playerMask.moveTo(x,y)
 		} else {
@@ -445,8 +562,8 @@ function genericCell(playerMask) {
 	var size = 50000
 	tilingSprite = new PIXI.extras.TilingSprite(texture, size, size);
 
-	tilingSprite.scale.x = .01
-	tilingSprite.scale.y = .01
+	tilingSprite.scale.x = .3
+	tilingSprite.scale.y = .3
 	tilingSprite.position.x = -size/2*tilingSprite.scale.x
 	tilingSprite.position.y = -size/2*tilingSprite.scale.y
 

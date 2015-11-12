@@ -261,7 +261,7 @@ sock.prototype.handleRemovePellet = function(dv, off) {
 	var p = this.room.findTile(dx,dy).find(dx,dy)
 
 	if (p) {
-		p.remove()	
+		p.remove()
 	} else {
 		console.log("COULDNT FIND", dx, dy)
 	}
@@ -483,7 +483,7 @@ window.onload = function() {
 	servers = new server(document.location.hostname+":4000")
 	setQuality(maxQuality-1)
 	renderBackground = gfx.createRenderBackground(ctx)
-	renderLeaderBoard = gfx.createLeaderBoard({stage:ctx.top})
+	leaderBoardRenderer = gfx.createLeaderBoard({stage:ctx.top})
 	window.requestAnimationFrame(render)
 	graphicsChanged();
 	document.getElementById("loginButton").onclick = function() {
@@ -618,7 +618,7 @@ function setQuality(q) {
 }
 // var renderArea = gfx.createRenderArea(ctx)
 var renderBackground
-var renderLeaderBoard
+var leaderBoardRenderer
 function render() {
 	window.requestAnimationFrame(render)
 	newFps += 1
@@ -723,18 +723,6 @@ function render() {
 
 	gfx.done(ctx)
 
-
-
-	var actor;
-	if (currentSock && currentSock.room) {
-		for (var id in currentSock.room.renderable) {
-			var actor = currentSock.room.renderable[id]
-			if (actor.postRender) {
-				actor.postRender()
-			}
-		}
-	}
-
 	if (currentSock && currentSock.room) {
 		draw_leaderboard(ctx,currentSock.room)
 	}
@@ -757,7 +745,7 @@ function draw_leaderboard(ctx, room) {
 		}
 	}
 	playersWithScore.sort(function(a,b){return b[1]-a[1]})
-	renderLeaderBoard.update(playersWithScore, canvas.width-400, 0, 400, 800, total)
+	leaderBoardRenderer.update(playersWithScore, canvas.width-400, 0, 400, 800, total)
 }
 
 // utils

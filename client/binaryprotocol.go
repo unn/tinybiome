@@ -78,10 +78,11 @@ func guaranteeRead(r io.Reader, p []byte) error {
 	for n < len(p) {
 		o, e := r.Read(p[n:])
 		if e != nil {
-			log.Println("ERR", e)
-		}
-		if o != len(p) {
-			log.Println("ERR, READ", o, "/", len(p))
+			log.Println("ERR", e, "READ", o, "BYTES")
+			if o == 0 {
+				log.Println("ZERO READ")
+				return e
+			}
 		}
 		n += o
 	}
@@ -100,7 +101,10 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 	switch act {
 	case 0:
 		size := make([]byte, 4)
-		guaranteeRead(s.R, size)
+		e := guaranteeRead(s.R, size)
+		if e != nil {
+			return e
+		}
 
 		strSize := *(*int32)(unsafe.Pointer(&size[0]))
 		if s.Logging {
@@ -113,13 +117,19 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 			return invalidProto
 		}
 		nameBytes := make([]byte, strSize)
-		guaranteeRead(s.R, nameBytes)
+		e = guaranteeRead(s.R, nameBytes)
+		if e != nil {
+			return e
+		}
 
 		name := string(nameBytes)
 		p.Join(name)
 	case 1:
 		parts := make([]byte, 12)
-		guaranteeRead(s.R, parts)
+		e := guaranteeRead(s.R, parts)
+		if e != nil {
+			return e
+		}
 
 		pid := *(*int32)(unsafe.Pointer(&parts[0]))
 		d := *(*float32)(unsafe.Pointer(&parts[4]))

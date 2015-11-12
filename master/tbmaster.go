@@ -87,8 +87,8 @@ func newConn(ws *websocket.Conn) {
 
 	delete(clients, cli)
 	if p != nil {
-		log.Println("SERVER LEAVING", p, "# SERVERS", len(servers))
 		delete(servers, p)
+		log.Println("SERVER LEAVING", p, "# SERVERS", len(servers))
 		for c, _ := range clients {
 			c.w.Encode(map[string]interface{}{"meth": "del", "address": p.addr()})
 		}
