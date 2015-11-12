@@ -300,6 +300,7 @@ func (p *Player) Sync() {
 
 	r.ChangeLock.Lock()
 	p.ID = r.getPlayerId(p)
+	p.room.AddTicker(p)
 
 	log.Println("SYNCING", p)
 	start := time.Now()
@@ -311,26 +312,25 @@ func (p *Player) Sync() {
 		if oPlayer == nil {
 			continue
 		}
-		p.Net.WriteNewPlayer(oPlayer)
-		if oPlayer == p {
-			continue
-		}
 		oPlayer.Net.WriteNewPlayer(p)
 	}
+	p.Net.WriteOwns(p)
 
 	log.Println("SYNCING TICKERS")
 	for _, oPlayer := range r.Tickers {
 		if oPlayer == nil {
 			continue
 		}
+		if oPlayer == p {
+			continue
+		}
 		oPlayer.Write(p.Net)
-
 	}
+
 	log.Println("SYNCING PELLETS")
 	p.Net.WritePelletsIncoming(r.Pellets[:r.PelletCount])
 	took := time.Since(start)
 
-	p.Net.WriteOwns(p)
 	log.Println(p, "INITIAL SYNC COMPLETE IN", took)
 	p.Net.Save()
 
@@ -442,7 +442,6 @@ func (p *Player) Join(name string) {
 
 	if !p.Joined {
 		p.Joined = true
-		p.room.AddTicker(p)
 		p.room.PlayerCount += 1
 	}
 
@@ -473,8 +472,8 @@ func (p *Player) Remove() {
 	r.Players[p.ID] = nil
 	if p.Joined {
 		r.PlayerCount -= 1
-		r.RemoveTicker(p)
 	}
+	r.RemoveTicker(p)
 	for _, oPlayer := range r.Players {
 		if oPlayer == nil {
 			continue

@@ -371,7 +371,7 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 	case 0:
 		aid = dv.getInt32(off+2, true)
 		pid = dv.getInt32(off+6, true)
-		console.log("ACTOR",aid,"IS PLAYERACTOR")
+		console.log("ACTOR",aid,"IS PLAYERACTOR OWNED BY",pid)
 		
 		a = new playeractor(this.room, aid,pid)
 		return off + 10
@@ -526,6 +526,7 @@ canvas.onmousemove = function(e) {
 	mousex = e.offsetX/canvas.cwidth*canvas.width;
 	mousey = e.offsetY/canvas.cheight*canvas.height;
 }
+
 canSplit = true
 document.onkeydown = function(e) {
     e = e || window.event;

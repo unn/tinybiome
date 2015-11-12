@@ -90,10 +90,10 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 	}
 	act, e := s.R.ReadByte()
 	if e != nil {
+		log.Println(s, "ERR", e)
 		// if e == io.EOF {
 		// 	return nil
 		// }
-		log.Println(s, "ERR", e)
 		return e
 	}
 	switch act {
