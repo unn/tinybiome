@@ -52,6 +52,7 @@ type BinaryProtocol struct {
 	WriteChan     chan []byte
 	Disconnected  bool
 	MessageMap    []byte
+	DownLogging   bool
 }
 
 func NewBinaryProtocol(ws *websocket.Conn) Protocol {
@@ -74,18 +75,12 @@ var hackAttempt = errors.New("Hack Attempt")
 var Disconnected = errors.New("Disconnected")
 
 func guaranteeRead(r io.Reader, p []byte) error {
-	n := 0
-	for n < len(p) {
-		o, e := r.Read(p[n:])
-		if e != nil {
-			log.Println("ERR", e)
-		}
-		if o != len(p) {
-			log.Println("ERR, READ", o, "/", len(p))
-		}
-		n += o
-	}
-	return nil
+	_, e := io.ReadFull(r, p)
+	return e
+}
+
+func (s *BinaryProtocol) String() string {
+	return s.RW.Request().RemoteAddr
 }
 
 // runs in a goroutine
@@ -95,6 +90,10 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 	}
 	act, e := s.R.ReadByte()
 	if e != nil {
+		if e == io.EOF {
+			return nil
+		}
+		log.Println(s, "ERR", e)
 		return e
 	}
 	switch act {
@@ -103,7 +102,7 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		guaranteeRead(s.R, size)
 
 		strSize := *(*int32)(unsafe.Pointer(&size[0]))
-		if s.Logging {
+		if s.DownLogging {
 			log.Println(p, "SENT JOIN")
 		}
 		if strSize > 100 {
@@ -131,17 +130,17 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		if math.IsNaN(float64(speed)) {
 			speed = 0
 		}
-		if s.Logging {
-			log.Println(p, "SENT DIRECTION", pid, d, speed)
+		if s.DownLogging {
+			// log.Println(p, "SENT DIRECTION", pid, d, speed)
 		}
 		p.UpdateDirection(pid, d, speed)
 	case 2:
-		if s.Logging {
+		if s.DownLogging {
 			log.Println(p, "SENT SPLIT")
 		}
 		p.Split()
 	case 3:
-		if s.Logging {
+		if s.DownLogging {
 			log.Println(p, "SENT CONNECT")
 		}
 		p.Sync()
@@ -182,9 +181,8 @@ func WriteFloat32(w io.Writer, i float64) {
 // sends updates
 func (s *BinaryProtocol) WriteRoom(r *Room) {
 	if s.Logging {
-		log.Println("SENDING WriteRoom", r)
+		log.Println(s, "SENDING WriteRoom", r)
 	}
-	log.Println("WRITEROOM INDEX", s.MessageMap[0])
 	s.W.WriteByte(s.MessageMap[0])
 	WriteInt32(s.W, r.Width)
 	WriteInt32(s.W, r.Height)
@@ -197,7 +195,7 @@ func (s *BinaryProtocol) WriteRoom(r *Room) {
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 	if s.Logging {
-		log.Println("SENDING WriteNewActor", actor)
+		log.Println(s, "SENDING WriteNewActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[1])
 	WriteInt32(s.W, actor.ID)
@@ -211,7 +209,7 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 
 func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 	if s.Logging {
-		log.Println("SENDING WriteNewPellet", pellet)
+		// log.Println(s, "SENDING WriteNewPellet", pellet)
 	}
 	s.W.WriteByte(s.MessageMap[2])
 	WriteInt32(s.W, pellet.X)
@@ -221,7 +219,7 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 
 func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 	if s.Logging {
-		log.Println("SENDING WriteDestroyPellet", pellet)
+		// log.Println(s, "SENDING WriteDestroyPellet", pellet)
 	}
 	s.W.WriteByte(s.MessageMap[3])
 	WriteInt32(s.W, pellet.X)
@@ -233,7 +231,7 @@ func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 
 func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 	if s.Logging {
-		log.Println("SENDING WriteNewPlayer", player)
+		log.Println(s, "SENDING WriteNewPlayer", player)
 	}
 	s.W.WriteByte(s.MessageMap[4])
 	WriteInt32(s.W, player.ID)
@@ -248,7 +246,7 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 
 func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 	if s.Logging {
-		log.Println("SENDING WriteNamePlayer", player)
+		log.Println(s, "SENDING WriteNamePlayer", player)
 	}
 	s.W.WriteByte(s.MessageMap[5])
 	WriteInt32(s.W, player.ID)
@@ -263,7 +261,7 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 
 func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 	if s.Logging {
-		log.Println("SENDING WriteDestroyPlayer", player)
+		log.Println(s, "SENDING WriteDestroyPlayer", player)
 	}
 	s.W.WriteByte(s.MessageMap[6])
 	WriteInt32(s.W, player.ID)
@@ -274,7 +272,7 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 
 func (s *BinaryProtocol) WriteOwns(player *Player) {
 	if s.Logging {
-		log.Println("SENDING WriteOwns", player)
+		log.Println(s, "SENDING WriteOwns", player)
 	}
 	s.W.WriteByte(s.MessageMap[7])
 	WriteInt32(s.W, player.ID)
@@ -285,7 +283,7 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 
 func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 	if s.Logging {
-		log.Println("SENDING WriteDestroyActor", actor)
+		log.Println(s, "SENDING WriteDestroyActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[8])
 	WriteInt32(s.W, actor.ID)
@@ -296,7 +294,7 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 
 func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 	if s.Logging {
-		log.Println("SENDING WriteMoveActor", actor)
+		// log.Println(s, "SENDING WriteMoveActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[9])
 	WriteInt32(s.W, actor.ID)
@@ -311,7 +309,7 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 
 func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 	if s.Logging {
-		log.Println("SENDING WriteSetMassActor", actor)
+		// log.Println(s, "SENDING WriteSetMassActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[10])
 	WriteInt32(s.W, actor.ID)
@@ -323,7 +321,7 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 
 func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 	if s.Logging {
-		log.Println("SENDING WritePelletsIncoming", len(pellets))
+		log.Println(s, "SENDING WritePelletsIncoming", len(pellets))
 	}
 
 	s.W.WriteByte(s.MessageMap[11])
@@ -338,7 +336,7 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 
 func (s *BinaryProtocol) WritePlayerActor(pa *PlayerActor) {
 	if s.Logging {
-		log.Println("SENDING WritePlayerActor", pa)
+		log.Println(s, "SENDING WritePlayerActor", pa)
 	}
 
 	s.W.WriteByte(s.MessageMap[12])
@@ -349,7 +347,7 @@ func (s *BinaryProtocol) WritePlayerActor(pa *PlayerActor) {
 
 func (s *BinaryProtocol) WriteVirus(v *Virus) {
 	if s.Logging {
-		log.Println("SENDING WriteVirus", v)
+		log.Println(s, "SENDING WriteVirus", v)
 	}
 
 	s.W.WriteByte(s.MessageMap[12])
@@ -359,7 +357,7 @@ func (s *BinaryProtocol) WriteVirus(v *Virus) {
 
 func (s *BinaryProtocol) WriteBacteria(v *Bacteria) {
 	if s.Logging {
-		log.Println("SENDING WriteBacteria", v)
+		log.Println(s, "SENDING WriteBacteria", v)
 	}
 
 	s.W.WriteByte(s.MessageMap[12])
@@ -372,7 +370,7 @@ func (s *BinaryProtocol) WriteNewMessageMap() {
 		s.W.WriteByte(s.MessageMap[13])
 	}
 	newMessages := rand.Perm(255)
-	// log.Println("SENDING SYNC MAP SIZE", len(newMessages), newMessages)
+	// log.Println(s, "SENDING SYNC MAP SIZE", len(newMessages), newMessages)
 	s.MessageMap = make([]byte, len(newMessages))
 	s.W.WriteByte(byte(len(newMessages)))
 	for n, om := range newMessages {
@@ -383,7 +381,7 @@ func (s *BinaryProtocol) WriteNewMessageMap() {
 
 func (s *BinaryProtocol) WritePong() {
 	if s.Logging {
-		log.Println("SENDING WritePong")
+		log.Println(s, "SENDING WritePong")
 	}
 	s.W.WriteByte(s.MessageMap[14])
 }

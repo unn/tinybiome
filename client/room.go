@@ -148,12 +148,11 @@ func (r *Room) sendUpdates() {
 			if actor == nil {
 				continue
 			}
-			if actor.moved {
+			if actor.X != actor.oldx || actor.Y != actor.oldy {
 				player.Net.WriteMoveActor(actor)
 			}
 			if actor.oldm != actor.Mass {
 				player.Net.WriteSetMassActor(actor)
-
 			}
 		}
 	}
@@ -161,7 +160,8 @@ func (r *Room) sendUpdates() {
 		if actor == nil {
 			continue
 		}
-		actor.moved = false
+		actor.oldx = actor.X
+		actor.oldy = actor.Y
 		actor.oldm = actor.Mass
 	}
 }
@@ -301,9 +301,23 @@ func (p *Player) Sync() {
 	r.ChangeLock.Lock()
 	p.ID = r.getPlayerId(p)
 
+	log.Println("SYNCING", p)
 	start := time.Now()
 	log.Println("SYNCING ROOM")
 	p.Net.WriteRoom(r)
+
+	log.Println("SYNCING OTHER PLAYERS")
+	for _, oPlayer := range r.Players {
+		if oPlayer == nil {
+			continue
+		}
+		p.Net.WriteNewPlayer(oPlayer)
+		if oPlayer == p {
+			continue
+		}
+		oPlayer.Net.WriteNewPlayer(p)
+	}
+
 	log.Println("SYNCING TICKERS")
 	for _, oPlayer := range r.Tickers {
 		if oPlayer == nil {
@@ -315,14 +329,6 @@ func (p *Player) Sync() {
 	log.Println("SYNCING PELLETS")
 	p.Net.WritePelletsIncoming(r.Pellets[:r.PelletCount])
 	took := time.Since(start)
-
-	log.Println("SYNCING OTHER PLAYERS")
-	for _, oPlayer := range r.Players {
-		if oPlayer == nil {
-			continue
-		}
-		oPlayer.Net.WriteNewPlayer(p)
-	}
 
 	p.Net.WriteOwns(p)
 	log.Println(p, "INITIAL SYNC COMPLETE IN", took)
@@ -429,14 +435,17 @@ func (p *Player) Join(name string) {
 		log.Println("PLAYER NOT SYNCED YET", p)
 		return
 	}
+
+	r := p.room
+	log.Println("Lock 3")
+	r.ChangeLock.Lock()
+
 	if !p.Joined {
 		p.Joined = true
 		p.room.AddTicker(p)
 		p.room.PlayerCount += 1
 	}
-	r := p.room
-	log.Println("Lock 3")
-	r.ChangeLock.Lock()
+
 	defer func() {
 		log.Println("Unlock 3")
 		r.ChangeLock.Unlock()
@@ -505,7 +514,7 @@ func (p *Player) NewActor(x, y, mass float64) *Actor {
 }
 
 func (p *Player) String() string {
-	return fmt.Sprintf("#%d (%s)", p.ID, p.Name)
+	return fmt.Sprintf("#%d (%s, %s)", p.ID, p.Name, p.Net)
 }
 
 var clanRegex = regexp.MustCompile(`^\[(.*)\]`)

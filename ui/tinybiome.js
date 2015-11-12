@@ -135,6 +135,7 @@ function sock(location) {
 		servers.addServer(self)
 	}
 	this.ws.onerror = function() {
+		console.log("ECLOSED",self)
 		self.myremove()
 		ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
 	}
@@ -182,7 +183,7 @@ sock.prototype.remove = function() {
 sock.prototype.tick = function() {
 	if (this.connected) {
 		this.writePing()
-		setTimeout(this.mytick,1000);
+		setTimeout(this.mytick,5000);
 	}
 }
 sock.prototype.onmessage = function(m){
@@ -218,10 +219,10 @@ sock.prototype.handleSync = function(dv, off) {
 	return off+l+2
 }
 sock.prototype.handleNewRoom = function(dv, off) {
-	console.log("NEW ROOM INCOMING")
 	width = dv.getInt32(off+1, true)
 	height = dv.getInt32(off+5, true)
 	if (!this.room) {
+		console.log("NEW ROOM INCOMING",width,height)
 		this.room = new room(width,height)
 	}
 	this.room.sizemultiplier = .7
@@ -231,7 +232,7 @@ sock.prototype.handleNewRoom = function(dv, off) {
 	this.room.speedmultiplier = dv.getFloat32(off+21, true)
 	this.room.playercount = dv.getInt32(off+25, true)
 	
-	console.log("NEW ROOM",{width:width,height:height,sm:this.room.sizemultiplier,mass:this.room.startmass})
+	console.log("ROOM UPDATE",{pc:this.room.playercount,sm:this.room.sizemultiplier,mass:this.room.startmass})
 	return off + 29
 }
 sock.prototype.handleNewActor = function(dv, off) {
@@ -412,8 +413,20 @@ sock.prototype.writeJoin = function(name) {
 
 mab = new DataView(new ArrayBuffer(13))
 mab.setUint8(0,1,true)
-sock.prototype.writeMove = function(id,d,s) {
+sock.prototype.writeBrokenMove = function(id,d,s) {
+	mab = new DataView(new ArrayBuffer(9))
+	mab.setUint8(0,1,true)
+	mab.setInt32(1,id,true)
+	mab.setFloat32(5,d,true)
+	this.ws.send(mab)
 
+	mab = new DataView(new ArrayBuffer(4))
+	mab.setFloat32(0,s,true)
+	this.ws.send(mab)
+}
+sock.prototype.writeMove = function(id,d,s) {
+	mab = new DataView(new ArrayBuffer(13))
+	mab.setUint8(0,1,true)
 	mab.setInt32(1,id,true)
 	mab.setFloat32(5,d,true)
 	mab.setFloat32(9,s,true)

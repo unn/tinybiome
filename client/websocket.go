@@ -27,6 +27,7 @@ var allowedHosts = map[string]struct{}{
 	"http://localhost":        struct{}{},
 	"http://96.50.20.37:8080": struct{}{},
 	"http://96.50.20.37":      struct{}{},
+	"http://192.168.0.17":     struct{}{},
 }
 
 func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {

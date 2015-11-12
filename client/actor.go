@@ -68,13 +68,14 @@ type Actor struct {
 	Y         float64
 	Direction float64
 	Speed     float64
-	moved     bool
 	Mass      float64
 
 	XSpeed float64
 	YSpeed float64
 	radius float64
 	oldm   float64
+	oldx   float64
+	oldy   float64
 }
 
 func NewActor(r *Room) *Actor {
@@ -179,7 +180,6 @@ func (a *Actor) CheckCollisions() {
 			}
 		}
 	}
-	a.moved = true
 	a.X = math.Min(float64(a.room.Width), a.X)
 	a.Y = math.Min(float64(a.room.Height), a.Y)
 	a.X = math.Max(0, a.X)
@@ -477,6 +477,9 @@ func (v *Bacteria) Remove() {
 	v.Room.BacteriaCount -= 1
 	v.Room.RemoveTicker(v)
 }
+func (v *Bacteria) String() string {
+	return fmt.Sprintf("BA (%s)", v.Actor)
+}
 
 type Virus struct {
 	Actor   *Actor
@@ -566,4 +569,7 @@ func (v *Virus) Remove() {
 	v.Actor.Remove()
 	v.Room.VirusCount -= 1
 	v.Room.RemoveTicker(v)
+}
+func (v *Virus) String() string {
+	return fmt.Sprintf("VI (%s)", v.Actor)
 }
