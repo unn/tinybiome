@@ -428,6 +428,15 @@ func (p *Player) Split() {
 	}
 	p.room.ChangeLock.Unlock()
 }
+func (p *Player) Spit() {
+	p.room.ChangeLock.Lock()
+	for _, a := range p.Owns {
+		if a != nil {
+			a.(*PlayerActor).Spit()
+		}
+	}
+	p.room.ChangeLock.Unlock()
+}
 func (p *Player) Ping() {
 	p.room.ChangeLock.Lock()
 	p.Net.WritePong()

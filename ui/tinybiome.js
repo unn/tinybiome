@@ -377,27 +377,28 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 }
 sock.prototype.handleDescribeActor = function(dv, off) {
 	var t = dv.getUint8(off+1)
+	var aid = dv.getInt32(off+2, true)
 	switch (t) {
 	case 0:
-		var aid = dv.getInt32(off+2, true)
 		var pid = dv.getInt32(off+6, true)
 		console.log("ACTOR",aid,"IS PLAYERACTOR OWNED BY",pid)
 		
 		var a = new playeractor(this.room, aid,pid)
 		return off + 10
 	case 1:
-		var aid = dv.getInt32(off+2, true)
 		console.log("ACTOR",aid,"IS VIRUS")
 		
 		var a = new virus(this.room, aid)
 		return off + 6
 	case 2:
-		var aid = dv.getInt32(off+2, true)
 		console.log("ACTOR",aid,"IS BACTERIA")
-		
 		var a = new bacteria(this.room, aid)
 		return off + 6
-
+	case 3:
+		console.log("ACTOR",aid,"IS BLOB")
+		
+		var a = new blob(this.room, aid)
+		return off + 6
 	}
 }
 sock.prototype.handlePong = function(dv, off) {
@@ -451,6 +452,11 @@ sock.prototype.writePing = function() {
 
 }
 
+sock.prototype.writeSpit = function() {
+	var sab = new DataView(new ArrayBuffer(1))
+	sab.setUint8(0,5,true)
+	this.ws.send(sab)
+}
 
 
 function ab2str(buf) {
@@ -532,7 +538,8 @@ canvas.onmousemove = function(e) {
 	mousey = e.offsetY/canvas.cheight*canvas.height;
 }
 
-var canSplit = true
+var canSplit = true;
+var canSpit = true;
 
 document.onkeydown = function(e) {
     e = e || window.event;
@@ -540,6 +547,10 @@ document.onkeydown = function(e) {
 	if (canSplit && e.keyCode == '32') {
     	canSplit = false
     	currentSock.writeSplit()
+    }
+	if (canSpit && e.keyCode == '87') {
+    	canSpit = false
+    	currentSock.writeSpit()
     }
     if (e.keyCode == '144') {
     	debugMode = true
@@ -563,7 +574,10 @@ document.onkeyup = function(e) {
     	canSplit = true
 
     }
+    if (e.keyCode == '87') {
+    	canSpit = true
 
+    }
 }
 
 function handleScroll(e) {

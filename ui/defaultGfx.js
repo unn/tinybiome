@@ -43,7 +43,7 @@ var noop = {update:function(){},free:function(){},hide:function(){},show:functio
 
 gfx.getContext = function(canvas) {
 	if (!pix.renderer) {
-		pix.renderer = PIXI.autoDetectRenderer(canvas.width, canvas.height, {view:canvas})
+		pix.renderer = PIXI.autoDetectRenderer(canvas.width, canvas.height, {view:canvas,antialias:true})
 	} else {
 		pix.renderer.resize(canvas.width, canvas.height);
 	}
@@ -148,7 +148,7 @@ gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 				font: '48px Arial', 
 				stroke: "black", 
 				fill: "white", 
-				strokeThickness: 1});
+				strokeThickness: 2});
 
 			last.addChild(text)
 			last.position.x = bbox[0]
@@ -424,7 +424,7 @@ gfx.createActor = function(pix) { // (this.x,this.y,this.color,n, Math.floor(thi
 var countCreatePlayerActor = 0
 gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
 	if (!renderPlayerActor) return noop
-	var model = genericCell(genericCircle());
+	var model = genericCell(genericHDCircle());
 	model.container.z = 8
 	var visible = false;
 	countCreatePlayerActor += 1
@@ -505,6 +505,45 @@ gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.col
 	return noop
 }
 
+gfx.createBlob = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+	if (!renderVirus) return noop
+	var model = bubbleCircle();
+	model.z = -5
+	var visible = false;
+	return {
+		hide: function() {
+			if (visible) {
+				pix.stage.removeChild(model)
+			}
+			visible = false
+		},
+		show: function() {
+			if (!visible) {
+				pix.stage.addChild(model)
+				pix.dirty = true
+			}
+			visible = true
+		},
+		update: function(x,y,c) {
+			model.scale.x = 7
+			model.scale.y = 7
+			// model.front.tint = c
+			model.position.x = x
+			model.position.y = y
+
+			model.rotation = (x+y)/200
+			model.tint = c
+		},
+		free: function() {
+			if (visible) {
+				pix.stage.removeChild(model)
+			}
+			model.destroy(true)
+		}
+	}
+	return noop
+}
+
 var countCreateBacteria = 0
 gfx.createBacteria = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 	if (!renderBacteria) return noop
@@ -569,6 +608,29 @@ var genericCircle = (function() {
 	}
 })()
 
+var genericHDCircle = (function() {
+	var playerMask = new PIXI.Graphics()
+	playerMask.beginFill(0xFFFFFF,1);
+	// playerMask.arc(0,0,1,0,Math.PI*2)
+
+	var parts = 36
+	var a = Math.PI*2/parts
+	for(var i=0;i<=parts;i++) {
+		var x = Math.cos(i*a)
+		var y = Math.sin(i*a)
+		if (i==0) {
+			playerMask.moveTo(x,y)
+		} else {
+			playerMask.lineTo(x,y)
+		}
+	}
+
+	playerMask.endFill();	
+	return function() {
+		return playerMask.clone()
+	}
+})()
+
 var bubbleCircle = (function() {
 	var playerMask = new PIXI.Graphics()
 	playerMask.beginFill(0xFFFFFF,1);
@@ -602,9 +664,15 @@ var virusBall = (function() {
 		if (i==0) {
 			playerMask.moveTo(x,y)
 		} else {
-			var xn = Math.cos(i*a-a/2)*.4
-			var yn = Math.sin(i*a-a/2)*.4
-			playerMask.quadraticCurveTo(xn,yn,x,y)
+
+			var xa = Math.cos(i*a-a/4*3)*.3
+			var ya = Math.sin(i*a-a/4*3)*.3
+			var xb = Math.cos(i*a-a/2)*.7
+			var yb = Math.sin(i*a-a/2)*.7
+			var xc = Math.cos(i*a-a/4)*.3
+			var yc = Math.sin(i*a-a/4)*.3
+			playerMask.quadraticCurveTo(xa,ya,xb,yb)
+			playerMask.quadraticCurveTo(xc,yc,x,y)
 		}
 	}
 	playerMask.endFill();	

@@ -30,6 +30,7 @@ type ProtocolDown interface {
 	WritePlayerActor(*PlayerActor)
 	WriteVirus(*Virus)
 	WriteBacteria(*Bacteria)
+	WriteBlob(*Blob)
 	WritePong()
 	Flush() error
 	Save()
@@ -155,6 +156,11 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		p.Sync()
 	case 4:
 		p.Ping()
+	case 5:
+		if s.DownLogging {
+			log.Println(p, "SENT SPIT")
+		}
+		p.Spit()
 	default:
 		log.Println("READ ERROR, TYPE", act)
 		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
@@ -371,6 +377,16 @@ func (s *BinaryProtocol) WriteBacteria(v *Bacteria) {
 
 	s.W.WriteByte(s.MessageMap[12])
 	s.W.WriteByte(2)
+	WriteInt32(s.W, v.Actor.ID)
+}
+
+func (s *BinaryProtocol) WriteBlob(v *Blob) {
+	if s.Logging {
+		log.Println(s, "SENDING WriteBlob", v)
+	}
+
+	s.W.WriteByte(s.MessageMap[12])
+	s.W.WriteByte(3)
 	WriteInt32(s.W, v.Actor.ID)
 }
 

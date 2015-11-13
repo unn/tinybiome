@@ -467,11 +467,11 @@ actor.prototype.radius = function() {return Math.pow(this.mass, this.room.sizemu
 actor.prototype.render = function(ctx) {
 	this.inview = true
 	if (this.owner) if (this.owner.render) return this.owner.render(ctx)
-	radius = this.radius()
+	var radius = this.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
 	this.color = "#000000";
-	n = "Something..?"
+	var n = "Something..?"
 	this.gfx.update(this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 
 }
@@ -634,4 +634,15 @@ function bacteria(room, aid) {
 }
 bacteria.prototype.render = function(ctx) {
 	this.gfx.update(this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
+}
+function blob(room, aid) {
+	this.room = room
+	this.actor = this.room.actors[aid]
+	this.actor.owner = this
+	this.actor.color = lightBlue
+	this.gfx = gfx.createBlob(pix)
+	this.actor.gfx = this.gfx
+}
+blob.prototype.render = function(ctx) {
+	this.gfx.update(this.actor.x, this.actor.y, this.actor.color)
 }

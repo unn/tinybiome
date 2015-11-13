@@ -162,10 +162,16 @@ func (a *Actor) CheckCollisions() {
 					b.X += dx / dist * depth * a.Mass / tot
 					b.Y += dy / dist * depth * a.Mass / tot
 
-					a.XSpeed = ((a.XSpeed - math.Min(dx/dist*depth/2*b.Mass/tot, 6)) + a.XSpeed) / 2
-					a.YSpeed = ((a.YSpeed - math.Min(dy/dist*depth/2*b.Mass/tot, 6)) + a.YSpeed) / 2
-					b.XSpeed = ((b.XSpeed + math.Min(dx/dist*depth/2*a.Mass/tot, 6)) + b.XSpeed) / 2
-					b.YSpeed = ((b.YSpeed + math.Min(dy/dist*depth/2*a.Mass/tot, 6)) + b.YSpeed) / 2
+					a.XSpeed = ((a.XSpeed - math.Min(dx/dist*depth/2*b.Mass/tot*35, 6)) + a.XSpeed) / 2
+					a.YSpeed = ((a.YSpeed - math.Min(dy/dist*depth/2*b.Mass/tot*35, 6)) + a.YSpeed) / 2
+					b.XSpeed = ((b.XSpeed + math.Min(dx/dist*depth/2*a.Mass/tot*35, 6)) + b.XSpeed) / 2
+					b.YSpeed = ((b.YSpeed + math.Min(dy/dist*depth/2*a.Mass/tot*35, 6)) + b.YSpeed) / 2
+
+					// b.Direction = math.Atan2(b.YSpeed, b.XSpeed)
+					// b.Speed = math.Sqrt(b.XSpeed*b.XSpeed + b.YSpeed*b.YSpeed)
+					// a.Direction = math.Atan2(a.YSpeed, a.XSpeed)
+					// a.Speed = math.Sqrt(a.XSpeed*a.XSpeed + a.YSpeed*a.YSpeed)
+					continue
 				}
 				if dist < a.Radius() || dist < b.Radius() {
 					consumes = append(consumes, b)
@@ -185,7 +191,7 @@ func (a *Actor) CheckCollisions() {
 	a.Y = math.Max(0, a.Y)
 }
 
-var friction = .1
+var friction = .2
 
 func (a *Actor) Tick(d time.Duration) {
 	allowed := 500 / (a.room.SpeedMultiplier * math.Pow(a.Mass+50, .5))
@@ -196,8 +202,8 @@ func (a *Actor) Tick(d time.Duration) {
 
 	a.XSpeed = math.Pow(friction, d.Seconds()) * a.XSpeed
 	a.YSpeed = math.Pow(friction, d.Seconds()) * a.YSpeed
-	a.X += a.XSpeed
-	a.Y += a.YSpeed
+	a.X += a.XSpeed * d.Seconds()
+	a.Y += a.YSpeed * d.Seconds()
 
 	a.X += dx
 	a.Y += dy
@@ -254,7 +260,13 @@ func (a *PlayerActor) Remove() {
 	}
 	a.Actor.Remove()
 }
-
+func (oa *PlayerActor) Spit() {
+	if oa.Actor.Mass > 50 {
+		oa.Actor.Mass -= 15
+		oa.Actor.RecalcRadius()
+		NewBlob(oa)
+	}
+}
 func (oa *PlayerActor) Split() {
 	a := oa.Actor
 	if a.Mass < 40 {
@@ -274,18 +286,18 @@ func (oa *PlayerActor) Split() {
 	oa.MergeTime = oa.MergeTime.Add(oa.Player.room.MergeTimeFromMass(a.Mass))
 	a.RecalcRadius()
 
-	distance := math.Sqrt(a.Radius()*3) * 1
-	XSpeed := math.Cos(a.Direction)
-	YSpeed := math.Sin(a.Direction)
+	distance := a.Radius()
+	dx := math.Cos(a.Direction)
+	dy := math.Sin(a.Direction)
 
-	b := oa.Player.NewPlayerActor(a.X+XSpeed*a.Radius(), a.Y+YSpeed*a.Radius(), a.Mass)
+	b := oa.Player.NewPlayerActor(a.X+dx*distance*2, a.Y+dy*distance*2, a.Mass)
 
 	b.Actor.Direction = a.Direction
 	b.Actor.Speed = a.Speed
 
-	d := math.Sqrt(distance)
-	b.Actor.XSpeed = XSpeed * d
-	b.Actor.YSpeed = YSpeed * d
+	d := math.Sqrt(distance*40) * 7
+	b.Actor.XSpeed = dx * d
+	b.Actor.YSpeed = dy * d
 }
 
 func (a *PlayerActor) String() string {
@@ -383,6 +395,74 @@ func (pa *PlayerActor) Write(p ProtocolDown) {
 	p.WritePlayerActor(pa)
 }
 
+type Blob struct {
+	Actor  *Actor
+	Origin *PlayerActor
+	Birth  time.Time
+	Room   *Room
+}
+
+func NewBlob(p *PlayerActor) *Blob {
+	log.Println("SHOOT", p)
+	r := p.Player.room
+	v := &Blob{Birth: time.Now()}
+	v.Room = r
+
+	v.Actor = r.NewActor(
+		p.Actor.X,
+		p.Actor.Y, 15)
+	v.Actor.Owner = v
+	v.Actor.Direction = p.Actor.Direction
+
+	rad := p.Actor.Radius()
+	v.Actor.XSpeed = math.Cos(p.Actor.Direction) * 300
+	v.Actor.YSpeed = math.Sin(p.Actor.Direction) * 300
+	v.Actor.X += math.Cos(p.Actor.Direction) * rad
+	v.Actor.Y += math.Sin(p.Actor.Direction) * rad
+
+	r.AddTicker(v)
+	for _, player := range r.Players {
+		if player == nil {
+			continue
+		}
+		v.Actor.Write(player.Net)
+		player.Net.WriteBlob(v)
+	}
+	return v
+}
+func (b *Blob) ActorCollision(a *Actor) {
+	b.Remove()
+	a.Mass += b.Actor.Mass
+	a.RecalcRadius()
+	if av, is := a.Owner.(*Virus); is {
+		av.LastDirection = b.Actor.Direction
+		log.Println("FEEDING VIRUS, DIRECTION", b.Actor.Direction)
+	}
+}
+func (b *Blob) ShouldCollide(a *Actor) bool {
+	if pa, is := a.Owner.(*PlayerActor); is {
+		if pa == a.Owner && time.Since(b.Birth) > time.Second*5 {
+			return false
+		}
+		return true
+	}
+	if _, is := a.Owner.(*Blob); is {
+		return true
+	}
+	return false
+}
+func (b *Blob) Remove() {
+	b.Actor.Remove()
+	b.Room.RemoveTicker(b)
+}
+func (b *Blob) Write(p ProtocolDown) {
+	b.Actor.Write(p)
+	p.WriteBlob(b)
+}
+func (b *Blob) Tick(d time.Duration) {
+	b.Actor.Tick(d)
+}
+
 type Bacteria struct {
 	Actor   *Actor
 	Room    *Room
@@ -435,10 +515,18 @@ func (v *Bacteria) ActorCollision(a *Actor) {
 			v.Remove()
 		}
 	}
-	if _, isV := a.Owner.(*Virus); isV {
-		a.Mass += v.Actor.Mass
-		a.RecalcRadius()
-		v.Remove()
+	if virus, isV := a.Owner.(*Virus); isV {
+		v.Actor.Mass -= 1
+		virus.Actor.Mass += 1
+
+		v.Actor.RecalcRadius()
+		virus.Actor.RecalcRadius()
+
+		if v.Actor.Mass < 25 {
+			v.Remove()
+		}
+
+		virus.LastEat = time.Now()
 	}
 }
 func (v *Bacteria) ShouldCollide(a *Actor) bool {
@@ -482,19 +570,21 @@ func (v *Bacteria) String() string {
 }
 
 type Virus struct {
-	Actor   *Actor
-	Room    *Room
-	TargetX float64
-	TargetY float64
+	Actor         *Actor
+	Room          *Room
+	TargetX       float64
+	TargetY       float64
+	LastEat       time.Time
+	LastDirection float64
 }
 
 func NewVirus(r *Room) *Virus {
-	v := &Virus{}
+	v := &Virus{LastEat: time.Now()}
 	v.Room = r
 	v.Actor = r.NewActor(
 		float64(rand.Int63n(r.Width)),
 		float64(rand.Int63n(r.Height)),
-		rand.Float64()*250+150)
+		250)
 	v.Actor.Owner = v
 	v.Actor.Direction = rand.Float64() * math.Pi * 2
 	v.PickSpot()
@@ -509,6 +599,27 @@ func NewVirus(r *Room) *Virus {
 	v.Room.VirusCount += 1
 	return v
 }
+
+func NewVirusWithSpecs(r *Room, x, y, mass float64) *Virus {
+	v := &Virus{LastEat: time.Now()}
+	v.Room = r
+	v.Actor = r.NewActor(
+		x, y, mass)
+	v.Actor.Owner = v
+	v.Actor.Direction = rand.Float64() * math.Pi * 2
+	v.PickSpot()
+	r.AddTicker(v)
+	for _, player := range r.Players {
+		if player == nil {
+			continue
+		}
+		v.Actor.Write(player.Net)
+		player.Net.WriteVirus(v)
+	}
+	v.Room.VirusCount += 1
+	return v
+}
+
 func (v *Virus) PickSpot() {
 	v.TargetX = v.Actor.X + rand.Float64()*500 - 250
 	v.TargetY = v.Actor.Y + rand.Float64()*500 - 250
@@ -530,13 +641,24 @@ func (v *Virus) ActorCollision(a *Actor) {
 	}
 }
 func (v *Virus) ShouldCollide(a *Actor) bool {
-	if _, isVirus := a.Owner.(*Virus); isVirus {
-		return true
+	if ov, isVirus := a.Owner.(*Virus); isVirus {
+		if time.Since(v.LastEat) > time.Second && time.Since(ov.LastEat) > time.Second {
+			return true
+		}
 	}
 	return false
 }
 func (v *Virus) Tick(d time.Duration) {
-	if v.Actor.Mass > 500 {
+	if v.Actor.Mass > 340 {
+		v.Actor.Mass -= 150
+		nv := NewVirusWithSpecs(v.Room, v.Actor.X, v.Actor.Y, 150)
+		nv.Actor.Direction = v.LastDirection
+		log.Println("FEEDING VIRUS, DIRECTION", v.LastDirection)
+		nv.Actor.XSpeed = math.Cos(nv.Actor.Direction) * 450
+		nv.Actor.YSpeed = math.Sin(nv.Actor.Direction) * 450
+		v.Actor.RecalcRadius()
+	}
+	if time.Since(v.LastEat) > time.Minute {
 		v.Actor.Mass -= 1
 		v.Actor.RecalcRadius()
 	}
@@ -564,6 +686,9 @@ func (v *Virus) Tick(d time.Duration) {
 	}
 
 	v.Actor.Tick(d)
+	if v.Actor.Mass < 10 {
+		v.Remove()
+	}
 }
 func (v *Virus) Remove() {
 	v.Actor.Remove()
