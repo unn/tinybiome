@@ -232,7 +232,7 @@ sock.prototype.handleNewRoom = function(dv, off) {
 	this.room.speedmultiplier = dv.getFloat32(off+21, true)
 	this.room.playercount = dv.getInt32(off+25, true)
 	
-	console.log("ROOM UPDATE",{pc:this.room.playercount,sm:this.room.sizemultiplier,mass:this.room.startmass})
+	console.info("ROOM UPDATE",{pc:this.room.playercount,sm:this.room.sizemultiplier,mass:this.room.startmass})
 	return off + 29
 }
 sock.prototype.handleNewActor = function(dv, off) {
@@ -315,10 +315,12 @@ sock.prototype.handleMoveActor = function(dv, off) {
 	s = dv.getFloat32(off+17, true)
 
 	p = this.room.actors[id]
-	p.xs = x
-	p.ys = y
-	p.direction = d
-	p.speed = s
+	if (!p) {
+		console.log("COULDNT FIND",id)
+	} else {
+		p.setVelocity(s,d)
+		p.setPosition(x,y)
+	}
 
 	return off + 21
 }
@@ -394,7 +396,7 @@ sock.prototype.handlePong = function(dv, off) {
 	now = (new Date());
 	if (this.latency==0) this.latency = now-this.lastPing
 	else this.latency = (this.latency*5+(now-this.lastPing))/6;
-	console.log("PING",this.latency)
+	console.info(this, "PING",this.latency)
 	this.ele.innerHTML = "(PING "+Math.floor(this.latency*10)/10+"ms) "+this.location+" ("+this.room.playercount+" PLAYERS)"
 	return off+1
 }
@@ -671,7 +673,7 @@ function render() {
 	if (currentSock && currentSock.room && currentSock.room.myplayer) {
 		size = currentSock.room.myplayer.bbox()
 		if (Math.random()<.01) {
-			console.log("CAMERA",size)
+			console.info("CAMERA",size)
 		}
 		size[0] -= camPad
 		size[1] -= camPad

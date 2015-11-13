@@ -370,7 +370,7 @@ func (s *BinaryProtocol) WriteNewMessageMap() {
 		s.W.WriteByte(s.MessageMap[13])
 	}
 	newMessages := rand.Perm(255)
-	// log.Println(s, "SENDING SYNC MAP SIZE", len(newMessages), newMessages)
+	log.Println(s, "SENDING SYNC MAP SIZE", len(newMessages), newMessages)
 	s.MessageMap = make([]byte, len(newMessages))
 	s.W.WriteByte(byte(len(newMessages)))
 	for n, om := range newMessages {
@@ -388,18 +388,24 @@ func (s *BinaryProtocol) WritePong() {
 
 func (s *BinaryProtocol) Save() {
 	s.Lock.Lock()
+
+	a := s.W.Bytes()
+	b := make([]byte, len(a))
+	copy(b, a)
+	s.W.Reset()
+
 	if rand.Intn(10000) == 0 {
+		log.Println(s, "RANDOMIZING BUFFER")
 		s.WriteNewMessageMap()
 	}
-	oldW := s.W
-	s.W = bytes.NewBuffer(nil)
+
 	if len(s.WriteChan) > 10 {
-		log.Println("HIGH WRITECHAN", len(s.WriteChan))
+		log.Println(s, "HIGH WRITECHAN", len(s.WriteChan))
 	}
 	if len(s.WriteChan) > 50 {
+		s.Lock.Unlock()
 		s.Disconnected = true
 		start := time.Now()
-		s.Lock.Unlock()
 		log.Println("KILLING", s.RW)
 		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
 		s.RW.Close()
@@ -410,8 +416,7 @@ func (s *BinaryProtocol) Save() {
 		}
 
 	} else {
-		s.WriteChan <- oldW.Bytes()
-		s.W.Reset()
+		s.WriteChan <- b
 		s.Lock.Unlock()
 	}
 }

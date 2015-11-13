@@ -82,7 +82,6 @@ func NewActor(r *Room) *Actor {
 	a := &Actor{room: r}
 	id := r.getId(a)
 	a.ID = id
-	log.Println("NEW ACTOR", a)
 	return a
 }
 func (a *Actor) RecalcRadius() {
@@ -215,6 +214,7 @@ func (a *Actor) String() string {
 
 func (a *Actor) Remove() {
 	r := a.room
+	log.Println("REMOVING ACTOR", a)
 	r.Actors[a.ID] = nil
 	for _, player := range r.Players {
 		if player == nil {
@@ -278,14 +278,14 @@ func (oa *PlayerActor) Split() {
 	XSpeed := math.Cos(a.Direction)
 	YSpeed := math.Sin(a.Direction)
 
-	b := oa.Player.NewActor(a.X+XSpeed*a.Radius(), a.Y+YSpeed*a.Radius(), a.Mass)
+	b := oa.Player.NewPlayerActor(a.X+XSpeed*a.Radius(), a.Y+YSpeed*a.Radius(), a.Mass)
 
-	b.Direction = a.Direction
-	b.Speed = a.Speed
+	b.Actor.Direction = a.Direction
+	b.Actor.Speed = a.Speed
 
 	d := math.Sqrt(distance)
-	b.XSpeed = XSpeed * d
-	b.YSpeed = YSpeed * d
+	b.Actor.XSpeed = XSpeed * d
+	b.Actor.YSpeed = YSpeed * d
 }
 
 func (a *PlayerActor) String() string {

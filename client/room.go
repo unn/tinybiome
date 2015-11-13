@@ -229,12 +229,7 @@ func (r *Room) getActor(id int64) *Actor {
 }
 
 func (r *Room) Accept(p Protocol) {
-	player := &Player{Net: p, room: r, Connected: true}
-	go player.SendUpdates()
-	log.Println(player, "STARTING LOOP")
-	p.WriteRoom(r)
-	player.ReceiveUpdates()
-	player.Remove()
+	NewPlayer(r, p)
 }
 
 func (r *Room) MergeTimeFromMass(mass float64) time.Duration {
@@ -284,6 +279,15 @@ type Player struct {
 	Joined    bool
 }
 
+func NewPlayer(r *Room, p Protocol) *Player {
+	player := &Player{Net: p, room: r, Connected: true}
+	go player.SendUpdates()
+	log.Println(player, "STARTING LOOP")
+	p.WriteRoom(r)
+	player.ReceiveUpdates()
+	player.Remove()
+	return player
+}
 func (p *Player) Tick(d time.Duration) {
 	for _, actor := range p.Owns {
 		if actor != nil {
@@ -299,6 +303,7 @@ func (p *Player) Sync() {
 	r := p.room
 
 	r.ChangeLock.Lock()
+
 	p.ID = r.getPlayerId(p)
 	p.room.AddTicker(p)
 
@@ -440,11 +445,6 @@ func (p *Player) Join(name string) {
 	log.Println("Lock 3")
 	r.ChangeLock.Lock()
 
-	if !p.Joined {
-		p.Joined = true
-		p.room.PlayerCount += 1
-	}
-
 	defer func() {
 		log.Println("Unlock 3")
 		r.ChangeLock.Unlock()
@@ -454,66 +454,74 @@ func (p *Player) Join(name string) {
 			return
 		}
 	}
+
+	if !p.Joined {
+		p.Joined = true
+		p.room.PlayerCount += 1
+	}
+
 	p.Rename(name)
 	log.Println(name, "JOINED")
-	p.NewActor(rand.Float64()*float64(r.Width), rand.Float64()*float64(r.Height), float64(r.StartMass))
+	p.NewPlayerActor(rand.Float64()*float64(r.Width), rand.Float64()*float64(r.Height), float64(r.StartMass))
 
 }
 func (p *Player) Remove() {
-	r := p.room
-	log.Println("Lock 4")
-	r.ChangeLock.Lock()
-	for _, actor := range p.Owns {
-		if actor == nil {
-			continue
+	if p.Synced {
+		r := p.room
+		log.Println("Lock 4")
+		r.ChangeLock.Lock()
+		for _, ticker := range p.Owns {
+			if ticker == nil {
+				continue
+			}
+			ticker.Remove()
 		}
-		actor.Remove()
-	}
-	r.Players[p.ID] = nil
-	if p.Joined {
-		r.PlayerCount -= 1
-	}
-	r.RemoveTicker(p)
-	for _, oPlayer := range r.Players {
-		if oPlayer == nil {
-			continue
+		r.Players[p.ID] = nil
+		r.RemoveTicker(p)
+		if p.Joined {
+			r.PlayerCount -= 1
 		}
-		oPlayer.Net.WriteDestroyPlayer(p)
+		for _, oPlayer := range r.Players {
+			if oPlayer == nil {
+				continue
+			}
+			oPlayer.Net.WriteDestroyPlayer(p)
+		}
+		log.Println("Unlock 4")
+		log.Println("CLOSING CHAN")
+		r.ChangeLock.Unlock()
 	}
 
-	log.Println("Unlock 4")
-	log.Println("CLOSING CHAN")
-	r.ChangeLock.Unlock()
 }
 
-func (p *Player) NewActor(x, y, mass float64) *Actor {
+func (p *Player) NewPlayerActor(x, y, mass float64) *PlayerActor {
 	r := p.room
-	actor := &PlayerActor{
+	playerActor := &PlayerActor{
 		Actor:     r.NewActor(x, y, mass),
 		Player:    p,
 		MergeTime: time.Now().Add(r.MergeTimeFromMass(mass)),
 	}
-	actor.Actor.Owner = actor
+	playerActor.Actor.Owner = playerActor
 
 	for _, oPlayer := range r.Players {
 		if oPlayer == nil {
 			continue
 		}
-		actor.Write(oPlayer.Net)
+		playerActor.Write(oPlayer.Net)
 	}
 
 	for n, a := range p.Owns {
 		if a == nil {
-			p.Owns[n] = actor
+			p.Owns[n] = playerActor
 			break
 		}
 	}
 
-	return actor.Actor
+	return playerActor
 }
 
 func (p *Player) String() string {
-	return fmt.Sprintf("#%d (%s, %s)", p.ID, p.Name, p.Net)
+	return fmt.Sprintf("PL #%d (%s, %s)", p.ID, p.Name, p.Net)
 }
 
 var clanRegex = regexp.MustCompile(`^\[(.*)\]`)
