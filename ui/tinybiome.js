@@ -709,22 +709,21 @@ function render() {
 		gfx.position(ctx, -camera.x,-camera.y, camera.xscale,camera.yscale)
 	}
 
-	
-
-	var x = camera.x<0 ? 0 : camera.x
-	var y = camera.y<0 ? 0 : camera.y
-	var w = x + camera.width > room.width ? room.width - x : camera.width
-	var h = y + camera.height > room.height ? room.height - y : camera.height 
-
-	var x = camera.x
-	var y = camera.y
-	var w = camera.width
-	var h = camera.height 
-
-
-	renderBackground.update(x, y, w, h)
-
 	if (currentSock && currentSock.room) {
+		var room = currentSock.room;
+		var x = camera.x<0 ? 0 : camera.x
+		var y = camera.y<0 ? 0 : camera.y
+		var w = x + camera.width > room.width ? room.width - x : camera.width
+		var h = y + camera.height > room.height ? room.height - y : camera.height 
+
+		// var x = camera.x
+		// var y = camera.y
+		// var w = camera.width
+		// var h = camera.height 
+
+
+		renderBackground.update(x, y, w, h)
+
 		currentSock.room.render(ctx)
 	}
 

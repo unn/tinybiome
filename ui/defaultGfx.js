@@ -18,6 +18,7 @@ var mPlier = 4
 var tileSize = 100;
 
 var pix = {
+	dirty: true,
 	top: new PIXI.Container(),
 	stage: new PIXI.Container(),
 	scale: new PIXI.Container()
@@ -80,7 +81,10 @@ function depthCompare(a,b) {
 
 gfx.done = function(ctx) {
 	// console.log("DONE")
-	ctx.stage.children.sort(depthCompare);
+	if (pix.dirty) {
+		ctx.stage.children.sort(depthCompare);
+		pix.dirty = false
+	}
 
 	ctx.renderer.render(ctx.top)
 }
@@ -91,6 +95,9 @@ var countCreateRenderBackground = 0
 gfx.createRenderBackground = function(pix) {
 	if (!renderRenderBackground) return noop
 	var g = new PIXI.Graphics();
+	g.beginFill(0xFFFFFF,1)
+	g.drawRect(0,0,1,1)
+	g.endFill()
 
 	var size = 50000
 	var tilingSprite = new PIXI.extras.TilingSprite(bgTex, size, size);
@@ -101,19 +108,21 @@ gfx.createRenderBackground = function(pix) {
 	tilingSprite.mask = g;
 	tilingSprite.z = -10;
 	pix.stage.addChild(tilingSprite)
+	pix.dirty = true
 
 
 	g.z = -10
 	pix.stage.addChild(g)
+	pix.dirty = true
 	return {
 		show: function(){},
 		hide: function(){},
 		free: function(){},
 		update:function(x,y,w,h) {
-			g.clear();
-			g.beginFill(0xFFFFFF,1)
-			g.drawRect(x,y,w,h)
-			g.endFill()
+			g.position.x = x
+			g.position.y = y
+			g.scale.x = w
+			g.scale.y = h
 		}}
 }
 
@@ -152,6 +161,7 @@ gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 			text.position.y = bbox[3]-bbox[1]
 			last.z = 10
 			pix.stage.addChild(last) 
+			pix.dirty = true
 		},
 		free:function(){
 			pix.stage.removeChild(last)
@@ -246,6 +256,7 @@ gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
 			last.position.y = 0
 			last.z = 20
 			pix.stage.addChild(last)
+			pix.dirty = true
 		},
 		free:function(){
 			pix.stage.removeChild(last)
@@ -271,6 +282,7 @@ gfx.createRenderTile = function(pix) {
 		show: function() {
 			if (!visible) {
 				pix.stage.addChild(container);
+				pix.dirty = true
 			}
 			visible = true
 		},
@@ -307,6 +319,7 @@ gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
 		show: function() {
 			if (!visible){
 				pix.stage.addChild(model);
+				pix.dirty = true
 			}
 			visible = true
 		},
@@ -348,6 +361,7 @@ gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius
 		show: function() {
 			if (!visible)
 				pix.stage.addChild(model);
+			pix.dirty = true
 			visible = true
 		},
 		update: function(x,y,c,r) {
@@ -381,6 +395,7 @@ gfx.createMineral = function(pix) { // (this.x, this.y, this.color, this._radius
 		show: function() {
 			if (!visible)
 				pix.stage.addChild(model);
+			pix.dirty = true
 			visible = true
 		},
 		update: function(x,y,c,r) {
@@ -423,6 +438,7 @@ gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor
 		show: function() {
 			if (!visible) {
 				pix.stage.addChild(model.container)
+				pix.dirty = true
 			}
 			visible = true
 		},
@@ -464,6 +480,7 @@ gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.col
 		show: function() {
 			if (!visible) {
 				pix.stage.addChild(model.container)
+				pix.dirty = true
 			}
 			visible = true
 		},
@@ -505,6 +522,7 @@ gfx.createBacteria = function(pix) { // (this.actor.x, this.actor.y, this.actor.
 		show: function() {
 			if (!visible) {
 				pix.stage.addChild(model.container)
+				pix.dirty = true
 			}
 			visible = true
 		},
