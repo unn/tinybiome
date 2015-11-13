@@ -142,6 +142,7 @@ function sock(location) {
 		servers.addServer(self)
 	}
 	this.ws.onerror = function() {
+		console.log("ECLOSED",self)
 		self.myremove()
 		ohno("Websocket Error! Refresh in a bit, it might have been restarted...")
 	}
@@ -189,7 +190,7 @@ sock.prototype.remove = function() {
 sock.prototype.tick = function() {
 	if (this.connected) {
 		this.writePing()
-		setTimeout(this.mytick,1000);
+		setTimeout(this.mytick,5000);
 	}
 }
 sock.prototype.onmessage = function(m){
@@ -229,6 +230,7 @@ sock.prototype.handleNewRoom = function(dv, off) {
 	var width = dv.getInt32(off+1, true)
 	var height = dv.getInt32(off+5, true)
 	if (!this.room) {
+		console.log("NEW ROOM INCOMING",width,height)
 		this.room = new room(width,height)
 	}
 	this.room.sizemultiplier = .7
@@ -238,7 +240,7 @@ sock.prototype.handleNewRoom = function(dv, off) {
 	this.room.speedmultiplier = dv.getFloat32(off+21, true)
 	this.room.playercount = dv.getInt32(off+25, true)
 	
-	console.log("NEW ROOM",{width:width,height:height,sm:this.room.sizemultiplier,mass:this.room.startmass})
+	console.info("ROOM UPDATE",{pc:this.room.playercount,sm:this.room.sizemultiplier,mass:this.room.startmass})
 	return off + 29
 }
 sock.prototype.handleNewActor = function(dv, off) {
@@ -321,10 +323,12 @@ sock.prototype.handleMoveActor = function(dv, off) {
 	var s = dv.getFloat32(off+17, true)
 
 	var p = this.room.actors[id]
-	p.xs = x
-	p.ys = y
-	p.direction = d
-	p.speed = s
+	if (!p) {
+		console.log("COULDNT FIND",id)
+	} else {
+		p.setVelocity(s,d)
+		p.setPosition(x,y)
+	}
 
 	return off + 21
 }
@@ -377,7 +381,7 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 	case 0:
 		var aid = dv.getInt32(off+2, true)
 		var pid = dv.getInt32(off+6, true)
-		console.log("ACTOR",aid,"IS PLAYERACTOR")
+		console.log("ACTOR",aid,"IS PLAYERACTOR OWNED BY",pid)
 		
 		var a = new playeractor(this.room, aid,pid)
 		return off + 10
@@ -400,7 +404,7 @@ sock.prototype.handlePong = function(dv, off) {
 	var now = (new Date());
 	if (this.latency==0) this.latency = now-this.lastPing
 	else this.latency = (this.latency*5+(now-this.lastPing))/6;
-	console.log("PING",this.latency)
+	console.info(this, "PING",this.latency)
 	this.ele.innerHTML = "(PING "+Math.floor(this.latency*10)/10+"ms) "+this.location+" ("+this.room.playercount+" PLAYERS)"
 	return off+1
 }
@@ -420,6 +424,8 @@ sock.prototype.writeJoin = function(name) {
 var mab = new DataView(new ArrayBuffer(13))
 mab.setUint8(0,1,true)
 sock.prototype.writeMove = function(id,d,s) {
+	mab = new DataView(new ArrayBuffer(13))
+	mab.setUint8(0,1,true)
 	mab.setInt32(1,id,true)
 	mab.setFloat32(5,d,true)
 	mab.setFloat32(9,s,true)
@@ -527,6 +533,7 @@ canvas.onmousemove = function(e) {
 }
 
 var canSplit = true
+
 document.onkeydown = function(e) {
     e = e || window.event;
 
@@ -671,7 +678,7 @@ function render() {
 	if (currentSock && currentSock.room && currentSock.room.myplayer) {
 		var size = currentSock.room.myplayer.bbox()
 		if (Math.random()<.01) {
-			console.log("CAMERA",size)
+			console.info("CAMERA",size)
 		}
 		size[0] -= camPad
 		size[1] -= camPad

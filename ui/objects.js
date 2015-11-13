@@ -475,6 +475,19 @@ actor.prototype.render = function(ctx) {
 	this.gfx.update(this.x,this.y,this.color,n, Math.floor(this.mass),radius)
 
 }
+actor.prototype.setVelocity = function(s,d) {
+	this.direction = d
+	this.speed = s
+}
+actor.prototype.setPosition = function(x,y) {
+	var allowed = 500 / (this.room.speedmultiplier * Math.pow(this.mass + 50, .5))
+	var distance = allowed * currentSock.latency/2000 * this.speed
+
+	this.xs = x + Math.cos(this.direction) * distance
+	this.ys = y + Math.sin(this.direction) * distance
+	this.xs = x
+	this.ys = y
+}
 actor.prototype.step = function(seconds) {
 	this.mass = (this.newmass+this.mass*4)/5
 
@@ -485,7 +498,6 @@ actor.prototype.step = function(seconds) {
 	var distance = allowed * seconds * this.speed
 	var mdx = Math.cos(this.direction) * distance
 	var mdy = Math.sin(this.direction) * distance
-
 
 	if (this.inview) {
 		var particleChance = 1-1/((10 * seconds)*this.speed*this.radius())

@@ -10,7 +10,8 @@ cellImg.loaded = false;
 cellImg.pattern = false;
 // cellImg.src = 'imgs/cells.jpg';
 
-var texture = PIXI.Texture.fromImage("imgs/cells.jpg");
+var bgTex = PIXI.Texture.fromImage("imgs/bg.jpg");
+var cellTex = PIXI.Texture.fromImage("imgs/cells.jpg");
 
 var mPlier = 4
 
@@ -60,8 +61,27 @@ gfx.position = function(ctx, x, y, xscale, yscale) {
 	// ctx.translate(x, y)
 }
 
+function depthCompare(a,b) {
+    if (!a.z) {
+    	console.log("DOESNT HAVE Z", a)
+    	throw "DOESNT HAVE Z"
+    }
+    if (!b.z) {
+    	console.log("DOESNT HAVE Z", b)
+    	throw "DOESNT HAVE Z"
+    }
+	if (a.z < b.z)
+		return -1;
+	if (a.z > b.z)
+		return 1;
+	return 0;
+}
+
+
 gfx.done = function(ctx) {
 	// console.log("DONE")
+	ctx.stage.children.sort(depthCompare);
+
 	ctx.renderer.render(ctx.top)
 }
 
@@ -71,6 +91,19 @@ var countCreateRenderBackground = 0
 gfx.createRenderBackground = function(pix) {
 	if (!renderRenderBackground) return noop
 	var g = new PIXI.Graphics();
+
+	var size = 50000
+	var tilingSprite = new PIXI.extras.TilingSprite(bgTex, size, size);
+
+	tilingSprite.scale.x = 1
+	tilingSprite.scale.y = 1
+
+	tilingSprite.mask = g;
+	tilingSprite.z = -10;
+	pix.stage.addChild(tilingSprite)
+
+
+	g.z = -10
 	pix.stage.addChild(g)
 	return {
 		show: function(){},
@@ -88,6 +121,7 @@ var countCreateGroup = 0
 gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 	if (!renderGroup) return noop
 	var last;
+	var text;
 	return {
 		hide: function() {
 		},
@@ -97,11 +131,11 @@ gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 		update:function(bbox,n,mass,myActors){
 			if (last) {
 				pix.stage.removeChild(last)
-				last.destroy()
+				last.destroy(true)
 			}
 			last = new PIXI.Container()
 
-			var text = new PIXI.Text(n,{
+			text = new PIXI.Text(n,{
 				font: '48px Arial', 
 				stroke: "black", 
 				fill: "white", 
@@ -116,11 +150,12 @@ gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 			text.scale.y = .5;
 			text.position.x = (bbox[2]-bbox[0])/2
 			text.position.y = bbox[3]-bbox[1]
+			last.z = 10
 			pix.stage.addChild(last) 
 		},
 		free:function(){
 			pix.stage.removeChild(last)
-			last.destroy()
+			last.destroy(true)
 		}}
 }
 
@@ -139,7 +174,7 @@ gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
 		update:function(leaders,x, y, width, height, connected){
 			if (last) {
 				pix.stage.removeChild(last)
-				last.destroy()
+				last.destroy(true)
 			}
 			last = new PIXI.Container()
 
@@ -209,11 +244,12 @@ gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
 
 			last.position.x = x
 			last.position.y = 0
+			last.z = 20
 			pix.stage.addChild(last)
 		},
 		free:function(){
 			pix.stage.removeChild(last)
-			last.destroy()
+			last.destroy(true)
 		}}
 }
 
@@ -222,6 +258,7 @@ var countCreateRenderTile = 0
 gfx.createRenderTile = function(pix) {
 	if (!renderRenderTile) return noop
 	var container = new PIXI.Container();
+	container.z = -9
 	var visible = false;
 	countCreateRenderTile += 1
 	return {
@@ -243,7 +280,7 @@ gfx.createRenderTile = function(pix) {
 		},
 		free:function(){
 			if (visible) pix.stage.removeChild(container)
-			container.destroy()
+			container.destroy(true)
 			countCreateRenderTile -= 1
 		}
 	}
@@ -255,37 +292,39 @@ gfx.renderBackground = function() {}
 var countCreateParticle = 0
 gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
 	if (!renderParticle) return noop
-	var bunny = genericCircle();
+	var model = genericCircle();
 	var visible = false;
 	var destroyed = false;
+	model.z = 9
 	countCreateParticle += 1
 	return {
 		hide: function() {
 			if (visible){
-				pix.stage.removeChild(bunny)
+				pix.stage.removeChild(model)
 			}
 			visible = false
 		},
 		show: function() {
 			if (!visible){
-				pix.stage.addChild(bunny);
+				pix.stage.addChild(model);
 			}
 			visible = true
 		},
 		update: function(x,y,life,c) {
 			var r = life / 50
-			bunny.scale.x = r
-			bunny.scale.y = r
-			bunny.position.x = x
-			bunny.position.y = y
-			bunny.tint = c
+			model.scale.x = r
+			model.scale.y = r
+			model.position.x = x
+			model.position.y = y
+			model.tint = c
+			model.alpha = .4
 		},
 		free: function() {
 			if (visible)
-				pix.stage.removeChild(bunny)
+				pix.stage.removeChild(model)
 
 			destroyed = true
-			bunny.destroy()
+			model.destroy(true)
 			countCreateParticle -= 1
 		}
 	}
@@ -297,31 +336,31 @@ var countCreateVitamin = 0
 gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius)
 	if (!renderVitamin) return noop
 	var rendered = false;
-	var bunny = genericCircle()
+	var model = genericCircle()
 	var visible = false;
 	countCreateVitamin += 1
 	return {
 		hide: function() {
 			if (visible)
-				pix.stage.removeChild(bunny)
+				pix.stage.removeChild(model)
 			visible = false
 		},
 		show: function() {
 			if (!visible)
-				pix.stage.addChild(bunny);
+				pix.stage.addChild(model);
 			visible = true
 		},
 		update: function(x,y,c,r) {
-			bunny.tint = c
-			bunny.scale.x = r
-			bunny.scale.y = r
-			bunny.position.x = x
-			bunny.position.y = y
+			model.tint = c
+			model.scale.x = r
+			model.scale.y = r
+			model.position.x = x
+			model.position.y = y
 		},
 		free: function() {
 			if (visible)
-				pix.stage.removeChild(bunny)
-			bunny.destroy()
+				pix.stage.removeChild(model)
+			model.destroy(true)
 			countCreateVitamin -= 1
 		}
 	}
@@ -330,31 +369,31 @@ gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius
 var countCreateMineral = 0
 gfx.createMineral = function(pix) { // (this.x, this.y, this.color, this._radius)
 	if (!renderMineral) return noop
-	var bunny = genericCircle()
+	var model = genericCircle()
 	var visible = false;
 	countCreateMineral += 1
 	return {
 		hide: function() {
 			if (visible)
-				pix.stage.removeChild(bunny)
+				pix.stage.removeChild(model)
 			visible = false
 		},
 		show: function() {
 			if (!visible)
-				pix.stage.addChild(bunny);
+				pix.stage.addChild(model);
 			visible = true
 		},
 		update: function(x,y,c,r) {
-			bunny.tint = c
-			bunny.scale.x = r
-			bunny.scale.y = r
-			bunny.position.x = x
-			bunny.position.y = y
+			model.tint = c
+			model.scale.x = r
+			model.scale.y = r
+			model.position.x = x
+			model.position.y = y
 		},
 		free: function() {
 			if (visible)
-				pix.stage.removeChild(bunny)
-			bunny.destroy()
+				pix.stage.removeChild(model)
+			model.destroy(true)
 			countCreateMineral -= 1
 		}
 	}
@@ -370,37 +409,38 @@ gfx.createActor = function(pix) { // (this.x,this.y,this.color,n, Math.floor(thi
 var countCreatePlayerActor = 0
 gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
 	if (!renderPlayerActor) return noop
-	var bunny = genericCell(genericCircle());
+	var model = genericCell(genericCircle());
+	model.container.z = 8
 	var visible = false;
 	countCreatePlayerActor += 1
 	return {
 		hide: function() {
 			if (visible) {
-				pix.stage.removeChild(bunny.container)
+				pix.stage.removeChild(model.container)
 			}
 			visible = false
 		},
 		show: function() {
 			if (!visible) {
-				pix.stage.addChild(bunny.container)
+				pix.stage.addChild(model.container)
 			}
 			visible = true
 		},
 		update: function(x,y,c,mass, r) {
-			bunny.front.scale.x = r
-			bunny.front.scale.y = r
-			// bunny.front.tint = c
-			bunny.container.position.x = x
-			bunny.container.position.y = y
+			model.front.scale.x = r
+			model.front.scale.y = r
+			// model.front.tint = c
+			model.container.position.x = x
+			model.container.position.y = y
 
-			bunny.container.rotation = (x+y)/200
-			bunny.back.tint = c
+			model.container.rotation = (x+y)/200
+			model.back.tint = c
 		},
 		free: function() {
 			if (visible) {
-				pix.stage.removeChild(bunny.container)
+				pix.stage.removeChild(model.container)
 			}
-			bunny.container.destroy()
+			model.container.destroy(true)
 			countCreatePlayerActor -= 1
 		}
 	}
@@ -410,37 +450,38 @@ gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor
 var countCreateVirus = 0
 gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 	if (!renderVirus) return noop
-	var bunny = genericCell(virusBall());
+	var model = genericCell(virusBall());
+	model.container.z = -5
 	var visible = false;
 	countCreateVirus += 1
 	return {
 		hide: function() {
 			if (visible) {
-				pix.stage.removeChild(bunny.container)
+				pix.stage.removeChild(model.container)
 			}
 			visible = false
 		},
 		show: function() {
 			if (!visible) {
-				pix.stage.addChild(bunny.container)
+				pix.stage.addChild(model.container)
 			}
 			visible = true
 		},
 		update: function(x,y,c,mass, r) {
-			bunny.front.scale.x = r
-			bunny.front.scale.y = r
-			// bunny.front.tint = c
-			bunny.container.position.x = x
-			bunny.container.position.y = y
+			model.front.scale.x = r
+			model.front.scale.y = r
+			// model.front.tint = c
+			model.container.position.x = x
+			model.container.position.y = y
 
-			bunny.container.rotation = (x+y)/200
-			bunny.back.tint = c
+			model.container.rotation = (x+y)/200
+			model.back.tint = c
 		},
 		free: function() {
 			if (visible) {
-				pix.stage.removeChild(bunny.container)
+				pix.stage.removeChild(model.container)
 			}
-			bunny.container.destroy()
+			model.container.destroy(true)
 			countCreateVirus -= 1
 		}
 	}
@@ -450,37 +491,38 @@ gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.col
 var countCreateBacteria = 0
 gfx.createBacteria = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 	if (!renderBacteria) return noop
-	var bunny = genericCell(bubbleCircle());
+	var model = genericCell(bubbleCircle());
 	var visible = false;
 	countCreateBacteria += 1
+	model.container.z = -4
 	return {
 		hide: function() {
 			if (visible) {
-				pix.stage.removeChild(bunny.container)
+				pix.stage.removeChild(model.container)
 			}
 			visible = false
 		},
 		show: function() {
 			if (!visible) {
-				pix.stage.addChild(bunny.container)
+				pix.stage.addChild(model.container)
 			}
 			visible = true
 		},
 		update: function(x,y,c,mass, r) {
-			bunny.front.scale.x = r
-			bunny.front.scale.y = r
-			// bunny.front.tint = c
-			bunny.container.position.x = x
-			bunny.container.position.y = y
+			model.front.scale.x = r
+			model.front.scale.y = r
+			// model.front.tint = c
+			model.container.position.x = x
+			model.container.position.y = y
 
-			bunny.container.rotation = (x+y)/200
-			bunny.back.tint = c
+			model.container.rotation = (x+y)/200
+			model.back.tint = c
 		},
 		free: function() {
 			if (visible) {
-				pix.stage.removeChild(bunny.container)
+				pix.stage.removeChild(model.container)
 			}
-			bunny.container.destroy()
+			model.container.destroy(true)
 			countCreateBacteria -= 1
 		}
 	}
@@ -560,10 +602,11 @@ function genericCell(playerMask) {
 	var c = new PIXI.Container()
 
 	var size = 50000
-	tilingSprite = new PIXI.extras.TilingSprite(texture, size, size);
+	tilingSprite = new PIXI.extras.TilingSprite(cellTex, size, size);
 
 	tilingSprite.scale.x = .3
 	tilingSprite.scale.y = .3
+	tilingSprite.alpha = .8
 	tilingSprite.position.x = -size/2*tilingSprite.scale.x
 	tilingSprite.position.y = -size/2*tilingSprite.scale.y
 

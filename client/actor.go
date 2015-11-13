@@ -68,20 +68,20 @@ type Actor struct {
 	Y         float64
 	Direction float64
 	Speed     float64
-	moved     bool
 	Mass      float64
 
 	XSpeed float64
 	YSpeed float64
 	radius float64
 	oldm   float64
+	oldx   float64
+	oldy   float64
 }
 
 func NewActor(r *Room) *Actor {
 	a := &Actor{room: r}
 	id := r.getId(a)
 	a.ID = id
-	log.Println("NEW ACTOR", a)
 	return a
 }
 func (a *Actor) RecalcRadius() {
@@ -179,7 +179,6 @@ func (a *Actor) CheckCollisions() {
 			}
 		}
 	}
-	a.moved = true
 	a.X = math.Min(float64(a.room.Width), a.X)
 	a.Y = math.Min(float64(a.room.Height), a.Y)
 	a.X = math.Max(0, a.X)
@@ -215,6 +214,7 @@ func (a *Actor) String() string {
 
 func (a *Actor) Remove() {
 	r := a.room
+	log.Println("REMOVING ACTOR", a)
 	r.Actors[a.ID] = nil
 	for _, player := range r.Players {
 		if player == nil {
@@ -278,14 +278,14 @@ func (oa *PlayerActor) Split() {
 	XSpeed := math.Cos(a.Direction)
 	YSpeed := math.Sin(a.Direction)
 
-	b := oa.Player.NewActor(a.X+XSpeed*a.Radius(), a.Y+YSpeed*a.Radius(), a.Mass)
+	b := oa.Player.NewPlayerActor(a.X+XSpeed*a.Radius(), a.Y+YSpeed*a.Radius(), a.Mass)
 
-	b.Direction = a.Direction
-	b.Speed = a.Speed
+	b.Actor.Direction = a.Direction
+	b.Actor.Speed = a.Speed
 
 	d := math.Sqrt(distance)
-	b.XSpeed = XSpeed * d
-	b.YSpeed = YSpeed * d
+	b.Actor.XSpeed = XSpeed * d
+	b.Actor.YSpeed = YSpeed * d
 }
 
 func (a *PlayerActor) String() string {
@@ -477,6 +477,9 @@ func (v *Bacteria) Remove() {
 	v.Room.BacteriaCount -= 1
 	v.Room.RemoveTicker(v)
 }
+func (v *Bacteria) String() string {
+	return fmt.Sprintf("BA (%s)", v.Actor)
+}
 
 type Virus struct {
 	Actor   *Actor
@@ -566,4 +569,7 @@ func (v *Virus) Remove() {
 	v.Actor.Remove()
 	v.Room.VirusCount -= 1
 	v.Room.RemoveTicker(v)
+}
+func (v *Virus) String() string {
+	return fmt.Sprintf("VI (%s)", v.Actor)
 }

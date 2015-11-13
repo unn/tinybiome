@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"runtime"
 	"time"
 )
@@ -35,13 +36,12 @@ func main() {
 	cli := client.NewServer()
 	cli.AddRoom(room)
 	log.Println("WEBSOCKETS STARTING")
-	m := http.NewServeMux()
-	m.HandleFunc("/", cli.Handler)
+	http.HandleFunc("/", cli.Handler)
 	add := fmt.Sprintf("0.0.0.0:%d", port)
 	log.Println("STARTING ON", add)
 
 	go func() {
-		err := http.ListenAndServe(add, m)
+		err := http.ListenAndServe(add, nil)
 		if err != nil {
 			log.Println("ERROR", err)
 		}
