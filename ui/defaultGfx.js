@@ -285,7 +285,7 @@ gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
 
 		},
 		update:function(leaders,x, y, width, height, connected){
-			for(var i=0; i<leaders.length; i+=1) {
+			for(var i=0; i<maxLeaders; i+=1) {
 				massTexts[i].visible = false
 				leaderTexts[i].visible = false
 			}
