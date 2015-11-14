@@ -14,7 +14,7 @@ import (
 const MaxEnts = 256 * 256
 const MaxPlayers = 1024
 const MaxOwns = 16
-const MaxPellets = 12000
+const MaxPellets = 10000
 const MaxTickers = 12000
 const TickLen = 25
 

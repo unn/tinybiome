@@ -37,6 +37,28 @@ fi";
 done;
 
 
+for i in 139.162.220.253; do
+rsync tbnode "root@$i:/tmp/new";
+ssh "root@$i" "
+echo 'ON $i'
+if ! cmp /tmp/new tbnode ; then
+	echo 'NEW NODE ON $i'
+	pkill tbnode
+
+	echo 'COPYING'
+	/bin/cp -f /tmp/new tbnode
+
+	echo 'STARTING'
+	nohup ./tbnode </dev/null >tbnode.log 2>&1 &
+fi";
+done;
+
+for i in 45.79.166.39; do
+rsync tbnode "root@$i:/tmp/new";
+done;
+
+
+
 
 
 

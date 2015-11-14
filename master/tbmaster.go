@@ -19,12 +19,22 @@ func main() {
 	m.Handle("/", websocket.Handler(newConn))
 	go http.ListenAndServe("0.0.0.0:4000", m)
 
-	w := http.NewServeMux()
-	fs := http.FileServer(http.Dir("./ui"))
-	w.Handle("/", fs)
+	{
+		w := http.NewServeMux()
+		fs := http.FileServer(http.Dir("./ui"))
+		w.Handle("/", fs)
 
-	log.Println("ABOUT TO LISTEN FOR HTTP")
-	http.ListenAndServe("0.0.0.0:80", w)
+		log.Println("ABOUT TO LISTEN FOR HTTP")
+		go http.ListenAndServe("0.0.0.0:8080", w)
+	}
+	{
+		w := http.NewServeMux()
+		fs := http.FileServer(http.Dir("./ui"))
+		w.Handle("/", fs)
+
+		log.Println("ABOUT TO LISTEN FOR HTTP")
+		http.ListenAndServe("0.0.0.0:80", w)
+	}
 }
 
 type server struct {

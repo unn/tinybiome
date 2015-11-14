@@ -182,6 +182,7 @@ sock.prototype.remove = function() {
 	if (currentSock==this) {
 		currentSock=null
 	}
+	this.room.remove()
 	console.log("REMOVING", this)
 	document.getElementById("serverlist").removeChild(this.ele)
 	if (servers.servers.indexOf(this)!=-1)
@@ -254,7 +255,11 @@ sock.prototype.handleNewActor = function(dv, off) {
 	return off + 17
 }
 sock.prototype.handleNewPellet = function(dv, off) {
-	var p = new pellet(this.room, dv.getInt32(off+1, true), dv.getInt32(off+5, true), dv.getInt32(off+9, true))
+	var x = dv.getInt32(off+1, true)
+	var y = dv.getInt32(off+5, true)
+	var style = dv.getInt32(off+9, true)
+	var t = this.room.findTile(x,y)
+	var p = new pellet(t, x, y, style)
 	return off + 13
 }
 sock.prototype.handleRemovePellet = function(dv, off) {
@@ -297,7 +302,7 @@ sock.prototype.handleRenamePlayer = function(dv, off) {
 sock.prototype.handleDestroyPlayer = function(dv, off) {
 	var id = dv.getInt32(off+1, true)
 	console.log("DESTROYING PLAYER", id)
-	this.room.players[id].remove()
+	this.room.players[id].quit()
 
 	return off + 5
 }
@@ -358,7 +363,8 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 			if (Math.random()<.0001) {
 				console.log("CREATING PELLET", x, y, style)
 			}
-			var p = new pellet(this.room, x, y, style)
+			var t = this.room.findTile(x,y)
+			var p = new pellet(t, x, y, style)
 			o += 12
 		}
 
@@ -492,6 +498,7 @@ function ohno(x) {
 }
 var popup;
 window.onload = function() {
+	gfx.start()
 	servers = new server(document.location.hostname+":4000")
 	setQuality(maxQuality-1)
 	renderBackground = gfx.createRenderBackground(ctx)
@@ -741,11 +748,11 @@ function render() {
 		currentSock.room.render(ctx)
 	}
 
-	gfx.done(ctx)
 
 	if (currentSock && currentSock.room) {
 		draw_leaderboard(ctx,currentSock.room)
 	}
+	gfx.done(ctx)
 }
 
 function draw_leaderboard(ctx, room) {

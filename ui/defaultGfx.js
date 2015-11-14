@@ -12,6 +12,31 @@ cellImg.pattern = false;
 
 var bgTex = PIXI.Texture.fromImage("imgs/bg.jpg");
 var cellTex = PIXI.Texture.fromImage("imgs/cells.jpg");
+var colorsTex = PIXI.Texture.fromImage("imgs/colors.png");
+colorsTex.baseTexture.width = 256
+colorsTex.baseTexture.height = 256
+
+var redTex = new PIXI.Texture(colorsTex);
+
+redTex.frame = new PIXI.Rectangle(16*12,16*1,16,16)
+// var blueTex = PIXI.Texture.fromImage("imgs/colors.png");
+// blueTex.frame = new PIXI.Rectangle(10*11,10*0,10,10)
+
+var blueTex = new PIXI.Texture(colorsTex);
+blueTex.frame = new PIXI.Rectangle(16*11,16*0,16,16)
+
+var redModel = function() {
+	var m = new PIXI.Sprite(redTex)
+	m.anchor.x = .5
+	m.anchor.y = .5
+	return m
+}
+var blueModel = function() {
+	var m = new PIXI.Sprite(blueTex)
+	m.anchor.x = .5
+	m.anchor.y = .5
+	return m
+}
 
 var mPlier = 4
 
@@ -39,8 +64,30 @@ var renderPlayerActor = true;
 var renderVirus = true;
 var renderBacteria = true;
 
+function anyLeaks() {
+	var d = {}
+	d["countCreateRenderBackground"] =countCreateRenderBackground
+	d["countCreateGroup"] =countCreateGroup
+	d["countCreateLeaderBoard"] =countCreateLeaderBoard
+	d["countCreateRenderTile"] =countCreateRenderTile
+	d["countCreateParticle"] =countCreateParticle
+	d["countCreateVitamin"] =countCreateVitamin
+	d["countCreateMineral"] =countCreateMineral
+	d["countCreateActor"] =countCreateActor
+	d["countCreatePlayerActor"] =countCreatePlayerActor
+	d["countCreateVirus"] =countCreateVirus
+	d["countCreateBacteria"] =countCreateBacteria
+	d["countCreateBlob"] =countCreateBlob
+	return d
+}
+
+var font = "Verdana, Geneva, sans-serif";
+
 var noop = {update:function(){},free:function(){},hide:function(){},show:function(){}};
 
+gfx.start = function() {
+	console.log("STARTING")
+}
 gfx.getContext = function(canvas) {
 	if (!pix.renderer) {
 		pix.renderer = PIXI.autoDetectRenderer(canvas.width, canvas.height, {view:canvas,antialias:true})
@@ -108,12 +155,11 @@ gfx.createRenderBackground = function(pix) {
 	tilingSprite.mask = g;
 	tilingSprite.z = -10;
 	pix.stage.addChild(tilingSprite)
-	pix.dirty = true
-
 
 	g.z = -10
 	pix.stage.addChild(g)
 	pix.dirty = true
+	countCreateRenderBackground += 1
 	return {
 		show: function(){},
 		hide: function(){},
@@ -129,51 +175,108 @@ gfx.createRenderBackground = function(pix) {
 var countCreateGroup = 0
 gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 	if (!renderGroup) return noop
-	var last;
-	var text;
+	var last = new PIXI.Container();
+	last.z = 10
+
+	var text = new PIXI.Text("",{
+		font: '48px '+font, 
+		stroke: "black", 
+		fill: "white", 
+		strokeThickness: 2});
+
+	text.anchor.x = .5;
+	text.scale.x = .5;
+	text.scale.y = .5;
+	last.addChild(text)
+	pix.stage.addChild(last)
+	pix.dirty = true
+	countCreateGroup += 1
 	return {
 		hide: function() {
+			last.visible = false
 		},
 		show: function() {
-
+			last.visible = true;
 		},
 		update:function(bbox,n,mass,myActors){
-			if (last) {
-				pix.stage.removeChild(last)
-				last.destroy(true)
-			}
-			last = new PIXI.Container()
-
-			text = new PIXI.Text(n,{
-				font: '48px Arial', 
-				stroke: "black", 
-				fill: "white", 
-				strokeThickness: 2});
-
-			last.addChild(text)
 			last.position.x = bbox[0]
 			last.position.y = bbox[1]
 
-			text.anchor.x = .5;
-			text.scale.x = .5;
-			text.scale.y = .5;
+			text.text = n
 			text.position.x = (bbox[2]-bbox[0])/2
 			text.position.y = bbox[3]-bbox[1]
-			last.z = 10
-			pix.stage.addChild(last) 
-			pix.dirty = true
 		},
 		free:function(){
 			pix.stage.removeChild(last)
-			last.destroy(true)
-		}}
+			last.destroy(false)
+		}
+	}
 }
 
 var frame = 0
 var countCreateLeaderBoard = 0
 gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
 	if (!renderLeaderBoard) return noop
-	var last;
+	var last = new PIXI.Container()
+	var maxLeaders = 8;
+
+	var nPxHeight = 14;
+	var debugText = new PIXI.Text("NYFO",{
+		font: nPxHeight+'px '+font, 
+		stroke: "black", 
+		fill: "white", 
+		strokeThickness: 1});
+	debugText.anchor.x = 1;
+	debugText.position.x = 0
+	debugText.position.y = 0
+	last.addChild(debugText)
+
+	var pxHeight = 24
+
+	ctx.lineWidth = .7;
+	var headerText = new PIXI.Text("NYFO",{
+		font: pxHeight+'px '+font, 
+		stroke: "black", 
+		fill: "white", 
+		strokeThickness: 1});
+	headerText.anchor.x = 1;
+	headerText.position.x = 0
+	headerText.position.y = nPxHeight
+	last.addChild(headerText)
+
+	var leaderTexts = []
+	var massTexts = []
+	for(var i=0; i<maxLeaders; i+=1) {
+		var nameText = new PIXI.Text("NYFO",{
+			font: pxHeight+'px '+font, 
+			stroke: "black", 
+			fill: "white", 
+			strokeThickness: 1});
+		nameText.anchor.x = 1;
+		nameText.position.x = 0 - 200
+		nameText.position.y = i*pxHeight+nPxHeight+pxHeight
+		nameText.visible = false
+		last.addChild(nameText)
+		leaderTexts.push(nameText)
+
+		var massText = new PIXI.Text("NYFO",{
+			font: pxHeight+'px '+font, 
+			stroke: "black", 
+			fill: "white", 
+			strokeThickness: 1});
+		massText.anchor.x = 1;
+		massText.position.x = 0
+		massText.position.y = i*pxHeight+nPxHeight+pxHeight
+		massText.visible = false
+		last.addChild(massText)
+		massTexts.push(massText)
+	}
+
+
+	last.z = 20
+	pix.stage.addChild(last)
+
+	countCreateLeaderBoard += 1
 	return {
 		hide: function() {
 
@@ -182,96 +285,67 @@ gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
 
 		},
 		update:function(leaders,x, y, width, height, connected){
-			if (last) {
-				pix.stage.removeChild(last)
-				last.destroy(true)
-			}
-			last = new PIXI.Container()
-
-			frame += 1;
-			if (frame>1000) {
-				frame = 0
+			for(var i=0; i<leaders.length; i+=1) {
+				massTexts[i].visible = false
+				leaderTexts[i].visible = false
 			}
 
 			var total = leaders.length
 			if (leaders.length <= 0) {
 				return
 			}
-			if (leaders.length > 8) {
-				leaders.length = 8
+			if (leaders.length > maxLeaders) {
+				leaders.length = maxLeaders
 			}
 
 			var l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+Math.floor(currentSock.latency*10)/10+"ms"
+			debugText.text = l
+			debugText.x = width
 
-			var nPxHeight = 14;
-			var text = new PIXI.Text(l,{
-				font: nPxHeight+'px Arial', 
-				stroke: "black", 
-				fill: "white", 
-				strokeThickness: 1});
-			text.anchor.x = 1;
-			text.position.x = width
-			text.position.y = 0
-			last.addChild(text)
-
-			var pxHeight = 20
-
-			ctx.lineWidth = .7;
 			l = "Top "+leaders.length+":"
-			var text = new PIXI.Text(l,{
-				font: pxHeight+'px Arial', 
-				stroke: "black", 
-				fill: "white", 
-				strokeThickness: 1});
-			text.anchor.x = 1;
-			text.position.x = width
-			text.position.y = nPxHeight
-			last.addChild(text)
+			headerText.text = l
+			headerText.position.x = width
 
 			for(var i=0; i<leaders.length; i+=1) {
 				var n = leaders[i][0]
-				var text = new PIXI.Text(n,{
-					font: pxHeight+'px Arial', 
-					stroke: "black", 
-					fill: "white", 
-					strokeThickness: 1});
-				text.anchor.x = 1;
-				text.position.x = width - 200
-				text.position.y = i*pxHeight+nPxHeight+pxHeight
-				last.addChild(text)
+				leaderTexts[i].text = n
+				leaderTexts[i].position.x = width - 200
+				leaderTexts[i].visible = true
 
 				var m = leaders[i][1]
-				var text = new PIXI.Text(m,{
-					font: pxHeight+'px Arial', 
-					stroke: "black", 
-					fill: "white", 
-					strokeThickness: 1});
-				text.anchor.x = 1;
-				text.position.x = width
-				text.position.y = i*pxHeight+nPxHeight+pxHeight
-				last.addChild(text)
+				massTexts[i].text = m
+				massTexts[i].position.x = width
+				massTexts[i].visible = true
 			}
 
 			last.position.x = x
 			last.position.y = 0
-			last.z = 20
-			pix.stage.addChild(last)
-			pix.dirty = true
 		},
 		free:function(){
 			pix.stage.removeChild(last)
 			last.destroy(true)
+			countCreateLeaderBoard -= 1
 		}}
 }
 
 
 var countCreateRenderTile = 0
+var renderTileProps = {
+	scale: false,
+	position: false,
+	rotation: false,
+	uvs: false,
+	alpha: false
+}
+
 gfx.createRenderTile = function(pix) {
 	if (!renderRenderTile) return noop
-	var container = new PIXI.Container();
+	var container = new PIXI.ParticleContainer(1000,renderTileProps);
+	console.log(container._properties)
 	container.z = -9
 	var visible = false;
 	countCreateRenderTile += 1
+
 	return {
 		hide: function() {
 			if (visible) {
@@ -286,20 +360,95 @@ gfx.createRenderTile = function(pix) {
 			}
 			visible = true
 		},
-		container: container,
+		addChild: function(pell) {
+			container.addChild(pell)
+		},
+		removeChild: function(pell) {
+			container.removeChild(pell)
+		},
 		update:function(){
 
 		},
 		free:function(){
 			if (visible) pix.stage.removeChild(container)
-			container.destroy(true)
+			console.log(container.children)
 			countCreateRenderTile -= 1
 		}
 	}
 }
 
-gfx.renderArea = function() {}
-gfx.renderBackground = function() {}
+
+
+var countCreateVitamin = 0
+gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius)
+	if (!renderVitamin) return noop
+	var rendered = false;
+	var model = redModel()
+	var visible = false;
+	countCreateVitamin += 1
+	return {
+		attach: function(o) {
+			o.addChild(model)
+		},
+		detach: function(o) {
+			o.removeChild(model)
+		},
+		update: function(x,y,c,r) {
+			model.scale.x = r/16
+			model.scale.y = r/16
+			model.position.x = x
+			model.position.y = y
+			model.rotation = Math.random()*Math.PI
+		},
+		free: function() {
+			model.destroy()
+			countCreateVitamin -= 1
+		}
+	}
+}
+
+var countCreateMineral = 0
+gfx.createMineral = function(pix) { // (this.x, this.y, this.color, this._radius)
+	if (!renderMineral) return noop
+	
+	var model = blueModel()
+	var visible = false;
+	countCreateMineral += 1
+	return {
+		attach: function(o) {
+			o.addChild(model)
+		},
+		detach: function(o) {
+			o.removeChild(model)
+		},
+		update: function(x,y,c,r) {
+			model.scale.x = r/16
+			model.scale.y = r/16
+			model.position.x = x
+			model.position.y = y
+			model.rotation = Math.random()*Math.PI
+		},
+		free: function() {
+			if (visible)
+				pix.stage.removeChild(model)
+			// throw "Destroying"
+			model.destroy()
+			countCreateMineral -= 1
+		}
+	}
+	return noop
+}
+
+
+
+
+
+
+
+
+
+
+
 
 var countCreateParticle = 0
 gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
@@ -345,75 +494,7 @@ gfx.createParticle = function(pix) { // (this.x, this.y, this.life, this.color)
 }
 
 
-var countCreateVitamin = 0
-gfx.createVitamin = function(pix) { // (this.x, this.y, this.color, this._radius)
-	if (!renderVitamin) return noop
-	var rendered = false;
-	var model = genericCircle()
-	var visible = false;
-	countCreateVitamin += 1
-	return {
-		hide: function() {
-			if (visible)
-				pix.stage.removeChild(model)
-			visible = false
-		},
-		show: function() {
-			if (!visible)
-				pix.stage.addChild(model);
-			pix.dirty = true
-			visible = true
-		},
-		update: function(x,y,c,r) {
-			model.tint = c
-			model.scale.x = r
-			model.scale.y = r
-			model.position.x = x
-			model.position.y = y
-		},
-		free: function() {
-			if (visible)
-				pix.stage.removeChild(model)
-			model.destroy(true)
-			countCreateVitamin -= 1
-		}
-	}
-}
 
-var countCreateMineral = 0
-gfx.createMineral = function(pix) { // (this.x, this.y, this.color, this._radius)
-	if (!renderMineral) return noop
-	var model = genericCircle()
-	var visible = false;
-	countCreateMineral += 1
-	return {
-		hide: function() {
-			if (visible)
-				pix.stage.removeChild(model)
-			visible = false
-		},
-		show: function() {
-			if (!visible)
-				pix.stage.addChild(model);
-			pix.dirty = true
-			visible = true
-		},
-		update: function(x,y,c,r) {
-			model.tint = c
-			model.scale.x = r
-			model.scale.y = r
-			model.position.x = x
-			model.position.y = y
-		},
-		free: function() {
-			if (visible)
-				pix.stage.removeChild(model)
-			model.destroy(true)
-			countCreateMineral -= 1
-		}
-	}
-	return noop
-}
 
 var countCreateActor = 0
 gfx.createActor = function(pix) { // (this.x,this.y,this.color,n, Math.floor(this.mass),radius)
@@ -451,6 +532,7 @@ gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor
 
 			model.container.rotation = (x+y)/200
 			model.back.tint = c
+			model.container.z = 8 + mass / 100000
 		},
 		free: function() {
 			if (visible) {
@@ -505,11 +587,14 @@ gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.col
 	return noop
 }
 
+var countCreateBlob = 0;
 gfx.createBlob = function(pix) { // (this.actor.x, this.actor.y, this.actor.color, this.actor.mass, this.actor.radius())
 	if (!renderVirus) return noop
 	var model = bubbleCircle();
 	model.z = -5
 	var visible = false;
+	countCreateBlob += 1
+
 	return {
 		hide: function() {
 			if (visible) {
@@ -539,6 +624,7 @@ gfx.createBlob = function(pix) { // (this.actor.x, this.actor.y, this.actor.colo
 				pix.stage.removeChild(model)
 			}
 			model.destroy(true)
+			countCreateBlob -= 1
 		}
 	}
 	return noop
@@ -681,30 +767,38 @@ var virusBall = (function() {
 	}
 })()
 
-
+var texturedCells = true;
 function genericCell(playerMask) {
 	var tilingSprite;
+	if (texturedCells) {
+		var size = 50000
+		var c = new PIXI.Container()
+		tilingSprite = new PIXI.extras.TilingSprite(cellTex, size, size);
+		tilingSprite.scale.x = .3
+		tilingSprite.scale.y = .3
+		tilingSprite.position.x = -size/2*tilingSprite.scale.x
+		tilingSprite.position.y = -size/2*tilingSprite.scale.y
+		tilingSprite.mask = playerMask;
 
-	var c = new PIXI.Container()
-
-	var size = 50000
-	tilingSprite = new PIXI.extras.TilingSprite(cellTex, size, size);
-
-	tilingSprite.scale.x = .3
-	tilingSprite.scale.y = .3
-	tilingSprite.alpha = .8
-	tilingSprite.position.x = -size/2*tilingSprite.scale.x
-	tilingSprite.position.y = -size/2*tilingSprite.scale.y
-
-	tilingSprite.mask = playerMask;
-	c.addChild(tilingSprite);
-	c.addChild(playerMask);
-	
-	return {
-		container: c,
-		back: tilingSprite,
-		front: playerMask,
+		c.addChild(tilingSprite);
+		c.addChild(playerMask);
+		
+		return {
+			container: c,
+			back: tilingSprite,
+			front: playerMask,
+		}
+	} else {
+		playerMask.alpha = .8
+		
+		return {
+			container: playerMask,
+			back: playerMask,
+			front: playerMask,
+		}
 	}
+
+
 }
 
 function fromRgb(r,g,b) {

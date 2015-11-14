@@ -22,13 +22,16 @@ function player(room, id) {
 	this.id = id
 	this.room.players[id] = this
 	this.owns = {}
-	this.room.renderable["player"+this.id] = this
+	this.room.renderable.push(this)
 	this.gfx = gfx.createGroup(pix)
 }
 player.prototype.remove = function() {
 	this.gfx.free()
+	this.room.renderable.splice(this.room.renderable.indexOf(this),1)
+}
+player.prototype.quit = function() {
 	delete this.room.players[this.id]
-	delete this.room.renderable["player"+this.id]
+	this.remove()
 }
 player.prototype.free = function() {
 	this.gfx.free()
@@ -112,72 +115,40 @@ function renderTile(room,x,y) {
 	this.y = y
 	this.id = renderTile.id(x,y)
 	this.room = room
-	this.room.renderable[this.id] = this
+	this.room.renderable.push(this)
 	this.count = 0
 	this.room.tiles[this.id] = this
 	this.canRender = false
-	this.renderables = {}
+	this.renderable = []
 	this.dirty = false
 	this.room = room
 	this.freeadd = true
 	this.visible = false
 	this.gfx = gfx.createRenderTile(pix)
 }
-renderTile.prototype.add = function(pell) {
+renderTile.prototype.addChild = function(pell) {
 	this.count += 1
-	if (pell.id in this.renderables) {
-		console.log("Duplicate Pellet", pell)
-		this.renderables[pell.id].remove()
-	}
-
-	this.renderables[pell.id] = pell
-	pell.render({stage:this.gfx.container})
-	pell.gfx.show()
+	// if (pell.id in this.renderable) {
+	// 	console.log("Duplicate Pellet", pell)
+	// 	this.renderable[pell.id].remove()
+	// }
+	// this.renderable.splice(this.renderable.indexOf(pell),1)
+	this.renderable.push(pell)
+	pell.gfx.attach(this.gfx)
 
 }
-renderTile.prototype.free = function() {
-	this.gfx.free()
-}
-renderTile.prototype.remove = function(pell) {
-	delete this.renderables[pell.id]
+renderTile.prototype.removeChild = function(pell) {
+	pell.gfx.detach(this.gfx)
+	this.renderable.splice(this.renderable.indexOf(pell),1)
 }
 renderTile.prototype.render = function(ctx) {
-	this.gfx.update()
-
-	if (Math.random()*1000<Object.keys(this.renderables).length) {
-		var r = pickRandomProperty(this.renderables)
-		if (r) {
-			var r = this.renderables[r]
+	if (Math.random()*1000<this.renderable.length) {
+		var i = Math.floor(Math.random()*this.renderable.length)
+		if (i) {
+			var r = this.renderable[i]
 			this.room.addParticle(r.x,r.y,r.color)	
 		}
 	}
-
-
-  	// TODO: try optimizing drawImage to clip within camera area
-	// ctx.drawImage(this.canvas, sArea[0], sArea[1], sArea[2]-sArea[0],sArea[3]-sArea[1],
-	// 	tArea[0], tArea[1], tArea[2]-tArea[0],tArea[3]-tArea[1])
-
-  	// if (this.room.findTile(mousex-camera.x,mousey-camera.y)==this) {
-  	if (debugMode) {
-	  	if (this.contains(mousex+camera.x,mousey+camera.y)) {
-		  	ctx.strokeStyle = "rgba(0,0,0,.2)";
-		  	ctx.strokeRect(this.x,this.y,renderTileSize,renderTileSize)
-		  	ctx.strokeRect(this.x-tilePadding,this.y-tilePadding,tilePadding*2+renderTileSize,tilePadding*2+renderTileSize)
-	  }
-	 }
-}
-renderTile.prototype.rerender = function() {
-	for(i in this.renderables) {
-		r = this.renderables[i]
-		bbox = r.bbox()
-		if (bbox[2] < camera.x - padding || bbox[3] < camera.y - padding
-			|| bbox[0] > camera.x + camera.width + padding
-			|| bbox[1] > camera.y + camera.height + padding)
-			continue
-		r.render(ctx)
-	}
-
-	this.dirty = false
 }
 renderTile.prototype.contains = function(x,y) {
 	return (this.x<=x && this.y<=y && this.x+renderTileSize>x && this.y+renderTileSize>y)
@@ -186,22 +157,65 @@ renderTile.prototype.bbox = function() {
 	return [this.x-tilePadding,this.y-tilePadding,
 		this.x+renderTileSize+tilePadding,this.y+renderTileSize+tilePadding]
 }
-renderTile.prototype.findCollisions = function(actor) {
-	for(pel in this.renderables) {
-		var p = this.renderables[pel]
-		if (actor.contains(p)) {
-			p.remove()
-			actor.mass += 5
+renderTile.prototype.find = function(x,y) {
+	for(var i=0; i<this.renderable.length;i++) {
+		if (this.renderable[i].x == x && this.renderable[i].y == y ) {
+			return this.renderable[i]
 		}
 	}
-}
-renderTile.prototype.find = function(x,y) {
-	var id = ""+x+","+y
-	return this.renderables[id]
 }
 renderTile.id = function(x,y) {
 	return "a_t("+x+","+y+")"
 }
+renderTile.prototype.remove = function() {
+	console.log("REMOVING RENDERTILE")
+	for(var i in this.renderable) {
+		this.renderable[i].remove()
+	}
+	this.gfx.free()
+}
+renderTile.prototype.addParticle = function(x,y,c) {
+	this.room.addParticle(x,y,c)
+}
+
+function pellet(parent, x,y,style) {
+	this.style = style
+	this.x = x
+	this.y = y
+	this.id = ""+x+","+y
+	this.parent = parent
+	this._radius = 4
+
+	if (this.style==0) {
+		this.gfx = gfx.createMineral(ctx)
+		this.color = fromRgb(Math.random()*100,Math.random()*100,255)
+	}
+	if (this.style==1) {
+		this.gfx = gfx.createVitamin(ctx)
+		this.color = fromRgb(255,Math.random()*100,Math.random()*100)
+	}
+	this.gfx.update(this.x, this.y, this.color, this._radius)
+	this.parent.addChild(this)
+}
+pellet.prototype.remove = function() {
+	for(var i=0;i<4;i+=1) {
+		this.parent.addParticle(this.x,this.y,this.color)
+	}
+	this.parent.removeChild(this)
+	this.gfx.free()
+}
+pellet.prototype.bbox = function() {
+	var r = this._radius
+	return [this.x-r, this.y-r, this.x+r, this.y+r]
+}
+
+
+
+
+
+
+
+
 
 function pickRandomProperty(obj) {
     var result;
@@ -236,9 +250,9 @@ particle.prototype.step = function(seconds) {
 	this.yspeed *= Math.pow(.90, seconds)
 	this.xspeed += (Math.random()*.1-.05)*16*seconds
 	this.yspeed += (Math.random()*.1-.05)*16*seconds
-	if (this.life<=0) this.destroy()
+	if (this.life<=0) this.remove()
 }
-particle.prototype.destroy = function() {
+particle.prototype.remove = function() {
 	if (this.destroyed) {
 		throw new Exception("DOUBLE DESTROY")
 	}
@@ -258,7 +272,7 @@ function room(width, height) {
 	this.players = {}
 	this.actors = {}
 	this.steppers = {}
-	this.renderable = {}
+	this.renderable = []
 
 	for(var x=0; x<width; x+=renderTileSize) {
 		for(var y=0; y<height; y+=renderTileSize) {
@@ -300,11 +314,20 @@ room.prototype.addParticle = function(x,y,color) {
 	var p = new particle(id,this,x,y,color)
 	return p
 }
+room.prototype.remove = function() {
+	console.log("REMOVING ROOM")
+	for(var i = 0; i < this.renderable.length; i++) {
+		this.renderable[i].remove()
+	}
+	for(var i=0;i<this.particleCount;i++) {
+		this.particles[i].remove()
+	}
+}
 room.prototype.render = function(ctx) {
 	var start = (new Date())
 
 	var padding = 10
-	for (var id in this.renderable) {
+	for(var id = 0; id < this.renderable.length; id++) {
 		var objectToRender = this.renderable[id]
 		var bbox = objectToRender.bbox()
 		var isTile = false
@@ -365,52 +388,7 @@ room.prototype.findCollisions = function(actor) {
 }
 
 
-function pellet(room, x,y,style) {
-	this.style = style
-	this.x = x
-	this.y = y
-	this.id = ""+x+","+y
-	this.room = room
-	var mytile = this.room.findTile(x,y)
-	if (!mytile.contains(x,y)) {
-		console.log("WTF", this.id,mytile)
-	}
-	this._radius = 4
-	mytile.add(this)
-	if (!this.gfx) {
-		console.log("GFS",this.gfx)
-	}
-	this.style = style
-}
-pellet.prototype.radius = function() {
-	return this._radius
-}
-pellet.prototype.render = function(ctx) {
-	if (this.style==0) {
-		this.gfx = gfx.createMineral(ctx)
-		this.color = fromRgb(Math.random()*100,Math.random()*100,255)
-	}
-	if (this.style==1) {
-		this.gfx = gfx.createVitamin(ctx)
-		this.color = fromRgb(255,Math.random()*100,Math.random()*100)
-	}
-	this.gfx.update(this.x, this.y, this.color, this._radius)
-}
-pellet.prototype.remove = function() {
-	for(var i=0;i<4;i+=1) {
-		this.room.addParticle(this.x,this.y,this.color)
-	}
-	var myTile = this.room.findTile(this.x,this.y)
-	if (!myTile) {
-		console.log(myTile)
-	}
-	myTile.remove(this)
-	this.gfx.free()
-}
-pellet.prototype.bbox = function() {
-	var r = this._radius
-	return [this.x-r, this.y-r, this.x+r, this.y+r]
-}
+
 
 
 
@@ -429,7 +407,7 @@ function actor(room, id, x, y) {
 	this.newmass = this.mass
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
-	this.room.renderable["b_a"+this.id] = this
+	this.room.renderable.push(this)
 	this.room.steppers[this.id] = this
 	this.room.actors[this.id] = this
 
@@ -527,7 +505,7 @@ actor.prototype.step = function(seconds) {
 }
 actor.prototype.remove = function() {
 	this.gfx.free()
-	delete this.room.renderable["b_a"+this.id]
+	this.room.renderable.splice(this.room.renderable.indexOf(this),1)
 	delete this.room.steppers[this.id]
 	delete this.room.actors[this.id]
 	if (this.owner) if (this.owner.remove) this.owner.remove()
@@ -537,28 +515,30 @@ function playeractor(room, aid, pid) {
 	this.room = room
 	this.actor = this.room.actors[aid]
 	this.actor.owner = this
-	this.owner = pid
-	this.room.players[pid].owns[aid] = this.actor
+	this.owner = this.room.players[pid]
+	this.owner.owns[aid] = this.actor
 	this.id = "pa"+aid+","+pid
 	if (this.room.myplayer) {
-		if (pid == this.room.myplayer.id) {
+		if (this.owner == this.room.myplayer) {
 			document.getElementById("mainfloat").style.display="none";
 		}
 	}
 	this.lastupdate = (new Date())
 	this.gfx = gfx.createPlayerActor(pix)
 	this.actor.gfx = this.gfx
+	this.removed = false
 }
 playeractor.prototype.remove = function() {
-	delete this.room.players[this.owner].owns[this.actor.id]
-	if (this.owner == this.room.myplayer.id) {
+	this.removed = true
+	delete this.owner.owns[this.actor.id]
+	if (this.owner == this.room.myplayer) {
 		if (Object.keys(this.room.myplayer.owns).length==0) {
 			document.getElementById("mainfloat").style.display="block";
 		}
 	}
 }
 playeractor.prototype.step = function(seconds) {
-	if (this.owner==this.room.myplayer.id) {
+	if (this.owner==this.room.myplayer) {
 		var actor = this.actor;
 		var onCanvasX = (actor.x - camera.x)*camera.xscale
 		var onCanvasY = (actor.y - camera.y)*camera.yscale
@@ -605,8 +585,8 @@ playeractor.prototype.render = function(ctx) {
 	var radius = this.actor.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	this.actor.color = this.owner==this.room.myplayer.id ? 0x33FF33 : 0x3333FF;
-	var n = this.room.players[this.owner].name
+	this.actor.color = this.owner==this.room.myplayer ? 0x33FF33 : 0x3333FF;
+	var n = this.owner.name
 	n = n ? n : "Microbe"
 	this.gfx.update(this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)
 }

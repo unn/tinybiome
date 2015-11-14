@@ -441,10 +441,10 @@ func (b *Blob) ActorCollision(a *Actor) {
 }
 func (b *Blob) ShouldCollide(a *Actor) bool {
 	if pa, is := a.Owner.(*PlayerActor); is {
-		if pa == a.Owner && time.Since(b.Birth) > time.Second*5 {
-			return false
+		if pa == b.Origin && time.Since(b.Birth) < time.Second*5 {
+			return true
 		}
-		return true
+		return false
 	}
 	if _, is := a.Owner.(*Blob); is {
 		return true
