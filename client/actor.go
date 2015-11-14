@@ -69,6 +69,7 @@ type Actor struct {
 	Direction float64
 	Speed     float64
 	Mass      float64
+	Dead      bool
 
 	XSpeed float64
 	YSpeed float64
@@ -92,6 +93,9 @@ func (a *Actor) Radius() float64 {
 }
 
 func (a *Actor) CheckCollisions() {
+	if a.Dead {
+		return
+	}
 	if pc, is := a.Owner.(PelletCollider); is {
 		r := a.Radius()
 		rad := int64(a.Radius() * a.Radius())
@@ -144,6 +148,9 @@ func (a *Actor) CheckCollisions() {
 			if b == a || b == nil {
 				continue
 			}
+			if b.Dead {
+				continue
+			}
 			dx := b.X - a.X
 			dy := b.Y - a.Y
 			dist := dx*dx + dy*dy
@@ -181,7 +188,9 @@ func (a *Actor) CheckCollisions() {
 
 		if len(consumes) > 0 {
 			for i := 0; i < len(consumes); i += 1 {
-				ac.ActorCollision(consumes[i])
+				if !a.Dead {
+					ac.ActorCollision(consumes[i])
+				}
 			}
 		}
 	}
@@ -222,6 +231,7 @@ func (a *Actor) Remove() {
 	r := a.room
 	log.Println("REMOVING ACTOR", a)
 	r.Actors[a.ID] = nil
+	a.Dead = true
 	for _, player := range r.Players {
 		if player == nil {
 			continue
@@ -405,7 +415,7 @@ type Blob struct {
 func NewBlob(p *PlayerActor) *Blob {
 	log.Println("SHOOT", p)
 	r := p.Player.room
-	v := &Blob{Birth: time.Now()}
+	v := &Blob{Birth: time.Now(), Origin: p}
 	v.Room = r
 
 	v.Actor = r.NewActor(

@@ -185,6 +185,7 @@ gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 		strokeThickness: 2});
 
 	text.anchor.x = .5;
+	text.anchor.y = .5;
 	text.scale.x = .5;
 	text.scale.y = .5;
 	last.addChild(text)
@@ -204,7 +205,7 @@ gfx.createGroup = function(pix) { // (ctx, bbox, n, mass, myActors)
 
 			text.text = n
 			text.position.x = (bbox[2]-bbox[0])/2
-			text.position.y = bbox[3]-bbox[1]
+			text.position.y = (bbox[3]-bbox[1])/2
 		},
 		free:function(){
 			pix.stage.removeChild(last)

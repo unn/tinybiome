@@ -410,7 +410,7 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 sock.prototype.handlePong = function(dv, off) {
 	var now = (new Date());
 	if (this.latency==0) this.latency = now-this.lastPing
-	else this.latency = (this.latency*5+(now-this.lastPing))/6;
+	else this.latency = (this.latency*2+(now-this.lastPing))/3;
 	console.info(this, "PING",this.latency)
 	this.ele.innerHTML = "(PING "+Math.floor(this.latency*10)/10+"ms) "+this.location+" ("+this.room.playercount+" PLAYERS)"
 	return off+1
