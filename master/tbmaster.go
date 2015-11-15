@@ -7,12 +7,41 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os/exec"
 	"sync"
 )
 
 var servers = make(map[*server]struct{})
 var clients = make(map[*client]struct{})
 var slock sync.RWMutex
+
+var allowedCidrs = []string{
+	"10.0.0.0/8",
+	"192.0.0.0/8",
+}
+
+func checkHost(ip string) bool {
+	n := net.ParseIP(ip)
+	if n.IsLoopback() {
+		log.Println(ip, "IS LOOPBACK")
+		return true
+	}
+	for _, p := range allowedCidrs {
+		if _, cidr, _ := net.ParseCIDR(p); cidr.Contains(n) {
+			log.Println(ip, "IN ALLOWED CIDR")
+			return true
+		}
+	}
+	c := exec.Command("ssh-keygen", "-H", "-F", ip)
+	if e := c.Start(); e != nil {
+		log.Panicln("FAILED TO FIND SSH-KEYGEN", e)
+	}
+	if e := c.Wait(); e != nil {
+		log.Println("HACK ATTEMPT?", e, ip)
+		return false
+	}
+	return true
+}
 
 func main() {
 	m := http.NewServeMux()
@@ -80,14 +109,19 @@ func newConn(ws *websocket.Conn) {
 		}
 		switch v["meth"].(string) {
 		case "addme":
-			p = &server{ip: ip, port: int(v["port"].(float64))}
-			log.Println("NEW SERVER", p)
-			slock.Lock()
-			servers[p] = struct{}{}
-			for c, _ := range clients {
-				c.w.Encode(map[string]interface{}{"meth": "add", "address": p.addr()})
+			if checkHost(ip) {
+				p = &server{ip: ip, port: int(v["port"].(float64))}
+				log.Println("NEW SERVER", p)
+				slock.Lock()
+				servers[p] = struct{}{}
+				for c, _ := range clients {
+					c.w.Encode(map[string]interface{}{"meth": "add", "address": p.addr()})
+				}
+				slock.Unlock()
+			} else {
+				ws.Close()
+				break
 			}
-			slock.Unlock()
 		case "ping":
 
 		}
