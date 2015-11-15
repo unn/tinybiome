@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"sync"
 )
@@ -33,6 +34,8 @@ func checkHost(ip string) bool {
 		}
 	}
 	c := exec.Command("ssh-keygen", "-H", "-F", ip)
+	c.Stderr = os.Stderr
+	c.Stdout = os.Stdout
 	if e := c.Start(); e != nil {
 		log.Panicln("FAILED TO FIND SSH-KEYGEN", e)
 	}
@@ -40,6 +43,7 @@ func checkHost(ip string) bool {
 		log.Println("HACK ATTEMPT?", e, ip)
 		return false
 	}
+	log.Println(n, "ALLOWED BECAUSE IN SSH ALLOWED HOSTS")
 	return true
 }
 
