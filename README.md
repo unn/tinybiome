@@ -11,3 +11,5 @@ To run the nodes:
 > go run node/tbnode.go
 
 Optionally, provide --port N
+
+Then connect via http to the master to start playing.
