@@ -1,6 +1,13 @@
 # tinybiome
-Cell eat cell world out there
+Cell eat cell world out there!
 
-SUBSCRIBERS:
-RobinsonDickinson
-Arcacian
+To run the central server:
+
+> go build master/tbmaster.go
+> sudo ./tbmaster
+
+To run the nodes:
+
+> go run node/tbnode.go
+
+Optionally, provide --port N
