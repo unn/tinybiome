@@ -3,7 +3,7 @@ Cell eat cell world out there!
 
 To run the central server:
 
-> go build master/tbmaster.go
+> go build master/tbmaster.go  
 > sudo ./tbmaster
 
 To run the nodes:
