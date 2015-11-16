@@ -240,7 +240,7 @@ sock.prototype.handleNewRoom = function(dv, off) {
 	this.room.sizemultiplier = dv.getFloat32(off+17, true)
 	this.room.speedmultiplier = dv.getFloat32(off+21, true)
 	this.room.playercount = dv.getInt32(off+25, true)
-	
+
 	console.info("ROOM UPDATE",{pc:this.room.playercount,sm:this.room.sizemultiplier,mass:this.room.startmass})
 	return off + 29
 }
@@ -378,7 +378,7 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 	} else {
 		console.log("ERROR SIZE", amt)
 	}
-	
+
 	return off + 5 + amt * 12
 }
 sock.prototype.handleDescribeActor = function(dv, off) {
@@ -388,12 +388,12 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 	case 0:
 		var pid = dv.getInt32(off+6, true)
 		console.log("ACTOR",aid,"IS PLAYERACTOR OWNED BY",pid)
-		
+
 		var a = new playeractor(this.room, aid,pid)
 		return off + 10
 	case 1:
 		console.log("ACTOR",aid,"IS VIRUS")
-		
+
 		var a = new virus(this.room, aid)
 		return off + 6
 	case 2:
@@ -402,7 +402,7 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 		return off + 6
 	case 3:
 		console.log("ACTOR",aid,"IS BLOB")
-		
+
 		var a = new blob(this.room, aid)
 		return off + 6
 	}
@@ -510,6 +510,11 @@ window.onload = function() {
 		var n = document.getElementById("name").value;
 		currentSock.writeJoin(n)
 	}
+  document.getElementById("name").onkeypress = function(ev) {
+    if(ev.keyCode == 13) {
+      document.getElementById("loginButton").onclick();
+    }
+  }
 }
 
 var resFactor = 1;
@@ -682,7 +687,7 @@ function render() {
 				console.log(JSON.stringify(graphicsCounts))
 			}
 		}
-		graphicsCounts = {tiles:0, particles:0, tileSkips:0, 
+		graphicsCounts = {tiles:0, particles:0, tileSkips:0,
 			particleSkips: 0, renderTime:0,
 			particleTime: 0}
 		renderCycles = 100
@@ -694,7 +699,7 @@ function render() {
 		}
 	}
 	// renderArea.update(ctx,canvas.width,canvas.height)
-	
+
 
 	if (currentSock && currentSock.room && currentSock.room.myplayer) {
 		var size = currentSock.room.myplayer.bbox()
@@ -735,12 +740,12 @@ function render() {
 		var x = camera.x<0 ? 0 : camera.x
 		var y = camera.y<0 ? 0 : camera.y
 		var w = x + camera.width > room.width ? room.width - x : camera.width
-		var h = y + camera.height > room.height ? room.height - y : camera.height 
+		var h = y + camera.height > room.height ? room.height - y : camera.height
 
 		// var x = camera.x
 		// var y = camera.y
 		// var w = camera.width
-		// var h = camera.height 
+		// var h = camera.height
 
 
 		renderBackground.update(x, y, w, h)
