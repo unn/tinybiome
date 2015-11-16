@@ -1,7 +1,7 @@
 "use strict"
 
 var servers;
-var currentSock;
+var currentRoom;
 
 var tileSize = 50;
 var hidingBbox = true;
@@ -26,8 +26,9 @@ var ws;
 
 function server(location) {
 	var self = this;
+	this.roomCount = 0
 	this.ws = new WebSocket("ws://"+location)
-	this.servers = [];
+	this.rooms = {};
 	this.ws.onopen = function() {
 	}
 	this.ws.onerror = function() {
@@ -48,28 +49,9 @@ function server(location) {
 		}
 	}
 }
-server.prototype.connectTo = function(sock) {
-	if (currentSock==sock) return
-	if (currentSock) {
-		currentSock.dc()
-	}
-	currentSock = sock
-	if (currentSock.connected) {
-		currentSock.writeSync()
-	}
-}
 server.prototype.addServer = function(sock) {
 	this.servers.push(sock)
 	this.ensureConnected()
-}
-server.prototype.ensureConnected = function() {
-	console.log("EC",currentSock)
-	if (!currentSock) {
-		if (this.servers.length>=1) {
-			this.connectTo(this.servers[0])
-		}
-	}
-	console.log("EC",currentSock.connected,currentSock)
 }
 server.prototype.findServer = function(location) {
 	for(var i=0;i<this.servers;i+=1) {
@@ -87,11 +69,62 @@ server.prototype.removeServer = function(sock) {
 	}
 	this.ensureConnected()
 }
+server.prototype.addRoom = function(room) {
+	var name = ""+room.id+"@"+room.server.location;
+	this.rooms[name] = room
+	if (this.roomCount==0) {
+		this.connect()
+	}
+	this.roomCount += 1
+	document.getElementById("serversdown").style.display="none";
+	room.ele = document.getElementById("servertemplate").cloneNode(true);
+	document.getElementById("serverlist").appendChild(room.ele)
+
+	room.ele.onclick = function() {
+		servers.pickRoom(room)
+	}
+	room.refreshElement = function() {
+		room.ele.querySelector(".title").innerHTML = nameFromRoom(room)
+	}
+	room.refreshElement()
+}
+server.prototype.connect = function() {
+	console.info("PICKING A GOOD DEFAULT SERVER")
+	for(var i in this.rooms) {
+		console.info("PICKING",this.rooms[i])
+		this.rooms[i].server.writeSpectate(this.rooms[i].id)
+		break
+	}
+}
+server.prototype.removeRoom = function(room) {
+	console.info("REMOVING ROOM", room)
+	var name = ""+room.id+"@"+room.server.location;
+
+	delete this.rooms[name]
+
+	this.roomCount -= 1
+	if (room==currentRoom) {
+		this.connect()
+	}
+	document.getElementById("serverlist").removeChild(room.ele)
+	if (this.roomCount==0) {
+		document.getElementById("serversdown").style.display="block";
+	}
+}
+server.prototype.pickRoom = function(room) {
+	room.server.writeSpectate(room.id)
+}
+function nameFromRoom(room) {
+	return room.name+" (PING "+Math.floor(room.server.latency*5)/10+"ms)"
+}
 
 
 function sock(location) {
 	console.log("NEW SERVER", this)
 	this.room = null
+
+	this.rooms = {}
+
 	this.location = location
 	this.messageHandlers = [
 		this.handleNewRoom.bind(this),
@@ -108,24 +141,15 @@ function sock(location) {
 		this.handleMultiPellet.bind(this),
 		this.handleDescribeActor.bind(this),
 		this.handleSync.bind(this),
-		this.handlePong.bind(this)]
+		this.handlePong.bind(this),
+		this.handleStopSpec.bind(this)]
 	this.messageMap = []
 	this.latency = 0;
 	this.ws = new WebSocket("ws://"+location)
 	this.lastPong = (new Date());
 
-
-	this.ele = document.getElementById("servertemplate").cloneNode();
-	document.getElementById("serverlist").appendChild(this.ele)
-	this.ele.innerHTML = this.location
-
-
 	var self = this;
 
-
-	this.ele.onclick = function() {
-		servers.connectTo(self)
-	}
 
 	this.connected = false
 	this.ws.binaryType = "arraybuffer";
@@ -133,13 +157,9 @@ function sock(location) {
 	this.myremove = this.remove.bind(this)
 	this.ws.onopen = function() {
 		self.connected = true
-		if (currentSock==self)
-			self.writeSync()
 		console.log("CONNECTED TO",location)
 		self.mytick()
 		self.start.apply(self)
-
-		servers.addServer(self)
 	}
 	this.ws.onerror = function() {
 		console.log("ECLOSED",self)
@@ -160,7 +180,7 @@ sock.prototype.step = function() {
 	var actor;
 	var now = (new Date())
 	var diff = (now - this.lastStep) / 1000
-	if (this.room) {
+	if (this.room!=null) {
 		if (!this.room.step) {
 			console.log(this.room)
 		} else {
@@ -171,20 +191,22 @@ sock.prototype.step = function() {
 }
 sock.prototype.dc = function() {
 	console.log("DISCON FROM", this)
-	if (currentSock==this) {
-		currentSock=null
+	if (currentRoom.server==this) {
+		currentRoom=null
+		this.room=null
 	}
 	this.ws.close()
 	servers.removeServer(this)
 	this.connected = false
 }
 sock.prototype.remove = function() {
-	if (currentSock==this) {
-		currentSock=null
+	if (this.room) {
+		this.room.remove()
 	}
-	this.room.remove()
-	console.log("REMOVING", this)
-	document.getElementById("serverlist").removeChild(this.ele)
+	console.info("REMOVING", this)
+	for(var i in this.rooms) {
+		servers.removeRoom(this.rooms[i])
+	}
 	if (servers.servers.indexOf(this)!=-1)
 		new sock(this.location)
 }
@@ -215,6 +237,7 @@ sock.prototype.readMessage = function(dv, off) {
 		console.log("UNKNOWN TYPE", t, "MAPPED TO", this.messageMap[t])
 		return off+1000000
 	}
+	// console.log("CALLING",h)
 	var v = h(dv, off)
 	return v
 }
@@ -228,28 +251,38 @@ sock.prototype.handleSync = function(dv, off) {
 }
 sock.prototype.handleNewRoom = function(dv, off) {
 	console.log("NEW ROOM INCOMING")
-	var width = dv.getInt32(off+1, true)
-	var height = dv.getInt32(off+5, true)
-	if (!this.room) {
-		console.log("NEW ROOM INCOMING",width,height)
-		this.room = new room(width,height)
+	var room = {};
+	room.id = dv.getInt32(off+1, true)
+	room.width = dv.getFloat32(off+5, true)
+	room.height = dv.getFloat32(off+9, true)
+	room.startmass = dv.getFloat32(off+13, true)
+	room.mergetime = dv.getInt32(off+17, true)
+	room.sizemultiplier = dv.getFloat32(off+21, true)
+	room.speedmultiplier = dv.getFloat32(off+25, true)
+	room.playercount = dv.getInt32(off+29, true)
+
+	var len = dv.getInt32(off+33, true)
+	console.log("STRLEN",len)
+	if (len<100000 && len > -1) {
+		var name = dv.getUTF8String(off+37,len)
+		room.name = name
 	}
-	this.room.sizemultiplier = .7
-	this.room.startmass = dv.getInt32(off+9, true)
-	this.room.mergetime = dv.getInt32(off+13, true)
-	this.room.sizemultiplier = dv.getFloat32(off+17, true)
-	this.room.speedmultiplier = dv.getFloat32(off+21, true)
-	this.room.playercount = dv.getInt32(off+25, true)
+
+	room.server = this
 	
-	console.info("ROOM UPDATE",{pc:this.room.playercount,sm:this.room.sizemultiplier,mass:this.room.startmass})
-	return off + 29
+	this.rooms[room.id] = room
+	servers.addRoom(room)
+
+	console.info("NEW ROOM",room)
+
+	return off + len + 37
 }
 sock.prototype.handleNewActor = function(dv, off) {
 	var id = dv.getInt32(off+1, true)
 	var x = dv.getFloat32(off+5, true)
 	var y = dv.getFloat32(off+9, true)
 	var mass = dv.getFloat32(off+13, true)
-	console.log("CREATING ACTOR",id,"AT",x,y)
+	console.info("CREATING ACTOR",id,"AT",x,y)
 	var p = new actor(this.room, id, x, y)
 	p.mass = mass
 	return off + 17
@@ -279,7 +312,7 @@ sock.prototype.handleNewPlayer = function(dv, off) {
 	var len = dv.getInt32(off+5, true)
 	if (len<100000 && len > -1) {
 		var name = dv.getUTF8String(off+9,len)
-		console.log("CREATING PLAYER", id, "NAME(",len,")",name)
+		console.info("CREATING PLAYER", id, "NAME(",len,")",name)
 		var p = (new player(this.room, id))
 		p.name = name ? name : "";
 	} else {
@@ -314,7 +347,7 @@ sock.prototype.handleOwnPlayer = function(dv, off) {
 }
 sock.prototype.handleRemoveActor = function(dv, off) {
 	var id = dv.getInt32(off+1, true)
-	console.log("REMOVING ACTOR", id)
+	console.info("REMOVING ACTOR", id)
 	var p = this.room.actors[id]
 	p.remove()
 	return off + 5
@@ -353,7 +386,7 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 			}
 		}
 		catch(e) { console.log(e) }
-		console.log("MULTI PELLET", amt)
+		console.info("MULTI PELLET", amt)
 
 		var o = off + 5
 		for(var i=0;i<amt;i++) {
@@ -361,7 +394,7 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 			var y = dv.getInt32(o+4, true)
 			var style = dv.getInt32(o+8, true)
 			if (Math.random()<.0001) {
-				console.log("CREATING PELLET", x, y, style)
+				console.info("CREATING PELLET", x, y, style)
 			}
 			var t = this.room.findTile(x,y)
 			var p = new pellet(t, x, y, style)
@@ -387,21 +420,21 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 	switch (t) {
 	case 0:
 		var pid = dv.getInt32(off+6, true)
-		console.log("ACTOR",aid,"IS PLAYERACTOR OWNED BY",pid)
+		console.info("ACTOR",aid,"IS PLAYERACTOR OWNED BY",pid)
 		
 		var a = new playeractor(this.room, aid,pid)
 		return off + 10
 	case 1:
-		console.log("ACTOR",aid,"IS VIRUS")
+		console.info("ACTOR",aid,"IS VIRUS")
 		
 		var a = new virus(this.room, aid)
 		return off + 6
 	case 2:
-		console.log("ACTOR",aid,"IS BACTERIA")
+		console.info("ACTOR",aid,"IS BACTERIA")
 		var a = new bacteria(this.room, aid)
 		return off + 6
 	case 3:
-		console.log("ACTOR",aid,"IS BLOB")
+		console.info("ACTOR",aid,"IS BLOB")
 		
 		var a = new blob(this.room, aid)
 		return off + 6
@@ -411,8 +444,22 @@ sock.prototype.handlePong = function(dv, off) {
 	var now = (new Date());
 	if (this.latency==0) this.latency = now-this.lastPing
 	else this.latency = (this.latency*2+(now-this.lastPing))/3;
-	console.info(this, "PING",this.latency)
-	this.ele.innerHTML = "(PING "+Math.floor(this.latency*10)/10+"ms) "+this.location+" ("+this.room.playercount+" PLAYERS)"
+	console.info(this, "PING",this.latency,"AFFECTING",this.rooms)
+	for(var i in this.rooms) {
+		this.rooms[i].refreshElement()
+	}
+	return off+1
+}
+sock.prototype.handleStopSpec = function(dv, off) {
+	console.log("STOPPING SPECTATOR",this.room.id)
+	console.log("NEXT ROOM IS",this.nextRoom)
+	this.room.remove()
+	this.room = null
+	if (this.nextRoom != null) {
+		console.log("REQUESTING NEXT ROOM",this.nextRoom)
+		this.writeSpectate(this.nextRoom)
+		this.nextRoom = null
+	}
 	return off+1
 }
 
@@ -443,10 +490,31 @@ sock.prototype.writeSplit = function() {
 	sab.setUint8(0,2,true)
 	this.ws.send(sab)
 }
-sock.prototype.writeSync = function() {
-	console.log("SYNCING",this.location)
+sock.prototype.writeStopSpectate = function() {
+	console.log("REQUESTING TO STOP SPECTATOR",this.room.id)
 	var sab = new DataView(new ArrayBuffer(1))
 	sab.setUint8(0,3,true)
+	this.ws.send(sab)
+}
+sock.prototype.writeSpectate = function(n) {
+	var roomConf = this.rooms[n];
+	console.log("ATTEMPTING TO WRITE SPECTATE",n)
+	if (this.room!=null) {
+		console.log("ALREADY SPECTATING",this.room.id)
+		this.nextRoom = n
+		this.writeStopSpectate()
+		return
+	}
+	this.room = new room(this, roomConf.width,roomConf.height)
+	this.room.sizemultiplier = roomConf.sizemultiplier
+	this.room.speedmultiplier = roomConf.speedmultiplier 
+	this.room.id = n
+	currentRoom = this.room
+
+	console.log("SENDING REQUEST TO SPECTATE", n)
+	var sab = new DataView(new ArrayBuffer(2))
+	sab.setUint8(0,6,true)
+	sab.setUint8(1,n,true)
 	this.ws.send(sab)
 }
 
@@ -508,7 +576,11 @@ window.onload = function() {
 	document.getElementById("loginButton").onclick = function() {
 		console.log("JOINING")
 		var n = document.getElementById("name").value;
-		currentSock.writeJoin(n)
+		if (!currentRoom.myplayer) {
+			currentRoom.server.writeJoin(n)
+		} else {
+			document.getElementById("mainfloat").style.display="none";
+		}
 	}
 }
 
@@ -526,7 +598,7 @@ function graphicsChanged() {
     canvas.cheight = window.innerHeight;
     ctx = gfx.getContext(canvas)
 
-    console.log("New Cam",camera)
+    // console.log("New Cam",camera)
 }
 
 window.onresize = graphicsChanged;
@@ -553,17 +625,17 @@ document.onkeydown = function(e) {
 
 	if (canSplit && e.keyCode == '32') {
     	canSplit = false
-    	currentSock.writeSplit()
+    	currentRoom.server.writeSplit()
     }
 	if (canSpit && e.keyCode == '87') {
     	canSpit = false
-    	currentSock.writeSpit()
+    	currentRoom.server.writeSpit()
     }
     if (e.keyCode == '144') {
     	debugMode = true
     }
     if (e.keyCode == '27') {
-
+    	document.getElementById("mainfloat").style.display="block";
     }
     if (debugMode) {
 		if (e.keyCode == '68') {
@@ -696,11 +768,8 @@ function render() {
 	// renderArea.update(ctx,canvas.width,canvas.height)
 	
 
-	if (currentSock && currentSock.room && currentSock.room.myplayer) {
-		var size = currentSock.room.myplayer.bbox()
-		if (Math.random()<.01) {
-			console.info("CAMERA",size)
-		}
+	if (currentRoom) {
+		var size = currentRoom.getCameraBbox()
 		size[0] -= camPad
 		size[1] -= camPad
 		size[2] += camPad
@@ -730,8 +799,8 @@ function render() {
 		gfx.position(ctx, -camera.x,-camera.y, camera.xscale,camera.yscale)
 	}
 
-	if (currentSock && currentSock.room) {
-		var room = currentSock.room;
+	if (currentRoom && currentRoom.server) {
+		var room = currentRoom;
 		var x = camera.x<0 ? 0 : camera.x
 		var y = camera.y<0 ? 0 : camera.y
 		var w = x + camera.width > room.width ? room.width - x : camera.width
@@ -745,12 +814,12 @@ function render() {
 
 		renderBackground.update(x, y, w, h)
 
-		currentSock.room.render(ctx)
+		currentRoom.render(ctx)
 	}
 
 
-	if (currentSock && currentSock.room) {
-		draw_leaderboard(ctx,currentSock.room)
+	if (currentRoom && currentRoom.server) {
+		draw_leaderboard(ctx,currentRoom)
 	}
 	gfx.done(ctx)
 }

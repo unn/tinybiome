@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"golang.org/x/net/websocket"
 	"io"
 	"log"
 	"math"
@@ -13,6 +12,11 @@ import (
 	"time"
 	"unsafe"
 )
+
+var fallenBehind = errors.New("Socket fell behind")
+var invalidProto = errors.New("Invalid Protocol")
+var hackAttempt = errors.New("Hack Attempt")
+var Disconnected = errors.New("Disconnected")
 
 type ProtocolDown interface {
 	WriteNewActor(*Actor)
@@ -32,60 +36,69 @@ type ProtocolDown interface {
 	WriteBacteria(*Bacteria)
 	WriteBlob(*Blob)
 	WritePong()
+	WriteStopSpectating()
 	Flush() error
 	Save()
+	SaveOob()
+}
+
+type ProtocolUp interface {
+	GetMessage(*Connection) error
 }
 
 type Protocol interface {
 	ProtocolDown
-	GetMessage(*Player) error
+	ProtocolUp
 }
 
 type BinaryProtocol struct {
-	RW            *websocket.Conn
+	RW            io.ReadWriter
 	W             *bytes.Buffer
+	OW            *bytes.Buffer
 	R             *bufio.Reader
 	isTransaction bool
 	T             time.Time
 	Count         int
 	Lock          sync.RWMutex
-	Logging       bool
+	Logging       int
+	DownLogging   int
 	WriteChan     chan []byte
+	OobWriteChan  chan []byte
 	Disconnected  bool
 	MessageMap    []byte
-	DownLogging   bool
+	CloseChan     chan error
 }
 
-func NewBinaryProtocol(ws *websocket.Conn) Protocol {
+func NewBinaryProtocol(ws io.ReadWriter) Protocol {
 	p := &BinaryProtocol{
 		RW:            ws,
 		W:             bytes.NewBuffer(nil),
+		OW:            bytes.NewBuffer(nil),
 		R:             bufio.NewReaderSize(ws, 1024*4),
 		T:             time.Now(),
 		isTransaction: false,
 		WriteChan:     make(chan []byte, 1000),
-		Logging:       false,
+		OobWriteChan:  make(chan []byte, 100),
+		CloseChan:     make(chan error, 100),
+		Logging:       1,
+		DownLogging:   1,
 	}
 	a := Protocol(p)
 	p.WriteNewMessageMap()
 	return a
 }
 
-var invalidProto = errors.New("Invalid Protocol")
-var hackAttempt = errors.New("Hack Attempt")
-var Disconnected = errors.New("Disconnected")
+func (s *BinaryProtocol) String() string {
+	return "BINARY PROTO"
+}
 
 func guaranteeRead(r io.Reader, p []byte) error {
 	_, e := io.ReadFull(r, p)
 	return e
 }
 
-func (s *BinaryProtocol) String() string {
-	return s.RW.Request().RemoteAddr
-}
-
 // runs in a goroutine
-func (s *BinaryProtocol) GetMessage(p *Player) error {
+func (s *BinaryProtocol) GetMessage(c *Connection) error {
 	if s.Disconnected {
 		return Disconnected
 	}
@@ -106,8 +119,8 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		}
 
 		strSize := *(*int32)(unsafe.Pointer(&size[0]))
-		if s.DownLogging {
-			log.Println(p, "SENT JOIN")
+		if s.DownLogging > 0 {
+			log.Println(c, "SENT JOIN")
 		}
 		if strSize > 100 {
 			strSize = 100
@@ -122,8 +135,8 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		}
 
 		name := string(nameBytes)
-		p.Join(name)
-	case 1:
+		c.CreatePlayer(name)
+	case 1: // movement
 		parts := make([]byte, 12)
 		e := guaranteeRead(s.R, parts)
 		if e != nil {
@@ -140,31 +153,41 @@ func (s *BinaryProtocol) GetMessage(p *Player) error {
 		if math.IsNaN(float64(speed)) {
 			speed = 0
 		}
-		if s.DownLogging {
-			// log.Println(p, "SENT DIRECTION", pid, d, speed)
+		if s.DownLogging > 1 {
+			log.Println(c, "SENT DIRECTION", pid, d, speed)
 		}
-		p.UpdateDirection(pid, d, speed)
+		c.Player.UpdateDirection(pid, d, speed)
 	case 2:
-		if s.DownLogging {
-			log.Println(p, "SENT SPLIT")
+		if s.DownLogging > 0 {
+			log.Println(c, "SENT SPLIT")
 		}
-		p.Split()
-	case 3:
-		if s.DownLogging {
-			log.Println(p, "SENT CONNECT")
+		c.Player.Split()
+	case 3: // stop spectating
+		if s.DownLogging > 0 {
+			log.Println(c, "SENT STOP")
 		}
-		p.Sync()
+		c.StopSpectating()
 	case 4:
-		p.Ping()
-	case 5:
-		if s.DownLogging {
-			log.Println(p, "SENT SPIT")
+		if s.DownLogging > 0 {
+			log.Println(c, "SENT PING")
 		}
-		p.Spit()
+		c.Ping()
+	case 5:
+		if s.DownLogging > 0 {
+			log.Println(c, "SENT SPIT")
+		}
+		c.Player.Spit()
+	case 6: // spectate
+		if s.DownLogging > 0 {
+			log.Println(c, "SENT SPECTATE")
+		}
+		if room, e := s.R.ReadByte(); e != nil {
+			return e
+		} else {
+			c.Spectate(int(room))
+		}
 	default:
 		log.Println("READ ERROR, TYPE", act)
-		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
-		s.RW.Close()
 		return invalidProto
 	}
 	return nil
@@ -195,21 +218,26 @@ func WriteFloat32(w io.Writer, i float64) {
 
 // sends updates
 func (s *BinaryProtocol) WriteRoom(r *Room) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteRoom", r)
 	}
 	s.W.WriteByte(s.MessageMap[0])
-	WriteInt32(s.W, r.Width)
-	WriteInt32(s.W, r.Height)
-	WriteInt32(s.W, r.StartMass)
-	WriteInt32(s.W, r.MergeTime)
-	WriteFloat32(s.W, r.SizeMultiplier)
-	WriteFloat32(s.W, r.SpeedMultiplier)
+	WriteInt32(s.W, int64(r.ID))
+	WriteFloat32(s.W, r.Config.Width)
+	WriteFloat32(s.W, r.Config.Height)
+	WriteFloat32(s.W, r.Config.StartingMass)
+	WriteInt32(s.W, int64(r.Config.MergeTime))
+	WriteFloat32(s.W, r.Config.SizeMultiplier)
+	WriteFloat32(s.W, r.Config.SpeedMultiplier)
 	WriteInt32(s.W, r.PlayerCount)
+
+	nb := []byte(r.Config.Name)
+	WriteInt32(s.W, int64(len(nb)))
+	s.W.Write(nb)
 }
 
 func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteNewActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[1])
@@ -223,8 +251,8 @@ func (s *BinaryProtocol) WriteNewActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
-	if s.Logging {
-		// log.Println(s, "SENDING WriteNewPellet", pellet)
+	if s.Logging > 2 {
+		log.Println(s, "SENDING WriteNewPellet", pellet)
 	}
 	s.W.WriteByte(s.MessageMap[2])
 	WriteInt32(s.W, pellet.X)
@@ -233,8 +261,8 @@ func (s *BinaryProtocol) WriteNewPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
-	if s.Logging {
-		// log.Println(s, "SENDING WriteDestroyPellet", pellet)
+	if s.Logging > 2 {
+		log.Println(s, "SENDING WriteDestroyPellet", pellet)
 	}
 	s.W.WriteByte(s.MessageMap[3])
 	WriteInt32(s.W, pellet.X)
@@ -245,7 +273,7 @@ func (s *BinaryProtocol) WriteDestroyPellet(pellet *Pellet) {
 }
 
 func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteNewPlayer", player)
 	}
 	s.W.WriteByte(s.MessageMap[4])
@@ -260,7 +288,7 @@ func (s *BinaryProtocol) WriteNewPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteNamePlayer", player)
 	}
 	s.W.WriteByte(s.MessageMap[5])
@@ -275,7 +303,7 @@ func (s *BinaryProtocol) WriteNamePlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteDestroyPlayer", player)
 	}
 	s.W.WriteByte(s.MessageMap[6])
@@ -286,7 +314,7 @@ func (s *BinaryProtocol) WriteDestroyPlayer(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteOwns(player *Player) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteOwns", player)
 	}
 	s.W.WriteByte(s.MessageMap[7])
@@ -297,7 +325,7 @@ func (s *BinaryProtocol) WriteOwns(player *Player) {
 }
 
 func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteDestroyActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[8])
@@ -308,8 +336,8 @@ func (s *BinaryProtocol) WriteDestroyActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
-	if s.Logging {
-		// log.Println(s, "SENDING WriteMoveActor", actor)
+	if s.Logging > 1 {
+		log.Println(s, "SENDING WriteMoveActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[9])
 	WriteInt32(s.W, actor.ID)
@@ -323,8 +351,8 @@ func (s *BinaryProtocol) WriteMoveActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
-	if s.Logging {
-		// log.Println(s, "SENDING WriteSetMassActor", actor)
+	if s.Logging > 1 {
+		log.Println(s, "SENDING WriteSetMassActor", actor)
 	}
 	s.W.WriteByte(s.MessageMap[10])
 	WriteInt32(s.W, actor.ID)
@@ -335,7 +363,7 @@ func (s *BinaryProtocol) WriteSetMassActor(actor *Actor) {
 }
 
 func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WritePelletsIncoming", len(pellets))
 	}
 
@@ -350,7 +378,7 @@ func (s *BinaryProtocol) WritePelletsIncoming(pellets []*Pellet) {
 }
 
 func (s *BinaryProtocol) WritePlayerActor(pa *PlayerActor) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WritePlayerActor", pa)
 	}
 
@@ -361,7 +389,7 @@ func (s *BinaryProtocol) WritePlayerActor(pa *PlayerActor) {
 }
 
 func (s *BinaryProtocol) WriteVirus(v *Virus) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteVirus", v)
 	}
 
@@ -371,7 +399,7 @@ func (s *BinaryProtocol) WriteVirus(v *Virus) {
 }
 
 func (s *BinaryProtocol) WriteBacteria(v *Bacteria) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteBacteria", v)
 	}
 
@@ -381,7 +409,7 @@ func (s *BinaryProtocol) WriteBacteria(v *Bacteria) {
 }
 
 func (s *BinaryProtocol) WriteBlob(v *Blob) {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WriteBlob", v)
 	}
 
@@ -405,10 +433,16 @@ func (s *BinaryProtocol) WriteNewMessageMap() {
 }
 
 func (s *BinaryProtocol) WritePong() {
-	if s.Logging {
+	if s.Logging > 0 {
 		log.Println(s, "SENDING WritePong")
 	}
 	s.W.WriteByte(s.MessageMap[14])
+}
+func (s *BinaryProtocol) WriteStopSpectating() {
+	if s.Logging > 0 {
+		log.Println(s, "SENDING WriteStopSpectating")
+	}
+	s.W.WriteByte(s.MessageMap[15])
 }
 
 func (s *BinaryProtocol) Save() {
@@ -432,8 +466,7 @@ func (s *BinaryProtocol) Save() {
 		s.Disconnected = true
 		start := time.Now()
 		log.Println("KILLING", s.RW)
-		s.RW.SetDeadline(time.Now().Add(2 * time.Millisecond))
-		s.RW.Close()
+		s.CloseChan <- fallenBehind
 		log.Println("DONE CLOSING", s.RW)
 		took := time.Since(start)
 		if took > time.Millisecond {
@@ -446,8 +479,29 @@ func (s *BinaryProtocol) Save() {
 	}
 }
 
+func (s *BinaryProtocol) SaveOob() {
+	s.Lock.Lock()
+	a := s.OW.Bytes()
+	b := make([]byte, len(a))
+	copy(b, a)
+	s.OW.Reset()
+	s.OobWriteChan <- b
+	s.Lock.Unlock()
+}
+
 func (s *BinaryProtocol) Flush() error {
-	b := <-s.WriteChan
+	var b []byte
+
+	select {
+	case b = <-s.OobWriteChan:
+	case b = <-s.WriteChan:
+	case e := <-s.CloseChan:
+		return e
+	}
+
+	if s.Logging > 1 {
+		log.Println(s, "FLUSHING", len(b), "BYTES")
+	}
 	t := time.Now()
 	n, e := s.RW.Write(b)
 	if e != nil {

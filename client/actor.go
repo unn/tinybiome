@@ -8,44 +8,48 @@ import (
 	"time"
 )
 
-// types: 0 vitamind, 1 mineral
+// types: 0 vitamin, 1 mineral
 type Pellet struct {
 	X    int64
 	Y    int64
-	room *Room
-	ID   int64
-	TID  int64
+	Room *Room
+	ID   int
+	TID  int
 	Mass int64
 	Type int64
 }
 
 func (p *Pellet) Create() {
 	p.Mass = 3
-	for _, b := range p.room.Players {
+	for _, b := range p.Room.Connections {
 		if b == nil {
 			continue
 		}
-		b.Net.WriteNewPellet(p)
+		b.Protocol.WriteNewPellet(p)
 	}
-	p.ID = p.room.PelletCount
-	p.room.Pellets[p.ID] = p
-	p.room.PelletCount += 1
+	p.ID = p.Room.PelletCount
+	p.Room.Pellets[p.ID] = p
+	p.Room.PelletCount += 1
 	tx := int(p.X / int64(TileSize))
 	ty := int(p.Y / int64(TileSize))
 
-	t := p.room.PelletTiles[tx][ty]
+	t := p.Room.PelletTiles[tx][ty]
 	p.TID = t.PelletCount
-	t.Pellets[p.TID] = p
+	if len(t.Pellets) <= p.TID {
+		t.Pellets = append(t.Pellets, p)
+	} else {
+		t.Pellets[p.TID] = p
+	}
 	t.PelletCount += 1
 }
 func (p *Pellet) Remove() {
-	for _, b := range p.room.Players {
+	for _, b := range p.Room.Connections {
 		if b == nil {
 			continue
 		}
-		b.Net.WriteDestroyPellet(p)
+		b.Protocol.WriteDestroyPellet(p)
 	}
-	r := p.room
+	r := p.Room
 	r.PelletCount -= 1
 	r.Pellets[p.ID] = r.Pellets[r.PelletCount]
 	r.Pellets[p.ID].ID = p.ID
@@ -53,7 +57,7 @@ func (p *Pellet) Remove() {
 	tx := int(p.X / int64(TileSize))
 	ty := int(p.Y / int64(TileSize))
 
-	t := p.room.PelletTiles[tx][ty]
+	t := p.Room.PelletTiles[tx][ty]
 	t.PelletCount -= 1
 	t.Pellets[p.TID] = t.Pellets[t.PelletCount]
 	t.Pellets[p.TID].TID = p.TID
@@ -62,7 +66,7 @@ func (p *Pellet) Remove() {
 
 type Actor struct {
 	Owner     interface{}
-	room      *Room
+	Room      *Room
 	ID        int64
 	X         float64
 	Y         float64
@@ -80,13 +84,13 @@ type Actor struct {
 }
 
 func NewActor(r *Room) *Actor {
-	a := &Actor{room: r}
+	a := &Actor{Room: r}
 	id := r.getId(a)
 	a.ID = id
 	return a
 }
 func (a *Actor) RecalcRadius() {
-	a.radius = math.Pow(a.Mass, a.room.SizeMultiplier)
+	a.radius = math.Pow(a.Mass, a.Room.Config.SizeMultiplier)
 }
 func (a *Actor) Radius() float64 {
 	return a.radius
@@ -98,15 +102,15 @@ func (a *Actor) CheckCollisions() {
 	}
 	if pc, is := a.Owner.(PelletCollider); is {
 		r := a.Radius()
-		rad := int64(a.Radius() * a.Radius())
+		rad := a.Radius() * a.Radius()
 		t := time.Now()
 
-		ix := int64(int64(a.X-r) / TileSize)
-		iy := int64(int64(a.Y-r) / TileSize)
-		ax := int64(a.X)
-		ay := int64(a.Y)
-		ex := int64(int64(a.X+r) / TileSize)
-		ey := int64(int64(a.Y+r) / TileSize)
+		ix := ((a.X - r) / TileSize)
+		iy := ((a.Y - r) / TileSize)
+		ax := (a.X)
+		ay := (a.Y)
+		ex := ((a.X + r) / TileSize)
+		ey := ((a.Y + r) / TileSize)
 
 		if ix < 0 {
 			ix = 0
@@ -114,22 +118,22 @@ func (a *Actor) CheckCollisions() {
 		if iy < 0 {
 			iy = 0
 		}
-		if ex > a.room.Width/TileSize-1 {
-			ex = a.room.Width/TileSize - 1
+		if ex > a.Room.Config.Width/TileSize-1 {
+			ex = a.Room.Config.Width/TileSize - 1
 		}
-		if ey > a.room.Height/TileSize-1 {
-			ey = a.room.Height/TileSize - 1
+		if ey > a.Room.Config.Height/TileSize-1 {
+			ey = a.Room.Config.Height/TileSize - 1
 		}
 
-		for ix := ix; ix <= ex; ix += 1 {
-			for iy := iy; iy <= ey; iy += 1 {
+		for ix := int(ix); ix <= int(ex); ix += 1 {
+			for iy := int(iy); iy <= int(ey); iy += 1 {
 
-				tile := a.room.PelletTiles[ix][iy]
+				tile := a.Room.PelletTiles[ix][iy]
 				pels := tile.Pellets[:tile.PelletCount]
 
 				for _, p := range pels {
-					dx := p.X - ax
-					dy := p.Y - ay
+					dx := float64(p.X) - ax
+					dy := float64(p.Y) - ay
 					if dx*dx+dy*dy < rad {
 						pc.PelletCollision(p)
 					}
@@ -144,7 +148,7 @@ func (a *Actor) CheckCollisions() {
 
 	if ac, is := a.Owner.(ActorCollider); is {
 		consumes := []*Actor{}
-		for _, b := range a.room.Actors[:a.room.HighestID] {
+		for _, b := range a.Room.Actors[:a.Room.HighestID] {
 			if b == a || b == nil {
 				continue
 			}
@@ -194,8 +198,8 @@ func (a *Actor) CheckCollisions() {
 			}
 		}
 	}
-	a.X = math.Min(float64(a.room.Width), a.X)
-	a.Y = math.Min(float64(a.room.Height), a.Y)
+	a.X = math.Min(float64(a.Room.Config.Width), a.X)
+	a.Y = math.Min(float64(a.Room.Config.Height), a.Y)
 	a.X = math.Max(0, a.X)
 	a.Y = math.Max(0, a.Y)
 }
@@ -203,7 +207,7 @@ func (a *Actor) CheckCollisions() {
 var friction = .2
 
 func (a *Actor) Tick(d time.Duration) {
-	allowed := 500 / (a.room.SpeedMultiplier * math.Pow(a.Mass+50, .5))
+	allowed := 500 / (a.Room.Config.SpeedMultiplier * math.Pow(a.Mass+50, .5))
 	distance := allowed * d.Seconds() * a.Speed
 
 	dx := math.Cos(a.Direction) * distance
@@ -228,15 +232,15 @@ func (a *Actor) String() string {
 }
 
 func (a *Actor) Remove() {
-	r := a.room
+	r := a.Room
 	log.Println("REMOVING ACTOR", a)
 	r.Actors[a.ID] = nil
 	a.Dead = true
-	for _, player := range r.Players {
-		if player == nil {
+	for _, conn := range r.Connections {
+		if conn == nil {
 			continue
 		}
-		player.Net.WriteDestroyActor(a)
+		conn.Protocol.WriteDestroyActor(a)
 	}
 }
 
@@ -279,7 +283,7 @@ func (oa *PlayerActor) Spit() {
 }
 func (oa *PlayerActor) Split() {
 	a := oa.Actor
-	if a.Mass < 40 {
+	if a.Mass < a.Room.Config.MinSplitMass {
 		return
 	}
 	emptySlots := 0
@@ -293,7 +297,7 @@ func (oa *PlayerActor) Split() {
 	}
 
 	a.Mass *= .5
-	oa.MergeTime = oa.MergeTime.Add(oa.Player.room.MergeTimeFromMass(a.Mass))
+	oa.MergeTime = oa.MergeTime.Add(oa.Player.Room.MergeTimeFromMass(a.Mass))
 	a.RecalcRadius()
 
 	distance := a.Radius()
@@ -323,7 +327,7 @@ func (a *PlayerActor) ActorCollision(b *Actor) {
 		otherActor := otherPlayerActor.Actor
 		if a.Player == otherPlayerActor.Player {
 			a.Actor.Mass += otherActor.Mass
-			a.MergeTime = a.MergeTime.Add(a.Player.room.MergeTimeFromMass(otherActor.Mass))
+			a.MergeTime = a.MergeTime.Add(a.Player.Room.MergeTimeFromMass(otherActor.Mass))
 		} else {
 			a.Actor.Mass += otherActor.Mass * .65
 			a.DecayLevel -= otherActor.Mass / a.Actor.Mass
@@ -414,7 +418,7 @@ type Blob struct {
 
 func NewBlob(p *PlayerActor) *Blob {
 	log.Println("SHOOT", p)
-	r := p.Player.room
+	r := p.Player.Room
 	v := &Blob{Birth: time.Now(), Origin: p}
 	v.Room = r
 
@@ -431,12 +435,12 @@ func NewBlob(p *PlayerActor) *Blob {
 	v.Actor.Y += math.Sin(p.Actor.Direction) * rad
 
 	r.AddTicker(v)
-	for _, player := range r.Players {
-		if player == nil {
+	for _, conn := range r.Connections {
+		if conn == nil {
 			continue
 		}
-		v.Actor.Write(player.Net)
-		player.Net.WriteBlob(v)
+		v.Actor.Write(conn.Protocol)
+		conn.Protocol.WriteBlob(v)
 	}
 	return v
 }
@@ -484,19 +488,19 @@ func NewBacteria(r *Room) *Bacteria {
 	v := &Bacteria{}
 	v.Room = r
 	v.Actor = r.NewActor(
-		float64(rand.Int63n(r.Width)),
-		float64(rand.Int63n(r.Height)),
+		rand.Float64()*r.Config.Width,
+		rand.Float64()*r.Config.Height,
 		350)
 	v.Actor.Owner = v
 	v.Actor.Direction = rand.Float64() * math.Pi * 2
 	v.PickSpot()
 	r.AddTicker(v)
-	for _, player := range r.Players {
-		if player == nil {
+	for _, conn := range r.Connections {
+		if conn == nil {
 			continue
 		}
-		v.Actor.Write(player.Net)
-		player.Net.WriteBacteria(v)
+		v.Actor.Write(conn.Protocol)
+		conn.Protocol.WriteBacteria(v)
 	}
 	v.Room.BacteriaCount += 1
 	return v
@@ -592,19 +596,19 @@ func NewVirus(r *Room) *Virus {
 	v := &Virus{LastEat: time.Now()}
 	v.Room = r
 	v.Actor = r.NewActor(
-		float64(rand.Int63n(r.Width)),
-		float64(rand.Int63n(r.Height)),
+		rand.Float64()*r.Config.Width,
+		rand.Float64()*r.Config.Height,
 		250)
 	v.Actor.Owner = v
 	v.Actor.Direction = rand.Float64() * math.Pi * 2
 	v.PickSpot()
 	r.AddTicker(v)
-	for _, player := range r.Players {
-		if player == nil {
+	for _, conn := range r.Connections {
+		if conn == nil {
 			continue
 		}
-		v.Actor.Write(player.Net)
-		player.Net.WriteVirus(v)
+		v.Actor.Write(conn.Protocol)
+		conn.Protocol.WriteVirus(v)
 	}
 	v.Room.VirusCount += 1
 	return v
@@ -619,12 +623,12 @@ func NewVirusWithSpecs(r *Room, x, y, mass float64) *Virus {
 	v.Actor.Direction = rand.Float64() * math.Pi * 2
 	v.PickSpot()
 	r.AddTicker(v)
-	for _, player := range r.Players {
-		if player == nil {
+	for _, conn := range r.Connections {
+		if conn == nil {
 			continue
 		}
-		v.Actor.Write(player.Net)
-		player.Net.WriteVirus(v)
+		v.Actor.Write(conn.Protocol)
+		conn.Protocol.WriteVirus(v)
 	}
 	v.Room.VirusCount += 1
 	return v

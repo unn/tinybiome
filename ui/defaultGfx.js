@@ -299,7 +299,7 @@ gfx.createLeaderBoard = function(pix) { // (ctx, bbox, n, mass, myActors)
 				leaders.length = maxLeaders
 			}
 
-			var l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+Math.floor(currentSock.latency*10)/10+"ms"
+			var l = connected+" players connected, "+total+" playing. FPS: "+fps+", QUALITY: "+renderQuality+", PING: "+Math.floor(currentRoom.server.latency*10)/10+"ms"
 			debugText.text = l
 			debugText.x = width
 
@@ -342,7 +342,6 @@ var renderTileProps = {
 gfx.createRenderTile = function(pix) {
 	if (!renderRenderTile) return noop
 	var container = new PIXI.ParticleContainer(1000,renderTileProps);
-	console.log(container._properties)
 	container.z = -9
 	var visible = false;
 	countCreateRenderTile += 1
@@ -372,7 +371,6 @@ gfx.createRenderTile = function(pix) {
 		},
 		free:function(){
 			if (visible) pix.stage.removeChild(container)
-			console.log(container.children)
 			countCreateRenderTile -= 1
 		}
 	}

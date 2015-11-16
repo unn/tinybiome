@@ -67,7 +67,7 @@ player.prototype.bbox = function() {
 			console.log("BB ERROR",bb)
 		}
 		if (isNaN(bb[0])) {
-			console.log("BB ERROR",bb)
+			console.log("BB ERROR",bb,b)
 		}
 		if (bb[0]<x) x = bb[0]
 		if (bb[1]<y) y = bb[1]
@@ -76,32 +76,7 @@ player.prototype.bbox = function() {
 		found = true
 	}
 	if (!found) {
-		var now = (new Date());
-		if (now-randomActorTime>5000 || !randomActorId || !this.room.actors[randomActorId]) {
-			randomActorTime = now
-			randomActorId = pickRandomProperty(this.room.actors)
-		}
-		var a = this.room.actors[randomActorId]
-		if (!a) {
-			if (isNaN(x)) {
-				console.log("BB ERROR", x)
-			}
-			return [x/2-400,y/2-400,x/2+400,y/2+400]
-		}
-
-		var bb = a.bbox()
-		if (!bb) {
-			console.log("BB ERROR",bb)
-		}
-		bb = [bb[0],bb[1],bb[2],bb[3]]
-		bb[0] -= 200
-		bb[1] -= 200
-		bb[2] += 200
-		bb[3] += 200
-		if (isNaN(bb[0])) {
-			console.log("BB ERROR",bb, a)
-		}
-		return bb
+		
 	}
 
 	if (isNaN(x)) {
@@ -121,7 +96,6 @@ function renderTile(room,x,y) {
 	this.canRender = false
 	this.renderable = []
 	this.dirty = false
-	this.room = room
 	this.freeadd = true
 	this.visible = false
 	this.gfx = gfx.createRenderTile(pix)
@@ -168,10 +142,11 @@ renderTile.id = function(x,y) {
 	return "a_t("+x+","+y+")"
 }
 renderTile.prototype.remove = function() {
-	console.log("REMOVING RENDERTILE")
+	console.info("REMOVING RENDERTILE")
 	for(var i in this.renderable) {
 		this.renderable[i].remove()
 	}
+	this.room.renderable.splice(this.room.renderable.indexOf(this),1)
 	this.gfx.free()
 }
 renderTile.prototype.addParticle = function(x,y,c) {
@@ -208,12 +183,6 @@ pellet.prototype.bbox = function() {
 	var r = this._radius
 	return [this.x-r, this.y-r, this.x+r, this.y+r]
 }
-
-
-
-
-
-
 
 
 
@@ -264,10 +233,11 @@ particle.prototype.remove = function() {
 }
 
 
-function room(width, height) {
+function room(server, width, height) {
 	this.tiles = {}
 	this.width = width
 	this.height = height
+	this.server = server
 
 	this.players = {}
 	this.actors = {}
@@ -282,6 +252,36 @@ function room(width, height) {
 
 	this.particles = []
 	this.particleCount = 0;
+}
+room.prototype.getCameraBbox = function() {
+	if (this.myplayer) {
+		return this.myplayer.bbox()
+	}
+	var now = (new Date());
+	if (now-randomActorTime>5000 || !randomActorId || !this.actors[randomActorId]) {
+		randomActorTime = now
+		randomActorId = pickRandomProperty(this.actors)
+	}
+	var a = this.actors[randomActorId]
+	if (!a) {
+		var x = this.width/2
+		var y = this.height/2
+		return [x/2-400,y/2-400,x/2+400,y/2+400]
+	}
+
+	var bb = a.bbox()
+	if (!bb) {
+		console.log("BB ERROR",bb)
+	}
+	bb = [bb[0],bb[1],bb[2],bb[3]]
+	bb[0] -= 200
+	bb[1] -= 200
+	bb[2] += 200
+	bb[3] += 200
+	if (isNaN(bb[0])) {
+		console.log("BB ERROR",bb, a)
+	}
+	return bb
 }
 room.prototype.step = function(seconds) {
 	var actor;
@@ -315,13 +315,14 @@ room.prototype.addParticle = function(x,y,color) {
 	return p
 }
 room.prototype.remove = function() {
-	console.log("REMOVING ROOM")
-	for(var i = 0; i < this.renderable.length; i++) {
-		this.renderable[i].remove()
+	console.log("REMOVING ROOM",this.id,"WITH",this.renderable.length,"RENDERABLES")
+	while(this.renderable.length>0) {
+		this.renderable[0].remove()
 	}
 	for(var i=0;i<this.particleCount;i++) {
 		this.particles[i].remove()
 	}
+	this.actors = {}
 }
 room.prototype.render = function(ctx) {
 	var start = (new Date())
@@ -459,7 +460,7 @@ actor.prototype.setVelocity = function(s,d) {
 }
 actor.prototype.setPosition = function(x,y) {
 	var allowed = 500 / (this.room.speedmultiplier * Math.pow(this.mass + 50, .5))
-	var distance = allowed * currentSock.latency/2000 * this.speed
+	var distance = allowed * this.room.server.latency/2000 * this.speed
 
 	this.xs = x + Math.cos(this.direction) * distance
 	this.ys = y + Math.sin(this.direction) * distance
@@ -504,6 +505,7 @@ actor.prototype.step = function(seconds) {
 	if (this.owner) if (this.owner.step) this.owner.step(seconds)
 }
 actor.prototype.remove = function() {
+	console.info("REMOVING",this.gfx,this.owner)
 	this.gfx.free()
 	this.room.renderable.splice(this.room.renderable.indexOf(this),1)
 	delete this.room.steppers[this.id]
@@ -547,7 +549,7 @@ playeractor.prototype.step = function(seconds) {
 		var mdy = mousey - onCanvasY
 
 		actor.direction = Math.atan2(mdy,mdx)
-		actor.speed = (Math.sqrt(mdx*mdx+mdy*mdy)*canvas.cwidth/canvas.width-20) / 100
+		actor.speed = (Math.sqrt(mdx*mdx+mdy*mdy)*canvas.cwidth/canvas.width-5) / 100
 		if (actor.speed<0) actor.speed=0
 		if (actor.speed>1) actor.speed=1
 
@@ -576,7 +578,7 @@ playeractor.prototype.step = function(seconds) {
 
 		var now = (new Date())
 		if (now-this.lastupdate>3) {
-			currentSock.writeMove(actor.id,actor.direction,actor.speed)
+			this.room.server.writeMove(actor.id,actor.direction,actor.speed)
 			this.lastupdate = now
 		}
 	}
