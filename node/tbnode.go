@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/ethicatech/tinybiome/client"
+	"../client"
 	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
