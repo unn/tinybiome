@@ -545,6 +545,7 @@ gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor
 			}
 			model.container.destroy(false)
 			model.front.destroy(false)
+			model.back.destroy(false)
 			countCreatePlayerActor -= 1
 		}
 	}
@@ -593,6 +594,7 @@ gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.col
 			}
 			model.container.destroy(false)
 			model.front.destroy(false)
+			model.back.destroy(false)
 			countCreateVirus -= 1
 		}
 	}
@@ -630,11 +632,6 @@ gfx.createBlob = function(pix) { // (this.actor.x, this.actor.y, this.actor.colo
 
 			model.rotation = (x+y)/200
 			model.tint = c
-			var scale = 7/512+.1
-			model.back.scale.x = scale
-			model.back.scale.y = scale
-			model.back.position.x = -size/2*scale
-			model.back.position.y = -size/2*scale
 		},
 		free: function() {
 			if (visible) {
@@ -689,6 +686,7 @@ gfx.createBacteria = function(pix) { // (this.actor.x, this.actor.y, this.actor.
 			}
 			model.container.destroy(false)
 			model.front.destroy(false)
+			model.back.destroy(false)
 			countCreateBacteria -= 1
 		}
 	}
