@@ -142,9 +142,9 @@ renderTile.id = function(x,y) {
 	return "a_t("+x+","+y+")"
 }
 renderTile.prototype.remove = function() {
-	console.info("REMOVING RENDERTILE")
-	for(var i in this.renderable) {
-		this.renderable[i].remove()
+	console.info("REMOVING RENDERTILE WITH",this.renderable.length)
+	while(this.renderable.length>0) {
+		this.renderable[0].remove()
 	}
 	this.room.renderable.splice(this.room.renderable.indexOf(this),1)
 	this.gfx.free()
@@ -587,7 +587,7 @@ playeractor.prototype.render = function(ctx) {
 	var radius = this.actor.radius()
 	// a = pi * r^2
 	// sqrt(a/pi) = r
-	this.actor.color = this.owner==this.room.myplayer ? 0x33FF33 : 0x3333FF;
+	this.actor.color = this.owner==this.room.myplayer ? green : red;
 	var n = this.owner.name
 	n = n ? n : "Microbe"
 	this.gfx.update(this.actor.x,this.actor.y,this.actor.color, Math.floor(this.actor.mass),radius)

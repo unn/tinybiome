@@ -115,7 +115,7 @@ server.prototype.pickRoom = function(room) {
 	room.server.writeSpectate(room.id)
 }
 function nameFromRoom(room) {
-	return room.name+" (PING "+Math.floor(room.server.latency*5)/10+"ms)"
+	return room.name+" (PING "+Math.floor(room.server.latency*5)/10+"ms, "+room.playercount+" PLAYERS)"
 }
 
 
@@ -411,7 +411,7 @@ sock.prototype.handleMultiPellet = function(dv, off) {
 	} else {
 		console.log("ERROR SIZE", amt)
 	}
-	
+
 	return off + 5 + amt * 12
 }
 sock.prototype.handleDescribeActor = function(dv, off) {
@@ -435,7 +435,7 @@ sock.prototype.handleDescribeActor = function(dv, off) {
 		return off + 6
 	case 3:
 		console.info("ACTOR",aid,"IS BLOB")
-		
+	
 		var a = new blob(this.room, aid)
 		return off + 6
 	}
@@ -582,6 +582,11 @@ window.onload = function() {
 			document.getElementById("mainfloat").style.display="none";
 		}
 	}
+  document.getElementById("name").onkeypress = function(ev) {
+    if(ev.keyCode == 13) {
+      document.getElementById("loginButton").onclick();
+    }
+  }
 }
 
 var resFactor = 1;
@@ -754,7 +759,7 @@ function render() {
 				console.log(JSON.stringify(graphicsCounts))
 			}
 		}
-		graphicsCounts = {tiles:0, particles:0, tileSkips:0, 
+		graphicsCounts = {tiles:0, particles:0, tileSkips:0,
 			particleSkips: 0, renderTime:0,
 			particleTime: 0}
 		renderCycles = 100
@@ -766,7 +771,7 @@ function render() {
 		}
 	}
 	// renderArea.update(ctx,canvas.width,canvas.height)
-	
+
 
 	if (currentRoom) {
 		var size = currentRoom.getCameraBbox()
@@ -804,12 +809,12 @@ function render() {
 		var x = camera.x<0 ? 0 : camera.x
 		var y = camera.y<0 ? 0 : camera.y
 		var w = x + camera.width > room.width ? room.width - x : camera.width
-		var h = y + camera.height > room.height ? room.height - y : camera.height 
+		var h = y + camera.height > room.height ? room.height - y : camera.height
 
 		// var x = camera.x
 		// var y = camera.y
 		// var w = camera.width
-		// var h = camera.height 
+		// var h = camera.height
 
 
 		renderBackground.update(x, y, w, h)

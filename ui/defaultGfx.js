@@ -12,6 +12,7 @@ cellImg.pattern = false;
 
 var bgTex = PIXI.Texture.fromImage("imgs/bg.jpg");
 var cellTex = PIXI.Texture.fromImage("imgs/cells.jpg");
+var size = 1024
 var colorsTex = PIXI.Texture.fromImage("imgs/colors.png");
 colorsTex.baseTexture.width = 256
 colorsTex.baseTexture.height = 256
@@ -532,12 +533,18 @@ gfx.createPlayerActor = function(pix) { // (this.actor.x,this.actor.y,this.actor
 			model.container.rotation = (x+y)/200
 			model.back.tint = c
 			model.container.z = 8 + mass / 100000
+			var scale = r/512+.1
+			model.back.scale.x = scale
+			model.back.scale.y = scale
+			model.back.position.x = -size/2*scale
+			model.back.position.y = -size/2*scale
 		},
 		free: function() {
 			if (visible) {
 				pix.stage.removeChild(model.container)
 			}
-			model.container.destroy(true)
+			model.container.destroy(false)
+			model.front.destroy(false)
 			countCreatePlayerActor -= 1
 		}
 	}
@@ -574,12 +581,18 @@ gfx.createVirus = function(pix) { // (this.actor.x, this.actor.y, this.actor.col
 
 			model.container.rotation = (x+y)/200
 			model.back.tint = c
+			var scale = r/512+.1
+			model.back.scale.x = scale
+			model.back.scale.y = scale
+			model.back.position.x = -size/2*scale
+			model.back.position.y = -size/2*scale
 		},
 		free: function() {
 			if (visible) {
 				pix.stage.removeChild(model.container)
 			}
-			model.container.destroy(true)
+			model.container.destroy(false)
+			model.front.destroy(false)
 			countCreateVirus -= 1
 		}
 	}
@@ -617,6 +630,11 @@ gfx.createBlob = function(pix) { // (this.actor.x, this.actor.y, this.actor.colo
 
 			model.rotation = (x+y)/200
 			model.tint = c
+			var scale = 7/512+.1
+			model.back.scale.x = scale
+			model.back.scale.y = scale
+			model.back.position.x = -size/2*scale
+			model.back.position.y = -size/2*scale
 		},
 		free: function() {
 			if (visible) {
@@ -659,12 +677,18 @@ gfx.createBacteria = function(pix) { // (this.actor.x, this.actor.y, this.actor.
 
 			model.container.rotation = (x+y)/200
 			model.back.tint = c
+			var scale = r/512+.1
+			model.back.scale.x = scale
+			model.back.scale.y = scale
+			model.back.position.x = -size/2*scale
+			model.back.position.y = -size/2*scale
 		},
 		free: function() {
 			if (visible) {
 				pix.stage.removeChild(model.container)
 			}
-			model.container.destroy(true)
+			model.container.destroy(false)
+			model.front.destroy(false)
 			countCreateBacteria -= 1
 		}
 	}
@@ -770,13 +794,8 @@ var texturedCells = true;
 function genericCell(playerMask) {
 	var tilingSprite;
 	if (texturedCells) {
-		var size = 50000
+		var tilingSprite = new PIXI.Sprite(cellTex);
 		var c = new PIXI.Container()
-		tilingSprite = new PIXI.extras.TilingSprite(cellTex, size, size);
-		tilingSprite.scale.x = .3
-		tilingSprite.scale.y = .3
-		tilingSprite.position.x = -size/2*tilingSprite.scale.x
-		tilingSprite.position.y = -size/2*tilingSprite.scale.y
 		tilingSprite.mask = playerMask;
 
 		c.addChild(tilingSprite);

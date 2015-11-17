@@ -36,19 +36,6 @@ var defaultConf = []byte(`{
 			"speedmultiplier": 0.4,
 			"startmass": 40,
 			"maxpellets": 10000}
-		,{
-			"name": "Fast-paced madness!",
-			"width":1500, "height":1500,
-			"maxviruses": 14,
-			"maxbacteria": 14,
-			"maxsplit": 64,
-			"minsplitmass": 10,
-			"mergetime": 0.1,
-			"sizemultiplier": 0.6,
-			"speedmultiplier": 0.5,
-			"startmass": 80,
-			"maxpellets": 5000
-		}
 		]
 	}`)
 
