@@ -17,6 +17,7 @@ type Player struct {
 }
 
 func NewPlayer(r *Room, name string) *Player {
+	r.PlayerCount += 1
 	player := &Player{Room: r, Owns: make([]Ticker, r.Config.MaxSplit)}
 	player.ID = r.getPlayerId(player)
 	player.Room.AddTicker(player)
@@ -48,33 +49,34 @@ func (p *Player) Write(pn ProtocolDown) {
 }
 
 func (p *Player) UpdateDirection(actor int32, d, s float32) {
-
-	r := p.Room
-	p.Room.ChangeLock.RLock()
-	a := r.getActor(int64(actor))
-	if a != nil {
-		op, isPA := a.Owner.(*PlayerActor)
-		if isPA {
-			if op.Player == p {
-				a.Direction = float64(d)
-				a.Speed = float64(s)
-				if a.Speed > 1 {
-					a.Speed = 1
-				}
-				if a.Speed < 0 {
-					a.Speed = 0
+	if p.Room != nil {
+		r := p.Room
+		p.Room.ChangeLock.RLock()
+		a := r.getActor(int64(actor))
+		if a != nil {
+			op, isPA := a.Owner.(*PlayerActor)
+			if isPA {
+				if op.Player == p {
+					a.Direction = float64(d)
+					a.Speed = float64(s)
+					if a.Speed > 1 {
+						a.Speed = 1
+					}
+					if a.Speed < 0 {
+						a.Speed = 0
+					}
+				} else {
+					log.Println(a, "APPARENTLY NOT OWNED BY", p)
 				}
 			} else {
-				log.Println(a, "APPARENTLY NOT OWNED BY", p)
+				log.Println(a, "APPARENTLY NOT A PA")
 			}
 		} else {
-			log.Println(a, "APPARENTLY NOT A PA")
+			log.Println("ACTOR", actor, "NOT FOUND?")
 		}
-	} else {
-		log.Println("ACTOR", actor, "NOT FOUND?")
-	}
 
-	p.Room.ChangeLock.RUnlock()
+		p.Room.ChangeLock.RUnlock()
+	}
 }
 
 type PlayerActorList []Ticker
@@ -133,6 +135,7 @@ func (p *Player) Remove() {
 		}
 		conn.Protocol.WriteDestroyPlayer(p)
 	}
+	r.PlayerCount -= 1
 	log.Println("Unlock 4")
 	log.Println("CLOSING CHAN")
 }

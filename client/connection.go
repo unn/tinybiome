@@ -108,8 +108,20 @@ func (c *Connection) Done() {
 }
 
 func (c *Connection) Ping() {
+	if c.Room != nil {
+		c.Room.ChangeLock.RLock()
+	}
 	c.Protocol.WritePong()
 	c.Protocol.Save()
+
+	for _, room := range c.Server.Rooms {
+		c.Protocol.WriteRoom(room)
+	}
+	c.Protocol.Save()
+
+	if c.Room != nil {
+		c.Room.ChangeLock.RUnlock()
+	}
 }
 
 func (c *Connection) Spectate(room int) {

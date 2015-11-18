@@ -250,9 +250,14 @@ sock.prototype.handleSync = function(dv, off) {
 	return off+l+2
 }
 sock.prototype.handleNewRoom = function(dv, off) {
-	console.log("NEW ROOM INCOMING")
 	var room = {};
 	room.id = dv.getInt32(off+1, true)
+	var existingRoom = this.rooms[room.id]
+	if (existingRoom) {
+		console.log("ROOM UPDATE INCOMING")
+		room = existingRoom
+	}
+
 	room.width = dv.getFloat32(off+5, true)
 	room.height = dv.getFloat32(off+9, true)
 	room.startmass = dv.getFloat32(off+13, true)
@@ -268,12 +273,13 @@ sock.prototype.handleNewRoom = function(dv, off) {
 		room.name = name
 	}
 
-	room.server = this
-	
-	this.rooms[room.id] = room
-	servers.addRoom(room)
+	if (!existingRoom) {
+		room.server = this
+		console.log("NEW ROOM",room)
+		this.rooms[room.id] = room
+		servers.addRoom(room)
+	}
 
-	console.info("NEW ROOM",room)
 
 	return off + len + 37
 }
@@ -838,7 +844,7 @@ function draw_leaderboard(ctx, room) {
 		var s = 0
 		for(var i in p.owns) {
 			var a = p.owns[i];
-			s += a.mass
+			s += a.newmass
 		}
 		if (s!=0) {
 			var n = p.name ? p.name : "Microbe"
