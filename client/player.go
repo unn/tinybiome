@@ -21,6 +21,7 @@ func NewPlayer(r *Room, name string) *Player {
 	player := &Player{Room: r, Owns: make([]Ticker, r.Config.MaxSplit)}
 	player.ID = r.getPlayerId(player)
 	player.Room.AddTicker(player)
+	player.Name = name
 
 	for _, conn := range r.Connections {
 		if conn == nil {
