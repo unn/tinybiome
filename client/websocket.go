@@ -157,12 +157,16 @@ func (s *Server) Handler(res http.ResponseWriter, req *http.Request) {
 	s.Lock.Unlock()
 
 	log.Println("CLIENT ENTERS", ip)
+
+	defer func() {
+		log.Println("CLIENT EXITS", ip)
+		s.Lock.Lock()
+		s.IPS[ip] -= 1
+		s.Lock.Unlock()
+	}()
+
 	s.WSH.ServeHTTP(res, req)
 
-	log.Println("CLIENT EXITS", ip)
-	s.Lock.Lock()
-	s.IPS[ip] -= 1
-	s.Lock.Unlock()
 }
 
 func (s *Server) Accept(ws *websocket.Conn) {

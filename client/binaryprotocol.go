@@ -156,12 +156,16 @@ func (s *BinaryProtocol) GetMessage(c *Connection) error {
 		if s.DownLogging > 1 {
 			log.Println(c, "SENT DIRECTION", pid, d, speed)
 		}
-		c.Player.UpdateDirection(pid, d, speed)
+		if c.Player != nil {
+			c.Player.UpdateDirection(pid, d, speed)
+		}
 	case 2:
 		if s.DownLogging > 0 {
 			log.Println(c, "SENT SPLIT")
 		}
-		c.Player.Split()
+		if c.Player != nil {
+			c.Player.Split()
+		}
 	case 3: // stop spectating
 		if s.DownLogging > 0 {
 			log.Println(c, "SENT STOP")
@@ -176,7 +180,9 @@ func (s *BinaryProtocol) GetMessage(c *Connection) error {
 		if s.DownLogging > 0 {
 			log.Println(c, "SENT SPIT")
 		}
-		c.Player.Spit()
+		if c.Player != nil {
+			c.Player.Spit()
+		}
 	case 6: // spectate
 		if s.DownLogging > 0 {
 			log.Println(c, "SENT SPECTATE")

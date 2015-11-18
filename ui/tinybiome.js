@@ -459,11 +459,14 @@ sock.prototype.handlePong = function(dv, off) {
 sock.prototype.handleStopSpec = function(dv, off) {
 	console.log("STOPPING SPECTATOR",this.room.id)
 	console.log("NEXT ROOM IS",this.nextRoom)
+	console.log("NEXT SERVER IS",this.nextServer)
 	this.room.remove()
+	if (currentRoom==this.room) {
+		currentRoom=null
+	}
 	this.room = null
 	if (this.nextRoom != null) {
-		console.log("REQUESTING NEXT ROOM",this.nextRoom)
-		this.writeSpectate(this.nextRoom)
+		this.nextServer.writeSpectate(this.nextRoom)
 		this.nextRoom = null
 	}
 	return off+1
@@ -505,10 +508,11 @@ sock.prototype.writeStopSpectate = function() {
 sock.prototype.writeSpectate = function(n) {
 	var roomConf = this.rooms[n];
 	console.log("ATTEMPTING TO WRITE SPECTATE",n)
-	if (this.room!=null) {
-		console.log("ALREADY SPECTATING",this.room.id)
-		this.nextRoom = n
-		this.writeStopSpectate()
+	if (currentRoom!=null) {
+		console.log("ALREADY SPECTATING",currentRoom.id)
+		currentRoom.server.nextRoom = n
+		currentRoom.server.nextServer = this
+		currentRoom.server.writeStopSpectate()
 		return
 	}
 	this.room = new room(this, roomConf.width,roomConf.height)
