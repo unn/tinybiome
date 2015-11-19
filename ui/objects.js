@@ -405,7 +405,7 @@ function actor(room, id, x, y) {
 	this.ys = y
 
 	this.mass = room.startmass
-	this.newmass = this.mass
+	this.newmass  = this.mass
 	this.mergeTimer = (new Date())
 	this.mergeTimer.setSeconds(this.mergeTimer.getSeconds()+room.mergetime)
 	this.room.renderable.push(this)

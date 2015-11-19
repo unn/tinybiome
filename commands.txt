@@ -37,6 +37,19 @@ fi";
 done;
 
 
+for i in 139.162.220.253 45.79.166.39 45.79.110.252; do
+ssh "root@$i" "
+	echo 'NEW NODE ON $i'
+	pkill tbnode
+
+	echo 'COPYING'
+	/bin/cp -f /tmp/new tbnode
+
+	echo 'STARTING'
+	nohup ./tbnode </dev/null >tbnode.log 2>&1 &
+";
+done;
+
 
 for i in 139.162.220.253 45.79.166.39 45.79.110.252; do
 rsync "conf.$i.json" "root@$i:conf.json";
