@@ -1,15 +1,22 @@
 # tinybiome
 Cell eat cell world out there!
 
-To run the central server:
 
-> go build master/tbmaster.go  
-> sudo ./tbmaster
+Build the binaries:
+If you don't have gb, [install it](http://getgb.io/docs/install/)
+````
+gb bulid
+````
+
+To run the server:
+````
+./bin/master
+````
 
 To run the nodes:
-
-> go run node/tbnode.go
-
+````
+./bin/node
+````
 Optionally, provide --port N
 
 Then connect via http to the master to start playing.
