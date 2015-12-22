@@ -48,26 +48,34 @@ func checkHost(ip string) bool {
 }
 
 func main() {
-	m := http.NewServeMux()
-	m.Handle("/", websocket.Handler(newConn))
-	go http.ListenAndServe("0.0.0.0:4000", m)
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	{
+	log.Println("Starting websocket handler on port 4000")
+	go func() {
+		defer wg.Done()
+
+		m := http.NewServeMux()
+		m.Handle("/", websocket.Handler(newConn))
+		http.ListenAndServe("0.0.0.0:4000", m)
+	}()
+
+	log.Println("Starting ui on port 8080")
+	go func() {
+		defer wg.Done()
+
 		w := http.NewServeMux()
 		fs := http.FileServer(http.Dir("./ui"))
 		w.Handle("/", fs)
 
 		log.Println("ABOUT TO LISTEN FOR HTTP")
-		go http.ListenAndServe("0.0.0.0:8080", w)
-	}
-	{
-		w := http.NewServeMux()
-		fs := http.FileServer(http.Dir("./ui"))
-		w.Handle("/", fs)
+		http.ListenAndServe("0.0.0.0:8080", w)
+	}()
 
-		log.Println("ABOUT TO LISTEN FOR HTTP")
-		http.ListenAndServe("0.0.0.0:80", w)
-	}
+	log.Println("Waiting To Finish")
+	wg.Wait()
+
+	log.Println("\nTerminating Program")
 }
 
 type server struct {
